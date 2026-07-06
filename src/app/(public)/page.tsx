@@ -29,7 +29,7 @@ export default async function HomePage() {
   };
 
   return (
-    <div className="min-h-screen bg-surface text-on-surface">
+    <div className="min-h-screen bg-surface text-on-surface pb-8">
       <Header2 />
       <div id="main-content">
         <PremiumHome settings={preparedSettings} products={products} patents={patents} />

@@ -1,10 +1,18 @@
 import type { Metadata, Viewport } from "next";
-import { Space_Grotesk, Inter } from "next/font/google";
+import { Bodoni_Moda, Jost } from "next/font/google";
 import "./globals.css";
 import { ThemeProvider } from "@/components/providers/theme-provider";
 
-const spaceGrotesk = Space_Grotesk({ subsets: ["latin"], variable: "--font-headline" });
-const inter = Inter({ subsets: ["latin"], variable: "--font-body" });
+const bodoniModa = Bodoni_Moda({
+  subsets: ["latin"],
+  variable: "--font-headline",
+  weight: ["400", "500", "600", "700"]
+});
+const jost = Jost({
+  subsets: ["latin"],
+  variable: "--font-body",
+  weight: ["300", "400", "500", "600", "700"]
+});
 
 const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "https://cashmirbiotech.com";
 
@@ -32,7 +40,7 @@ export const viewport: Viewport = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <body className={`${spaceGrotesk.variable} ${inter.variable} font-sans`}>
+      <body className={`${bodoniModa.variable} ${jost.variable} font-[family-name:var(--font-body)] antialiased`}>
         {/* The public UI is designed dark-only; system light mode produced unreadable pages. */}
         <ThemeProvider attribute="class" defaultTheme="dark" enableSystem={false}>
           {children}

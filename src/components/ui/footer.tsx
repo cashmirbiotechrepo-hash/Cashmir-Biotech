@@ -1,149 +1,171 @@
 'use client';
+
 import React from 'react';
 import Link from 'next/link';
 import type { ComponentProps, ReactNode } from 'react';
 import { motion, useReducedMotion } from 'framer-motion';
-import { FacebookIcon, FlaskConical, InstagramIcon, LinkedinIcon, YoutubeIcon } from 'lucide-react';
+import { FlaskConical, Mail, MapPin, Microscope } from 'lucide-react';
 
 interface FooterLink {
-	title: string;
-	href: string;
-	icon?: React.ComponentType<{ className?: string }>;
+  title: string;
+  href: string;
 }
 
 interface FooterSection {
-	label: string;
-	links: FooterLink[];
+  label: string;
+  links: FooterLink[];
 }
 
 const footerLinks: FooterSection[] = [
-	{
-		label: 'Formulations',
-		links: [
-			{ title: 'All Products', href: '/products' },
-			{ title: 'Functional Foods', href: '/products' },
-			{ title: 'Clinical Supplements', href: '/products' },
-			{ title: 'Institutional Orders', href: 'mailto:contact@cashmirbiotech.com' },
-		],
-	},
-	{
-		label: 'Science',
-		links: [
-			{ title: 'Our Patents', href: '/patents' },
-			{ title: 'Research Registry', href: '/patents' },
-		],
-	},
-	{
-		label: 'Company',
-		links: [
-			{ title: 'About Cashmir Biotech', href: '/' },
-			{ title: 'Board Members', href: '/team' },
-			{ title: 'Admin Console', href: '/admin/login' }
-		],
-	},
-	{
-		label: 'Connect',
-		links: [
-			{ title: 'Facebook', href: '#', icon: FacebookIcon },
-			{ title: 'Instagram', href: '#', icon: InstagramIcon },
-			{ title: 'Youtube', href: '#', icon: YoutubeIcon },
-			{ title: 'LinkedIn', href: '#', icon: LinkedinIcon },
-		],
-	},
+  {
+    label: 'Formulations',
+    links: [
+      { title: 'Product catalog', href: '/products' },
+      { title: 'Magic Food TaxO', href: '/products' },
+      { title: 'Institutional orders', href: 'mailto:contact@cashmirbiotech.com' }
+    ]
+  },
+  {
+    label: 'Science',
+    links: [
+      { title: 'Patent registry', href: '/patents' },
+      { title: 'Research archive', href: '/patents' }
+    ]
+  },
+  {
+    label: 'Company',
+    links: [
+      { title: 'Home', href: '/' },
+      { title: 'Board members', href: '/team' },
+      { title: 'Admin console', href: '/admin/login' }
+    ]
+  }
 ];
 
-export function Footer() {
-	return (
-		<motion.footer
-			initial={{ opacity: 0, y: 40 }}
-			whileInView={{ opacity: 1, y: 0 }}
-			viewport={{ once: true, margin: '-50px' }}
-			transition={{ duration: 0.8, ease: 'easeOut' }}
-			className="relative mx-auto mt-20 w-full max-w-6xl rounded-t-[2.3rem] border-t border-outline-variant/30 bg-[radial-gradient(35%_150px_at_50%_0%,theme(colors.primary.DEFAULT/12%),transparent)] px-6 py-12 lg:py-16"
-		>
-			<div className="absolute left-1/2 top-0 h-px w-1/3 -translate-x-1/2 -translate-y-1/2 rounded-full bg-primary/25 blur-sm" />
-			<div className="grid w-full gap-8 xl:grid-cols-3 xl:gap-10">
-				<AnimatedContainer className="space-y-4">
-					<div className="mb-4 flex items-center gap-2 text-primary">
-						<FlaskConical className="size-7" />
-						<span className="text-xl font-bold tracking-tight text-heading [font-family:var(--font-headline)]">
-							Cashmir Biotech
-						</span>
-					</div>
-					<p className="mt-8 max-w-xs text-sm leading-relaxed text-on-muted md:mt-0">
-						Precision biotech innovation built on Kashmiri biodiversity, scientific rigor, and patented
-						formulation pathways.
-					</p>
-					<p className="text-xs uppercase tracking-[0.16em] text-on-muted">
-						© {new Date().getFullYear()} Cashmir Biotech Pvt Ltd
-					</p>
-				</AnimatedContainer>
+const STANDARDS = ['SKUAST-K aligned', 'GMP discipline', 'LC-MS verification', 'Kashmir origin'];
 
-				<div className="mt-10 grid grid-cols-2 gap-8 md:grid-cols-4 xl:col-span-2 xl:mt-0">
-					{footerLinks.map((section, index) => (
-						<AnimatedContainer key={section.label} delay={0.1 + index * 0.1}>
-							<div className="mb-10 md:mb-0">
-								<h3 className="text-xs font-semibold uppercase tracking-[0.2em] text-primary">{section.label}</h3>
-								<ul className="mt-6 space-y-3 text-sm text-on-muted">
-									{section.links.map((link, i) => (
-										<li key={i}>
-											{link.href.startsWith('/') ? (
-												<Link
-													href={link.href}
-													className="inline-flex items-center transition-all duration-300 hover:text-primary"
-												>
-													{link.icon && <link.icon className="me-2 size-4 opacity-70" />}
-													{link.title}
-												</Link>
-											) : (
-												<a
-													href={link.href}
-													className="inline-flex items-center transition-all duration-300 hover:text-primary"
-												>
-													{link.icon && <link.icon className="me-2 size-4 opacity-70" />}
-													{link.title}
-												</a>
-											)}
-										</li>
-									))}
-								</ul>
-							</div>
-						</AnimatedContainer>
-					))}
-				</div>
-			</div>
-		</motion.footer>
-	);
+const linkClass =
+  'inline-flex min-h-9 cursor-pointer items-center text-sm text-on-muted transition duration-200 hover:text-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary';
+
+export function Footer() {
+  return (
+    <motion.footer
+      initial={{ opacity: 0, y: 32 }}
+      whileInView={{ opacity: 1, y: 0 }}
+      viewport={{ once: true, margin: '-40px' }}
+      transition={{ duration: 0.7, ease: [0.16, 1, 0.3, 1] }}
+      className="relative mx-auto mt-24 w-[calc(100%-1.25rem)] max-w-[1320px] md:w-[calc(100%-2rem)]"
+    >
+      <div className="home-grain relative overflow-hidden rounded-[2rem] border border-outline-variant/20 bg-gradient-to-b from-surface-container-low via-surface-container to-surface-container-high px-6 py-12 md:px-10 md:py-14">
+        <div
+          className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-primary/35 to-transparent"
+          aria-hidden
+        />
+
+        <div className="grid gap-12 xl:grid-cols-[1.05fr_1fr] xl:gap-16">
+          <AnimatedContainer className="space-y-6">
+            <Link href="/" className={linkClass}>
+              <span className="flex items-center gap-3 text-heading hover:text-primary">
+                <span className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-primary/25 bg-primary/10">
+                  <FlaskConical className="h-5 w-5 text-primary" aria-hidden />
+                </span>
+                <span className="text-xl font-medium tracking-[-0.02em] [font-family:var(--font-headline)]">
+                  Cashmir Biotech
+                </span>
+              </span>
+            </Link>
+
+            <p className="text-pretty max-w-md text-sm leading-[1.8] text-on-surface/70">
+              Himalayan phyto intelligence translated into research-grade formulations — patented pathways, transparent
+              labeling, and manufacturing discipline built for institutions and informed consumers.
+            </p>
+
+            <div className="flex flex-wrap gap-2">
+              {STANDARDS.map((tag) => (
+                <span
+                  key={tag}
+                  className="rounded-full border border-outline-variant/25 bg-surface/50 px-3 py-1 text-[10px] font-medium uppercase tracking-[0.16em] text-on-muted"
+                >
+                  {tag}
+                </span>
+              ))}
+            </div>
+
+            <div className="space-y-3 border-t border-outline-variant/20 pt-6 text-sm text-on-muted">
+              <p className="flex items-start gap-2">
+                <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-primary/70" aria-hidden />
+                <span>Kashmir, India — alpine biodiversity corridors</span>
+              </p>
+              <a href="mailto:contact@cashmirbiotech.com" className={linkClass}>
+                <Mail className="me-2 h-4 w-4 text-primary/70" aria-hidden />
+                contact@cashmirbiotech.com
+              </a>
+            </div>
+          </AnimatedContainer>
+
+          <div className="grid grid-cols-2 gap-8 sm:grid-cols-3">
+            {footerLinks.map((section, index) => (
+              <AnimatedContainer key={section.label} delay={0.08 + index * 0.06}>
+                <h3 className="text-[10px] font-semibold uppercase tracking-[0.22em] text-primary">{section.label}</h3>
+                <ul className="mt-5 space-y-2">
+                  {section.links.map((link) => (
+                    <li key={`${section.label}-${link.title}`}>
+                      {link.href.startsWith('/') ? (
+                        <Link href={link.href} className={linkClass}>
+                          {link.title}
+                        </Link>
+                      ) : (
+                        <a href={link.href} className={linkClass}>
+                          {link.title}
+                        </a>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              </AnimatedContainer>
+            ))}
+          </div>
+        </div>
+
+        <div className="mt-12 flex flex-col gap-4 border-t border-outline-variant/20 pt-8 md:flex-row md:items-center md:justify-between">
+          <p className="text-xs text-on-muted">
+            © {new Date().getFullYear()} Cashmir Biotech Pvt Ltd. All rights reserved.
+          </p>
+          <p className="flex items-center gap-2 text-[10px] font-medium uppercase tracking-[0.18em] text-on-muted">
+            <Microscope className="h-3.5 w-3.5 text-primary/60" aria-hidden />
+            Research-grade formulation standards
+          </p>
+        </div>
+      </div>
+    </motion.footer>
+  );
 }
 
 type ViewAnimationProps = {
-	delay?: number;
-	className?: ComponentProps<typeof motion.div>['className'];
-	children: ReactNode;
+  delay?: number;
+  className?: ComponentProps<typeof motion.div>['className'];
+  children: ReactNode;
 };
 
 function AnimatedContainer({ className, delay = 0.1, children }: ViewAnimationProps) {
-	const reducedPref = useReducedMotion();
-	const [motionReady, setMotionReady] = React.useState(false);
-	React.useEffect(() => {
-		setMotionReady(true);
-	}, []);
-	/** Avoid div vs motion.div mismatch: defer reduced-motion until after first paint. */
-	const shouldReduceMotion = motionReady && Boolean(reducedPref);
+  const reducedPref = useReducedMotion();
+  const [motionReady, setMotionReady] = React.useState(false);
+  React.useEffect(() => setMotionReady(true), []);
+  const shouldReduceMotion = motionReady && Boolean(reducedPref);
 
-	if (shouldReduceMotion) {
-		return <div className={className}>{children}</div>;
-	}
+  if (shouldReduceMotion) {
+    return <div className={className}>{children}</div>;
+  }
 
-	return (
-		<motion.div
-			initial={{ filter: 'blur(4px)', translateY: -8, opacity: 0 }}
-			whileInView={{ filter: 'blur(0px)', translateY: 0, opacity: 1 }}
-			viewport={{ once: true }}
-			transition={{ delay, duration: 0.8 }}
-			className={className}
-		>
-			{children}
-		</motion.div>
-	);
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 12 }}
+      whileInView={{ opacity: 1, y: 0 }}
+      viewport={{ once: true }}
+      transition={{ delay, duration: 0.65, ease: [0.16, 1, 0.3, 1] }}
+      className={className}
+    >
+      {children}
+    </motion.div>
+  );
 }
