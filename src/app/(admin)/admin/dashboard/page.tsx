@@ -44,7 +44,12 @@ export default async function DashboardPage({ searchParams }: DashboardProps) {
     await requireAdminSession();
     const parsed = homepageSettingsSchema.safeParse({
       heroTitle: formData.get("heroTitle"),
+      heroSubtitle: formData.get("heroSubtitle"),
       heroDescription: formData.get("heroDescription"),
+      ctaPrimaryText: formData.get("ctaPrimaryText"),
+      ctaPrimaryHref: formData.get("ctaPrimaryHref"),
+      ctaSecondaryText: formData.get("ctaSecondaryText"),
+      ctaSecondaryHref: formData.get("ctaSecondaryHref"),
       missionStatement: formData.get("missionStatement")
     });
     if (!parsed.success) {
@@ -303,6 +308,14 @@ export default async function DashboardPage({ searchParams }: DashboardProps) {
                       placeholder="Enter hero title..."
                     />
                   </FormField>
+                  <FormField label="Hero Subtitle (eyebrow text)">
+                    <input
+                      name="heroSubtitle"
+                      defaultValue={settings?.heroSubtitle ?? ""}
+                      className="admin-input"
+                      placeholder="Enter hero subtitle..."
+                    />
+                  </FormField>
                   <FormField label="Hero Description">
                     <textarea
                       name="heroDescription"
@@ -319,6 +332,20 @@ export default async function DashboardPage({ searchParams }: DashboardProps) {
                       placeholder="Enter mission statement..."
                     />
                   </FormField>
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <FormField label="Primary CTA Text">
+                      <input name="ctaPrimaryText" defaultValue={settings?.ctaPrimaryText ?? "Explore Catalog"} className="admin-input" />
+                    </FormField>
+                    <FormField label="Primary CTA Link">
+                      <input name="ctaPrimaryHref" defaultValue={settings?.ctaPrimaryHref ?? "/products"} className="admin-input" />
+                    </FormField>
+                    <FormField label="Secondary CTA Text">
+                      <input name="ctaSecondaryText" defaultValue={settings?.ctaSecondaryText ?? "View Patents"} className="admin-input" />
+                    </FormField>
+                    <FormField label="Secondary CTA Link">
+                      <input name="ctaSecondaryHref" defaultValue={settings?.ctaSecondaryHref ?? "/patents"} className="admin-input" />
+                    </FormField>
+                  </div>
                   <div className="flex justify-end pt-2">
                     <button className="admin-btn-primary">
                       Save Changes

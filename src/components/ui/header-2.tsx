@@ -20,14 +20,13 @@ const NAV_ITEMS: NavItem[] = [
   {
     label: 'Company',
     children: [
-      { label: 'About Us', href: '/about', description: 'Our mission and values' },
       { label: 'Board Members', href: '/team', description: 'Leadership and advisors' },
-      { label: 'Certifications', href: '/certifications', description: 'Quality and compliance' },
+      { label: 'Patents & Research', href: '/patents', description: 'Our scientific registry' },
     ],
   },
   { label: 'Our Products', href: '/products' },
-  { label: 'News & Media', href: '/news' },
-  { label: 'Contact Us', href: '#contact' },
+  { label: 'Patents', href: '/patents' },
+  { label: 'Contact Us', href: 'mailto:contact@cashmirbiotech.com' },
 ];
 
 export function Header2() {

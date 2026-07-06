@@ -36,27 +36,21 @@ export async function getDashboardContent(): Promise<DashboardContent> {
 
 export async function upsertHomepageContent(input: {
   heroTitle: string;
+  heroSubtitle: string;
   heroDescription: string;
+  ctaPrimaryText: string;
+  ctaPrimaryHref: string;
+  ctaSecondaryText: string;
+  ctaSecondaryHref: string;
   missionStatement: string;
 }) {
   return db.siteSettings.upsert({
     where: { id: 1 },
-    update: {
-      heroTitle: input.heroTitle,
-      heroDescription: input.heroDescription,
-      missionStatement: input.missionStatement
-    },
+    update: { ...input },
     create: {
       id: 1,
       companyName: "Cashmir Biotech",
-      heroTitle: input.heroTitle,
-      heroSubtitle: "",
-      heroDescription: input.heroDescription,
-      ctaPrimaryText: "Explore Catalog",
-      ctaPrimaryHref: "/products",
-      ctaSecondaryText: "View Patents",
-      ctaSecondaryHref: "/patents",
-      missionStatement: input.missionStatement
+      ...input
     }
   });
 }

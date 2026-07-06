@@ -54,6 +54,15 @@ export function PremiumHome({
     setMotionReady(true);
   }, []);
   const reduceMotion = motionReady ? Boolean(reducedMotionPref) : false;
+
+  const [newsletterEmail, setNewsletterEmail] = React.useState("");
+  const [newsletterSubmitted, setNewsletterSubmitted] = React.useState(false);
+  const handleNewsletterSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    if (!newsletterEmail.trim()) return;
+    setNewsletterSubmitted(true);
+  };
+
   const storyRef = React.useRef<HTMLDivElement>(null);
   const { scrollYProgress: storyProgress } = useScroll({
     target: storyRef,
@@ -178,7 +187,7 @@ export function PremiumHome({
                 {/* Product Image (Rotates on scroll) */}
                 <motion.div style={{ rotate: storyProductRotate }} className="absolute inset-0 z-10">
                   <Image
-                    src="/product%201.png"
+                    src="/product-1.png"
                     alt="Cashmir Biotech Magic Food TaxO"
                     fill
                     priority
@@ -395,15 +404,26 @@ export function PremiumHome({
             <p className="mt-6 max-w-xl text-lg text-white/70">
               Get exclusive access to white papers, formulation updates, and early-stage clinical insights from Cashmir Biotech.
             </p>
-            <div className="mt-10 flex max-w-xl flex-col gap-4 sm:flex-row">
-              <input
-                placeholder="Institutional Email"
-                className="h-14 flex-1 rounded-xl border border-white/10 bg-white/5 px-5 text-sm text-white placeholder:text-white/40 outline-none transition-colors focus:border-primary focus:bg-white/10"
-              />
-              <button className="h-14 shrink-0 rounded-xl bg-gradient-to-r from-primary to-[rgb(250_204_21)] px-8 text-sm font-bold uppercase tracking-[0.12em] text-black shadow-[0_0_20px_rgba(250,204,21,0.3)] transition-all hover:brightness-110">
-                Apply Now
-              </button>
-            </div>
+            {newsletterSubmitted ? (
+              <p className="mt-10 max-w-xl rounded-xl border border-primary/25 bg-primary/10 px-6 py-4 text-sm font-semibold text-primary">
+                Thank you — your application has been received. We will contact you at {newsletterEmail}.
+              </p>
+            ) : (
+              <form onSubmit={handleNewsletterSubmit} className="mt-10 flex max-w-xl flex-col gap-4 sm:flex-row">
+                <input
+                  type="email"
+                  required
+                  value={newsletterEmail}
+                  onChange={(e) => setNewsletterEmail(e.target.value)}
+                  placeholder="Institutional Email"
+                  aria-label="Institutional Email"
+                  className="h-14 flex-1 rounded-xl border border-white/10 bg-white/5 px-5 text-sm text-white placeholder:text-white/40 outline-none transition-colors focus:border-primary focus:bg-white/10"
+                />
+                <button type="submit" className="h-14 shrink-0 rounded-xl bg-gradient-to-r from-primary to-[rgb(250_204_21)] px-8 text-sm font-bold uppercase tracking-[0.12em] text-black shadow-[0_0_20px_rgba(250,204,21,0.3)] transition-all hover:brightness-110">
+                  Apply Now
+                </button>
+              </form>
+            )}
             <p className="mt-6 flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.2em] text-white/40">
               <ShieldCheck className="h-4 w-4 text-primary/50" />
               Strict verification protocols required

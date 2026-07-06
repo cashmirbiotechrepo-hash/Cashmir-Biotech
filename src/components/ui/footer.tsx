@@ -22,7 +22,7 @@ const footerLinks: FooterSection[] = [
 			{ title: 'All Products', href: '/products' },
 			{ title: 'Functional Foods', href: '/products' },
 			{ title: 'Clinical Supplements', href: '/products' },
-			{ title: 'Institutional Orders', href: '/contact' },
+			{ title: 'Institutional Orders', href: 'mailto:contact@cashmirbiotech.com' },
 		],
 	},
 	{
@@ -30,17 +30,14 @@ const footerLinks: FooterSection[] = [
 		links: [
 			{ title: 'Our Patents', href: '/patents' },
 			{ title: 'Research Registry', href: '/patents' },
-			{ title: 'Quality Standards', href: '/quality' },
-			{ title: 'Certifications', href: '/science' },
 		],
 	},
 	{
 		label: 'Company',
 		links: [
-			{ title: 'About Cashmir Biotech', href: '/about' },
+			{ title: 'About Cashmir Biotech', href: '/' },
 			{ title: 'Board Members', href: '/team' },
-			{ title: 'Privacy Policy', href: '/privacy' },
-			{ title: 'Terms of Service', href: '/terms' }
+			{ title: 'Admin Console', href: '/admin/login' }
 		],
 	},
 	{

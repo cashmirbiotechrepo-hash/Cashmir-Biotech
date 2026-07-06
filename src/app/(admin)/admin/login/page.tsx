@@ -1,21 +1,27 @@
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
-import { authCookieName, credentialsAreValid, signAdminSession } from "@/lib/auth";
+import { authCookieName, credentialsAreValid, getCurrentAdmin, signAdminSession } from "@/lib/auth";
 import { logger } from "@/lib/logger";
 
 function safeReturnPath(next: string | undefined) {
-  if (!next || !next.startsWith("/") || next.startsWith("//")) return "/admin/dashboard";
+  if (!next || !next.startsWith("/") || next.startsWith("//") || next.includes("\\")) {
+    return "/admin/dashboard";
+  }
   return next;
 }
 
 type LoginPageProps = {
-  searchParams?: Promise<{ next?: string; rateLimited?: string }>;
+  searchParams?: Promise<{ next?: string; rateLimited?: string; error?: string }>;
 };
 
 export default async function AdminLoginPage({ searchParams }: LoginPageProps) {
   const sp = searchParams ? await searchParams : {};
   const returnTo = safeReturnPath(sp.next);
   const rateLimited = sp.rateLimited === "1" || sp.rateLimited === "true";
+  const invalidCredentials = sp.error === "credentials";
+
+  // Already signed in? Skip the login form entirely.
+  if (await getCurrentAdmin()) redirect(returnTo);
 
   async function login(formData: FormData) {
     "use server";
@@ -24,14 +30,16 @@ export default async function AdminLoginPage({ searchParams }: LoginPageProps) {
     const nextRaw = String(formData.get("next") ?? "/admin/dashboard");
     if (!credentialsAreValid(email, password)) {
       logger.warn({ event: "admin_login_rejected" }, "invalid admin credentials");
-      return;
+      const back = new URLSearchParams({ error: "credentials", next: safeReturnPath(nextRaw) });
+      redirect(`/admin/login?${back.toString()}`);
     }
     const token = await signAdminSession(email);
     (await cookies()).set(authCookieName, token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
       sameSite: "lax",
-      path: "/"
+      path: "/",
+      maxAge: 60 * 60 * 48 // matches the 2-day JWT expiry
     });
     redirect(safeReturnPath(nextRaw));
   }
@@ -59,6 +67,11 @@ export default async function AdminLoginPage({ searchParams }: LoginPageProps) {
         {rateLimited ? (
           <div className="mb-6 rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-center text-sm text-amber-800 dark:text-amber-200">
             Too many sign-in attempts from this network. Please wait a minute, then try again.
+          </div>
+        ) : null}
+        {invalidCredentials ? (
+          <div className="mb-6 rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-center text-sm text-red-800 dark:text-red-300">
+            Invalid email or password. Please try again.
           </div>
         ) : null}
         <div className="mb-8 text-center">

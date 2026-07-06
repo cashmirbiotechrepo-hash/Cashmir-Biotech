@@ -1,10 +1,25 @@
 import { z } from "zod";
 
-const nonEmpty = z.string().trim();
+const nonEmpty = z.string().trim().min(1);
+
+/** Allows only site-relative paths or http(s) URLs — blocks javascript:, data: and other dangerous schemes. */
+const safeUrl = z
+  .string()
+  .trim()
+  .min(1)
+  .max(2000)
+  .refine((v) => v.startsWith("/") || v.startsWith("http://") || v.startsWith("https://"), {
+    message: "Must be a site-relative path or an http(s) URL"
+  });
 
 export const homepageSettingsSchema = z.object({
   heroTitle: nonEmpty.max(500),
+  heroSubtitle: z.string().trim().max(500),
   heroDescription: nonEmpty.max(20000),
+  ctaPrimaryText: nonEmpty.max(200),
+  ctaPrimaryHref: safeUrl,
+  ctaSecondaryText: nonEmpty.max(200),
+  ctaSecondaryHref: safeUrl,
   missionStatement: nonEmpty.max(20000)
 });
 
@@ -15,7 +30,7 @@ export const productUpdateSchema = z.object({
   description: z.string().max(50000),
   mrpInr: z.coerce.number().int().min(0).max(100_000_000),
   sizeLabel: nonEmpty.max(200),
-  imageUrl: z.string().min(1).max(2000)
+  imageUrl: safeUrl
 });
 
 export const patentUpdateSchema = z.object({
@@ -30,5 +45,5 @@ export const teamMemberUpdateSchema = z.object({
   fullName: nonEmpty.max(200),
   role: nonEmpty.max(200),
   bio: z.string().max(50000),
-  avatarUrl: z.string().min(1).max(2000)
+  avatarUrl: safeUrl
 });
