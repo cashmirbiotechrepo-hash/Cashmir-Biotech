@@ -3,7 +3,7 @@
 import React from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { motion, useReducedMotion, useScroll, useTransform, useMotionValueEvent } from "framer-motion";
+import { motion, useReducedMotion, useScroll, useTransform } from "framer-motion";
 import { ArrowRight, Atom, ShieldCheck, FlaskConical, ChevronRight, Microscope, Leaf, TestTube, Award, Package } from "lucide-react";
 import { SpotlightCard } from "@/components/ui/spotlight-card";
 import { InfiniteSlider } from "@/components/ui/infinite-slider";
@@ -83,19 +83,43 @@ export function PremiumHome({
   // Hero text fades out (0% to 20% scroll)
   const storyHeroOpacity = useTransform(storyProgress, [0, 0.1, 0.2], [1, 1, 0]);
   const storyHeroY = useTransform(storyProgress, [0, 0.2], [0, reduceMotion ? 0 : -60]);
+  // Disable clicks on the hero text once it has faded out
+  const storyHeroPointerEvents = useTransform(storyHeroOpacity, (v) => (v < 0.3 ? "none" : "auto"));
+
+  // Product slide distance computed from the viewport so it settles on the
+  // left edge of the container on every screen size (was hard-coded -550px)
+  const [productShift, setProductShift] = React.useState(-550);
+  React.useEffect(() => {
+    const compute = () => {
+      const vw = window.innerWidth;
+      if (vw < 768) {
+        // mobile: product is 320px wide, keep a small left gutter
+        setProductShift(-Math.max(vw - 320 - 32, 0));
+      } else {
+        // desktop: container capped at max-w-7xl (1280px) with px-6 gutters, product is 450px
+        const container = Math.min(vw, 1280) - 48;
+        setProductShift(-(container - 450 - 24));
+      }
+    };
+    compute();
+    window.addEventListener("resize", compute);
+    return () => window.removeEventListener("resize", compute);
+  }, []);
 
   // Product: starts right side, moves to left (0% to 60% scroll)
-  // Moving from x=0 to x = -700px (approx to reach left side on desktop, less on mobile)
-  const storyProductX = useTransform(storyProgress, [0, 0.1, 0.6], [0, reduceMotion ? 0 : -20, reduceMotion ? 0 : -550]);
+  const storyProductX = useTransform(storyProgress, [0, 0.1, 0.6], [0, reduceMotion ? 0 : -20, reduceMotion ? 0 : productShift]);
   const storyProductRotate = useTransform(storyProgress, [0, 0.4], [-6, reduceMotion ? -6 : 0]);
   const storyProductScale = useTransform(storyProgress, [0, 0.5], [1, reduceMotion ? 1 : 1.05]);
 
   // Golden glow fades in behind product (30% to 60%)
   const storyGlowOpacity = useTransform(storyProgress, [0.3, 0.6], [0, reduceMotion ? 0 : 0.8]);
 
-  // Details panel reveals (50% to 80%)
-  const storyDetailsOpacity = useTransform(storyProgress, [0.5, 0.8], [0, reduceMotion ? 0 : 1]);
+  // Details panel reveals (50% to 80%) - opacity always reaches 1 so the
+  // panel is not permanently hidden for reduced-motion users
+  const storyDetailsOpacity = useTransform(storyProgress, [0.5, 0.8], [0, 1]);
   const storyDetailsY = useTransform(storyProgress, [0.5, 0.8], [reduceMotion ? 0 : 40, 0]);
+  // Keep the hidden panel from blocking clicks on elements underneath
+  const storyDetailsPointerEvents = useTransform(storyDetailsOpacity, (v) => (v > 0.5 ? "auto" : "none"));
 
   // Floating badge cards fade out early (0% to 15%)
   const storyBadgeOpacity = useTransform(storyProgress, [0, 0.05, 0.15], [1, 1, 0]);
@@ -113,7 +137,7 @@ export function PremiumHome({
   };
 
   return (
-    <main className="relative overflow-x-hidden">
+    <main className="relative overflow-x-clip">
       {/* ── Scroll-Driven Product Storytelling ── */}
       <section ref={storyRef} className="relative" style={{ height: "250vh" }}>
         <div className="sticky top-0 h-screen">
@@ -131,7 +155,7 @@ export function PremiumHome({
                 animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
                 transition={{ duration: reduceMotion ? 0.01 : 1, ease: [0.2, 0.8, 0.2, 1] }}
               >
-                <motion.div style={{ opacity: storyHeroOpacity, y: storyHeroY }} className="max-w-xl relative z-10">
+                <motion.div style={{ opacity: storyHeroOpacity, y: storyHeroY, pointerEvents: storyHeroPointerEvents }} className="max-w-xl relative z-10">
                   <div className="mb-6 flex items-center">
                     <span className="bg-gradient-to-r from-primary/90 via-amber-400/90 to-primary/90 bg-clip-text text-[10px] font-extrabold uppercase tracking-[0.25em] text-transparent drop-shadow-sm">
                       {settings.heroSubtitle || "Proven biotech innovation from Kashmir biodiversity"}
@@ -179,11 +203,11 @@ export function PremiumHome({
 
               {/* ─── Product Image + Badges (scroll-animated: right → left) ─── */}
               <motion.div
-                initial={{ opacity: 0, scale: 0.95, filter: "blur(8px)" }}
-                animate={{ opacity: 1, scale: 1, filter: "blur(0px)" }}
+                initial={{ opacity: 0, filter: "blur(8px)" }}
+                animate={{ opacity: 1, filter: "blur(0px)" }}
                 transition={{ duration: reduceMotion ? 0.01 : 1.15, delay: reduceMotion ? 0 : 0.15 }}
-                style={{ x: storyProductX, scale: storyProductScale }}
-                className="absolute right-0 lg:right-6 top-1/2 -translate-y-1/2 w-[320px] h-[420px] md:w-[450px] md:h-[550px] z-20"
+                style={{ x: storyProductX, y: "-50%", scale: storyProductScale }}
+                className="absolute right-0 lg:right-6 top-1/2 w-[320px] h-[420px] md:w-[450px] md:h-[550px] z-20"
               >
                 {/* Golden glow - fades in as product settles */}
                 <motion.div
@@ -231,11 +255,11 @@ export function PremiumHome({
 
               {/* ─── Product Details Panel (reveals on right after product moves left) ─── */}
               <motion.div
-                style={{ opacity: storyDetailsOpacity, y: storyDetailsY }}
-                className="absolute right-[5%] top-[12%] max-w-lg z-10"
+                style={{ opacity: storyDetailsOpacity, y: storyDetailsY, pointerEvents: storyDetailsPointerEvents }}
+                className="absolute left-4 right-4 top-[8%] z-10 max-w-lg md:left-auto md:right-[5%] md:top-[12%]"
               >
                 <p className="text-[10px] font-bold uppercase tracking-[0.25em] text-primary">Flagship Formulation</p>
-                <h2 className="mt-4 text-5xl font-bold leading-[1.05] tracking-tight text-white [font-family:var(--font-headline)] md:text-6xl">
+                <h2 className="mt-4 text-4xl font-bold leading-[1.05] tracking-tight text-white [font-family:var(--font-headline)] md:text-6xl">
                   Magic Food<br /><span className="bg-gradient-to-r from-primary to-[rgb(250_204_21)] bg-clip-text text-transparent">TaxO</span>
                 </h2>
                 <p className="mt-5 text-lg leading-relaxed text-white/60">
@@ -425,6 +449,7 @@ export function PremiumHome({
                 <input
                   type="email"
                   required
+                  autoComplete="email"
                   value={newsletterEmail}
                   onChange={(e) => setNewsletterEmail(e.target.value)}
                   placeholder="Institutional Email"

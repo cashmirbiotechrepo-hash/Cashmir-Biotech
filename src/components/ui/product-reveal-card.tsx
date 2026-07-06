@@ -147,10 +147,11 @@ export function ProductRevealCard({
       data-slot="product-reveal-card"
       initial="rest"
       whileHover="hover"
+      whileTap="hover"
       variants={containerVariants}
       className={cn(
         "relative w-full rounded-3xl border border-white/10 bg-black/40 backdrop-blur-xl text-white overflow-hidden",
-        "shadow-[0_8px_40px_rgb(0,0,0,0.5)] cursor-pointer group",
+        "shadow-[0_8px_40px_rgb(0,0,0,0.5)] group",
         className
       )}
     >

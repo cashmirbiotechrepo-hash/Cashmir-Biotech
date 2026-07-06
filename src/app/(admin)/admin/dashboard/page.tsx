@@ -17,6 +17,11 @@ import {
 } from "@/modules/cms/validations/admin";
 import { logger } from "@/lib/logger";
 
+export const metadata = {
+  title: "Admin Dashboard · Cashmir Biotech",
+  robots: { index: false, follow: false }
+};
+
 type DashboardProps = {
   searchParams?: Promise<Record<string, string | string[] | undefined>>;
 };

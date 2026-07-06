@@ -3,6 +3,11 @@ import { redirect } from "next/navigation";
 import { authCookieName, credentialsAreValid, getCurrentAdmin, signAdminSession } from "@/lib/auth";
 import { logger } from "@/lib/logger";
 
+export const metadata = {
+  title: "Admin Login · Cashmir Biotech",
+  robots: { index: false, follow: false }
+};
+
 function safeReturnPath(next: string | undefined) {
   if (!next || !next.startsWith("/") || next.startsWith("//") || next.includes("\\")) {
     return "/admin/dashboard";
@@ -101,6 +106,7 @@ export default async function AdminLoginPage({ searchParams }: LoginPageProps) {
                 name="email"
                 type="email"
                 required
+                autoComplete="email"
                 placeholder="admin@cashmirbiotech.com"
                 className="admin-input"
               />
@@ -114,6 +120,7 @@ export default async function AdminLoginPage({ searchParams }: LoginPageProps) {
                 name="password"
                 type="password"
                 required
+                autoComplete="current-password"
                 placeholder="••••••••"
                 className="admin-input"
               />
