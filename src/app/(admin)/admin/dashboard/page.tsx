@@ -387,7 +387,7 @@ export default async function DashboardPage({ searchParams }: DashboardProps) {
                           <input name="sizeLabel" defaultValue={p.sizeLabel} className="admin-input" />
                         </FormField>
                         <FormField label="Price (INR)">
-                          <input name="mrpInr" type="number" defaultValue={p.mrpInr} className="admin-input" />
+                          <input name="mrpInr" type="number" min={0} step={1} required defaultValue={p.mrpInr} className="admin-input" />
                         </FormField>
                         <FormField label="Image URL" className="md:col-span-2">
                           <input name="imageUrl" defaultValue={p.imageUrl} className="admin-input" />

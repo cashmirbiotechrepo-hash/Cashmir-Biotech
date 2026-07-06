@@ -7,6 +7,7 @@ const LOGIN_ATTEMPTS_PER_WINDOW = 15;
 const WINDOW_DURATION = "1 m";
 
 let ratelimitSingleton: Ratelimit | null | undefined;
+let newsletterRatelimitSingleton: Ratelimit | null | undefined;
 
 /**
  * Edge-safe admin login rate limiter (Upstash Redis). Returns null if Redis env is not configured —
@@ -32,6 +33,32 @@ export function getAdminLoginRatelimit(): Ratelimit | null {
     analytics: true
   });
   return ratelimitSingleton;
+}
+
+/**
+ * Edge-safe rate limiter for POST /api/newsletter — stops scripted spam into the Subscriber table.
+ * Returns null if Redis env is not configured.
+ */
+export function getNewsletterRatelimit(): Ratelimit | null {
+  if (newsletterRatelimitSingleton !== undefined) {
+    return newsletterRatelimitSingleton;
+  }
+
+  const url = process.env.UPSTASH_REDIS_REST_URL;
+  const token = process.env.UPSTASH_REDIS_REST_TOKEN;
+  if (!url || !token) {
+    newsletterRatelimitSingleton = null;
+    return null;
+  }
+
+  const redis = new Redis({ url, token });
+  newsletterRatelimitSingleton = new Ratelimit({
+    redis,
+    limiter: Ratelimit.slidingWindow(5, "1 m"),
+    prefix: "cashmir:newsletter",
+    analytics: true
+  });
+  return newsletterRatelimitSingleton;
 }
 
 export function clientIpFromRequest(request: Request): string {

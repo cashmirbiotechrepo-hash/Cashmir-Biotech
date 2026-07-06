@@ -2,7 +2,7 @@ import { SignJWT, jwtVerify } from "jose";
 import { compareSync } from "bcryptjs";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
-import { ADMIN_SESSION_COOKIE } from "@/config/auth.constants";
+import { ADMIN_SESSION_COOKIE, JWT_AUDIENCE, JWT_ISSUER } from "@/config/auth.constants";
 import { env } from "@/config/env.server";
 
 function secret() {
@@ -13,12 +13,17 @@ export async function signAdminSession(email: string) {
   return new SignJWT({ email, role: "admin" })
     .setProtectedHeader({ alg: "HS256" })
     .setIssuedAt()
+    .setIssuer(JWT_ISSUER)
+    .setAudience(JWT_AUDIENCE)
     .setExpirationTime("2d")
     .sign(secret());
 }
 
 export async function verifyAdminSession(token: string) {
-  const { payload } = await jwtVerify(token, secret());
+  const { payload } = await jwtVerify(token, secret(), {
+    issuer: JWT_ISSUER,
+    audience: JWT_AUDIENCE
+  });
   return payload;
 }
 
