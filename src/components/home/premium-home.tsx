@@ -56,11 +56,22 @@ export function PremiumHome({
   const reduceMotion = motionReady ? Boolean(reducedMotionPref) : false;
 
   const [newsletterEmail, setNewsletterEmail] = React.useState("");
-  const [newsletterSubmitted, setNewsletterSubmitted] = React.useState(false);
-  const handleNewsletterSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+  const [newsletterStatus, setNewsletterStatus] = React.useState<"idle" | "loading" | "success" | "error">("idle");
+  const handleNewsletterSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    if (!newsletterEmail.trim()) return;
-    setNewsletterSubmitted(true);
+    const email = newsletterEmail.trim();
+    if (!email || newsletterStatus === "loading") return;
+    setNewsletterStatus("loading");
+    try {
+      const res = await fetch("/api/newsletter", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email })
+      });
+      setNewsletterStatus(res.ok ? "success" : "error");
+    } catch {
+      setNewsletterStatus("error");
+    }
   };
 
   const storyRef = React.useRef<HTMLDivElement>(null);
@@ -319,6 +330,7 @@ export function PremiumHome({
                 price={`₹${p.mrpInr}`}
                 image={p.imageUrl}
                 description={p.description}
+                detailsHref="/products"
                 rating={4.9}
                 reviewCount={100 + idx * 42}
                 className="w-full"
@@ -404,7 +416,7 @@ export function PremiumHome({
             <p className="mt-6 max-w-xl text-lg text-white/70">
               Get exclusive access to white papers, formulation updates, and early-stage clinical insights from Cashmir Biotech.
             </p>
-            {newsletterSubmitted ? (
+            {newsletterStatus === "success" ? (
               <p className="mt-10 max-w-xl rounded-xl border border-primary/25 bg-primary/10 px-6 py-4 text-sm font-semibold text-primary">
                 Thank you — your application has been received. We will contact you at {newsletterEmail}.
               </p>
@@ -419,11 +431,20 @@ export function PremiumHome({
                   aria-label="Institutional Email"
                   className="h-14 flex-1 rounded-xl border border-white/10 bg-white/5 px-5 text-sm text-white placeholder:text-white/40 outline-none transition-colors focus:border-primary focus:bg-white/10"
                 />
-                <button type="submit" className="h-14 shrink-0 rounded-xl bg-gradient-to-r from-primary to-[rgb(250_204_21)] px-8 text-sm font-bold uppercase tracking-[0.12em] text-black shadow-[0_0_20px_rgba(250,204,21,0.3)] transition-all hover:brightness-110">
-                  Apply Now
+                <button
+                  type="submit"
+                  disabled={newsletterStatus === "loading"}
+                  className="h-14 shrink-0 rounded-xl bg-gradient-to-r from-primary to-[rgb(250_204_21)] px-8 text-sm font-bold uppercase tracking-[0.12em] text-black shadow-[0_0_20px_rgba(250,204,21,0.3)] transition-all hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {newsletterStatus === "loading" ? "Submitting..." : "Apply Now"}
                 </button>
               </form>
             )}
+            {newsletterStatus === "error" ? (
+              <p className="mt-4 max-w-xl text-sm font-medium text-red-400">
+                Something went wrong while submitting. Please try again.
+              </p>
+            ) : null}
             <p className="mt-6 flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.2em] text-white/40">
               <ShieldCheck className="h-4 w-4 text-primary/50" />
               Strict verification protocols required

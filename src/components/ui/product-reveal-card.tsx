@@ -1,5 +1,6 @@
 "use client"
 
+import Link from "next/link"
 import { motion, useReducedMotion } from "framer-motion"
 import { buttonVariants } from "@/components/ui/button"
 import { ShoppingCart, Star, Heart } from "lucide-react"
@@ -16,20 +17,23 @@ interface ProductRevealCardProps {
   reviewCount?: number
   onAdd?: () => void
   onFavorite?: () => void
+  /** When set, the "View Details" action renders as a link to this URL. */
+  detailsHref?: string
   enableAnimations?: boolean
   className?: string
 }
 
 export function ProductRevealCard({
-  name = "Premium Wireless Headphones",
-  price = "$199",
-  originalPrice = "$299",
-  image = "https://images.unsplash.com/photo-1618366712010-f4ae9c647dcb?w=800&h=600&fit=crop", // Premium headphones
-  description = "Experience studio-quality sound with advanced noise cancellation and 30-hour battery life. Perfect for music lovers and professionals.",
+  name = "Premium Product",
+  price = "",
+  originalPrice,
+  image = "/product-1.png",
+  description = "",
   rating = 4.8,
   reviewCount = 124,
   onAdd,
   onFavorite,
+  detailsHref,
   enableAnimations = true,
   className,
 }: ProductRevealCardProps) {
@@ -43,18 +47,18 @@ export function ProductRevealCard({
   }
 
   const containerVariants = {
-    rest: { 
+    rest: {
       scale: 1,
       y: 0,
       filter: "blur(0px)",
     },
-    hover: shouldAnimate ? { 
-      scale: 1.03, 
+    hover: shouldAnimate ? {
+      scale: 1.03,
       y: -8,
       filter: "blur(0px)",
-      transition: { 
-        type: "spring", 
-        stiffness: 300, 
+      transition: {
+        type: "spring",
+        stiffness: 300,
         damping: 30,
         mass: 0.8,
       }
@@ -67,12 +71,12 @@ export function ProductRevealCard({
   }
 
   const overlayVariants = {
-    rest: { 
-      y: "100%", 
+    rest: {
+      y: "100%",
       opacity: 0,
     },
-    hover: { 
-      y: "0%", 
+    hover: {
+      y: "0%",
       opacity: 1,
       transition: {
         type: "spring",
@@ -87,20 +91,20 @@ export function ProductRevealCard({
 
   const backdropVariants = {
     rest: { opacity: 0 },
-    hover: { 
+    hover: {
       opacity: 1,
       transition: { duration: 0.3, ease: "easeOut" }
     },
   }
 
   const contentVariants = {
-    rest: { 
-      opacity: 0, 
+    rest: {
+      opacity: 0,
       y: 20,
       scale: 0.95,
     },
-    hover: { 
-      opacity: 1, 
+    hover: {
+      opacity: 1,
       y: 0,
       scale: 1,
       transition: {
@@ -114,13 +118,13 @@ export function ProductRevealCard({
 
   const buttonVariants_motion = {
     rest: { scale: 1, y: 0 },
-    hover: shouldAnimate ? { 
-      scale: 1.05, 
+    hover: shouldAnimate ? {
+      scale: 1.05,
       y: -2,
-      transition: { 
-        type: "spring", 
-        stiffness: 400, 
-        damping: 25 
+      transition: {
+        type: "spring",
+        stiffness: 400,
+        damping: 25
       }
     } : {},
     tap: shouldAnimate ? { scale: 0.95 } : {},
@@ -128,10 +132,10 @@ export function ProductRevealCard({
 
   const favoriteVariants = {
     rest: { scale: 1, rotate: 0 },
-    favorite: { 
-      scale: [1, 1.3, 1], 
+    favorite: {
+      scale: [1, 1.3, 1],
       rotate: [0, 10, -10, 0],
-      transition: { 
+      transition: {
         duration: 0.5,
         ease: "easeInOut"
       }
@@ -155,28 +159,31 @@ export function ProductRevealCard({
         <motion.img
           src={image}
           alt={name}
+          loading="lazy"
           className="h-full w-full object-cover"
           variants={imageVariants}
           transition={{ type: "spring", stiffness: 300, damping: 30 }}
         />
         <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
-        
+
         {/* Favorite Button */}
         <motion.button
           onClick={handleFavorite}
           variants={favoriteVariants}
           animate={isFavorite ? "favorite" : "rest"}
+          aria-label={isFavorite ? "Remove from favorites" : "Add to favorites"}
+          aria-pressed={isFavorite}
           className={cn(
             "absolute top-4 right-4 p-2.5 rounded-full backdrop-blur-md border border-white/20 transition-colors",
-            isFavorite 
-              ? "bg-red-500 text-white" 
+            isFavorite
+              ? "bg-red-500 text-white"
               : "bg-black/40 text-white hover:bg-black/60"
           )}
         >
           <Heart className={cn("w-4 h-4", isFavorite && "fill-current")} />
         </motion.button>
 
-        {/* Discount Badge */}
+        {/* Discount Badge (only when a real original price is provided) */}
         {originalPrice && (
           <motion.div
             initial={{ opacity: 0, scale: 0.8, x: 20 }}
@@ -190,7 +197,7 @@ export function ProductRevealCard({
       </div>
 
       {/* Content */}
-      <motion.div 
+      <motion.div
         variants={{ rest: { opacity: 1 }, hover: { opacity: 0, transition: { duration: 0.2 } } }}
         className="p-6 space-y-3 relative z-10"
       >
@@ -202,8 +209,8 @@ export function ProductRevealCard({
                 key={i}
                 className={cn(
                   "w-3.5 h-3.5",
-                  i < Math.floor(rating) 
-                    ? "text-primary fill-primary" 
+                  i < Math.floor(rating)
+                    ? "text-primary fill-primary"
                     : "text-white/20"
                 )}
               />
@@ -219,7 +226,7 @@ export function ProductRevealCard({
           <h3 className="text-xl font-bold leading-tight tracking-tight [font-family:var(--font-headline)]">
             {name}
           </h3>
-          
+
           <div className="flex items-center gap-3 pt-1">
             <span className="text-2xl font-bold text-primary">{price}</span>
             {originalPrice && (
@@ -253,36 +260,37 @@ export function ProductRevealCard({
 
           {/* Action Buttons */}
           <motion.div variants={contentVariants} className="space-y-3 pt-2">
-            <motion.button
-              onClick={onAdd}
-              variants={buttonVariants_motion}
-              initial="rest"
-              whileHover="hover"
-              whileTap="tap"
-              className={cn(
-                buttonVariants({ variant: "default" }), 
-                "w-full h-12 font-bold rounded-xl",
-                "bg-gradient-to-r from-primary to-[rgb(250_204_21)] text-black",
-                "hover:brightness-110",
-                "shadow-[0_0_20px_rgba(250,204,21,0.3)]"
-              )}
-            >
-              <ShoppingCart className="w-4 h-4 mr-2" />
-              Add to Cart
-            </motion.button>
-            
-            <motion.button
-              variants={buttonVariants_motion}
-              initial="rest"
-              whileHover="hover"
-              whileTap="tap"
-              className={cn(
-                buttonVariants({ variant: "outline" }), 
-                "w-full h-10 font-semibold rounded-xl border-white/10 bg-white/5 text-white hover:bg-white/10 hover:text-white"
-              )}
-            >
-              View Details
-            </motion.button>
+            {onAdd ? (
+              <motion.button
+                onClick={onAdd}
+                variants={buttonVariants_motion}
+                initial="rest"
+                whileHover="hover"
+                whileTap="tap"
+                className={cn(
+                  buttonVariants({ variant: "default" }),
+                  "w-full h-12 font-bold rounded-xl",
+                  "bg-gradient-to-r from-primary to-[rgb(250_204_21)] text-black",
+                  "hover:brightness-110",
+                  "shadow-[0_0_20px_rgba(250,204,21,0.3)]"
+                )}
+              >
+                <ShoppingCart className="w-4 h-4 mr-2" />
+                Add to Cart
+              </motion.button>
+            ) : null}
+
+            {detailsHref ? (
+              <Link
+                href={detailsHref}
+                className={cn(
+                  buttonVariants({ variant: "outline" }),
+                  "w-full h-10 font-semibold rounded-xl border-white/10 bg-white/5 text-white hover:bg-white/10 hover:text-white"
+                )}
+              >
+                View Details
+              </Link>
+            ) : null}
           </motion.div>
         </div>
       </motion.div>

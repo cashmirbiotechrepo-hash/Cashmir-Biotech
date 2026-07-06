@@ -42,6 +42,10 @@
     --primary-container: 13 13 13;
     --on-primary-container: 255 255 255;
     --outline-variant: 210 210 210;
+    /* Light-mode values for tokens previously defined only in .dark (text-heading etc. were invisible) */
+    --on-heading: 13 13 13;
+    --on-muted: 90 90 95;
+    --brand-bronze: 133 77 14;
   }
 
   .dark {

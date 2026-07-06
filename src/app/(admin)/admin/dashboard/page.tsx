@@ -184,7 +184,7 @@ export default async function DashboardPage({ searchParams }: DashboardProps) {
           {/* Top Bar */}
           <header className="sticky top-0 z-20 flex h-[72px] items-center justify-between border-b border-[rgb(var(--outline-variant))]/20 bg-surface/80 px-6 backdrop-blur-xl lg:px-10">
             {/* Mobile Nav */}
-            <div className="flex items-center gap-2 lg:hidden">
+            <div className="flex items-center gap-2 overflow-x-auto lg:hidden">
               {tabs.map((t) => (
                 <Link
                   key={t.key}

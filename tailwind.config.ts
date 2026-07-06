@@ -58,6 +58,10 @@ const config = {
         heading: "rgb(var(--on-heading) / <alpha-value>)",
         "on-muted": "rgb(var(--on-muted) / <alpha-value>)",
         bronze: "rgb(var(--brand-bronze) / <alpha-value>)",
+        "outline-variant": "rgb(var(--outline-variant) / <alpha-value>)",
+        "surface-container": "rgb(var(--surface-container) / <alpha-value>)",
+        "surface-container-low": "rgb(var(--surface-container-low) / <alpha-value>)",
+        "surface-container-high": "rgb(var(--surface-container-high) / <alpha-value>)",
       },
       borderRadius: {
         lg: "var(--radius)",

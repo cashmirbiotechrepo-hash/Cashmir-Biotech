@@ -41,6 +41,12 @@ export function Header2() {
     setMounted(true);
   }, []);
 
+  // Close menus when navigating to a new route
+  useEffect(() => {
+    setOpen(false);
+    setDropdownOpen(null);
+  }, [pathname]);
+
   useEffect(() => {
     if (open) {
       document.body.style.overflow = 'hidden';
@@ -54,7 +60,10 @@ export function Header2() {
 
   useEffect(() => {
     const onEscape = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setOpen(false);
+      if (e.key === 'Escape') {
+        setOpen(false);
+        setDropdownOpen(null);
+      }
     };
     window.addEventListener('keydown', onEscape);
     return () => window.removeEventListener('keydown', onEscape);
@@ -78,7 +87,7 @@ export function Header2() {
       <nav
         className={cn(
           'flex w-full items-center justify-between px-4 transition-all duration-300 ease-out',
-          scrolled ? 'h-16 md:h-16 md:px-6' : 'h-20 md:h-20 md:px-4'
+          isScrolled ? 'h-16 md:h-16 md:px-6' : 'h-20 md:h-20 md:px-4'
         )}
       >
         {/* Restore Original Cashmir Biotech Logo */}
@@ -124,11 +133,14 @@ export function Header2() {
               >
                 <button
                   type="button"
+                  onClick={() => setDropdownOpen(dropdownOpen === item.label ? null : item.label)}
+                  onFocus={() => setDropdownOpen(item.label)}
                   className={cn(
                     buttonVariants({ variant: 'ghost' }),
                     'flex items-center gap-1 rounded-full px-4 font-medium transition-colors hover:bg-primary/10 hover:text-primary',
                     dropdownOpen === item.label ? 'bg-primary/10 text-primary' : 'text-on-muted hover:text-heading'
                   )}
+                  aria-haspopup="true"
                   aria-expanded={dropdownOpen === item.label}
                 >
                   {item.label}
@@ -198,6 +210,8 @@ export function Header2() {
           size="icon"
           variant="outline"
           onClick={() => setOpen(!open)}
+          aria-label={open ? 'Close menu' : 'Open menu'}
+          aria-expanded={open}
           className="md:hidden h-10 w-10 rounded-xl border-none bg-surface-container-low/50 hover:bg-surface-container-high"
         >
           <MenuToggleIcon open={open} className="size-5 text-heading" duration={300} />

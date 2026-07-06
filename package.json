@@ -8,6 +8,7 @@
     "start": "next start",
     "lint": "next lint",
     "format": "prettier --write \"src/**/*.{ts,tsx,css}\" \"*.{ts,js,json}\"",
+    "postinstall": "prisma generate",
     "db:generate": "prisma generate",
     "db:create": "tsx scripts/ensure-database.ts",
     "db:migrate": "prisma migrate dev",
