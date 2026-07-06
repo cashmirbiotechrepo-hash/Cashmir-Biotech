@@ -1,12 +1,20 @@
 import { Header2 } from "@/components/ui/header-2";
 import { Footer } from "@/components/ui/footer";
 import { PremiumHome } from "@/components/home/premium-home";
-import { getPublicHomeContent } from "@/modules/cms/services/content.service";
+import { getPublicHomeContent, type PublicHomeData } from "@/modules/cms/services/content.service";
+import { logger } from "@/lib/logger";
 
 export const dynamic = "force-dynamic";
 
 export default async function HomePage() {
-  const { settings, products, patents } = await getPublicHomeContent();
+  // Render the homepage with sensible defaults even if the database is unreachable.
+  let data: PublicHomeData = { settings: null, products: [], patents: [] };
+  try {
+    data = await getPublicHomeContent();
+  } catch (error) {
+    logger.error({ event: "home_content_fetch_failed", err: error }, "falling back to default homepage content");
+  }
+  const { settings, products, patents } = data;
 
   const preparedSettings = {
     heroTitle: settings?.heroTitle ?? "The architecture of daily vitality",
@@ -21,9 +29,11 @@ export default async function HomePage() {
   };
 
   return (
-    <div suppressHydrationWarning className="min-h-screen bg-surface text-on-surface">
+    <div className="min-h-screen bg-surface text-on-surface">
       <Header2 />
-      <PremiumHome settings={preparedSettings} products={products} patents={patents} />
+      <div id="main-content">
+        <PremiumHome settings={preparedSettings} products={products} patents={patents} />
+      </div>
       <Footer />
     </div>
   );

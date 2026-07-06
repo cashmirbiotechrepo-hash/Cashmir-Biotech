@@ -84,6 +84,12 @@ export function Header2() {
         }
       )}
     >
+      <a
+        href="#main-content"
+        className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-[60] focus:rounded-lg focus:bg-primary-brand focus:px-4 focus:py-2 focus:text-sm focus:font-semibold focus:text-on-primary-container"
+      >
+        Skip to content
+      </a>
       <nav
         className={cn(
           'flex w-full items-center justify-between px-4 transition-all duration-300 ease-out',

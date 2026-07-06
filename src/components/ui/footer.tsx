@@ -1,5 +1,6 @@
 'use client';
 import React from 'react';
+import Link from 'next/link';
 import type { ComponentProps, ReactNode } from 'react';
 import { motion, useReducedMotion } from 'framer-motion';
 import { FacebookIcon, FlaskConical, InstagramIcon, LinkedinIcon, YoutubeIcon } from 'lucide-react';
@@ -86,13 +87,23 @@ export function Footer() {
 								<ul className="mt-6 space-y-3 text-sm text-on-muted">
 									{section.links.map((link, i) => (
 										<li key={i}>
-											<a
-												href={link.href}
-												className="inline-flex items-center transition-all duration-300 hover:text-primary"
-											>
-												{link.icon && <link.icon className="me-2 size-4 opacity-70" />}
-												{link.title}
-											</a>
+											{link.href.startsWith('/') ? (
+												<Link
+													href={link.href}
+													className="inline-flex items-center transition-all duration-300 hover:text-primary"
+												>
+													{link.icon && <link.icon className="me-2 size-4 opacity-70" />}
+													{link.title}
+												</Link>
+											) : (
+												<a
+													href={link.href}
+													className="inline-flex items-center transition-all duration-300 hover:text-primary"
+												>
+													{link.icon && <link.icon className="me-2 size-4 opacity-70" />}
+													{link.title}
+												</a>
+											)}
 										</li>
 									))}
 								</ul>

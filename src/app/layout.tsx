@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Space_Grotesk, Inter } from "next/font/google";
 import "./globals.css";
 import { ThemeProvider } from "@/components/providers/theme-provider";
@@ -22,6 +22,10 @@ export const metadata: Metadata = {
     siteName: "Cashmir Biotech",
     type: "website"
   }
+};
+
+export const viewport: Viewport = {
+  themeColor: "#0d0d0d"
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

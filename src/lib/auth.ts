@@ -26,8 +26,10 @@ export function credentialsAreValid(email: string, password: string) {
   const adminEmail = env.ADMIN_EMAIL;
   const adminHash = env.ADMIN_PASSWORD_HASH;
   if (!adminEmail || !adminHash) return false;
-  if (email.toLowerCase() !== adminEmail.toLowerCase()) return false;
-  return compareSync(password, adminHash);
+  const emailMatches = email.toLowerCase() === adminEmail.toLowerCase();
+  // Always run the bcrypt comparison so response timing cannot reveal whether the email is correct.
+  const passwordMatches = compareSync(password, adminHash);
+  return emailMatches && passwordMatches;
 }
 
 export async function getCurrentAdmin() {

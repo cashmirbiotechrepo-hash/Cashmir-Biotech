@@ -327,7 +327,7 @@ export function PremiumHome({
             >
               <ProductRevealCard
                 name={p.name}
-                price={`₹${p.mrpInr}`}
+                price={`₹${p.mrpInr.toLocaleString("en-IN")}`}
                 image={p.imageUrl}
                 description={p.description}
                 detailsHref="/products"
@@ -470,7 +470,7 @@ function AmbientBackground() {
 
 function InfoTile({ icon, title, subtitle }: { icon: React.ReactNode; title: string; subtitle: string }) {
   return (
-    <div className="flex w-[280px] shrink-0 items-center p-6 text-left md:w-[320px] md:p-8 hover:bg-white/[0.02] transition-colors rounded-2xl cursor-pointer">
+    <div className="flex w-[280px] shrink-0 items-center p-6 text-left md:w-[320px] md:p-8 hover:bg-white/[0.02] transition-colors rounded-2xl">
       <div className="mr-4 flex h-14 w-14 shrink-0 items-center justify-center rounded-full border border-primary/30 bg-primary/10 text-primary shadow-[0_0_15px_rgba(250,204,21,0.2)] md:mr-5">
         {icon}
       </div>
