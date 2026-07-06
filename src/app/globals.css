@@ -1,0 +1,163 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 0 0% 5%;
+    --card: 0 0% 100%;
+    --card-foreground: 0 0% 5%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 0 0% 5%;
+    --primary: 0 0% 9%;
+    --primary-foreground: 0 0% 98%;
+    --secondary: 0 0% 96%;
+    --secondary-foreground: 0 0% 9%;
+    --muted: 0 0% 96%;
+    --muted-foreground: 0 0% 45%;
+    --accent: 0 0% 96%;
+    --accent-foreground: 0 0% 9%;
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 0 0% 90%;
+    --input: 0 0% 90%;
+    --ring: 0 0% 9%;
+    --radius: 0.75rem;
+    --chart-1: 220 70% 50%;
+    --chart-2: 160 60% 45%;
+    --chart-3: 30 80% 55%;
+    --chart-4: 280 65% 60%;
+    --chart-5: 340 75% 55%;
+
+    /* Admin design tokens */
+    --surface: 255 255 255;
+    --on-background: 13 13 13;
+    --surface-container-lowest: 255 255 255;
+    --surface-container-low: 250 250 250;
+    --surface-container: 245 245 245;
+    --surface-container-high: 238 238 238;
+    --surface-container-highest: 230 230 230;
+    --primary-legacy: 13 13 13;
+    --primary-container: 13 13 13;
+    --on-primary-container: 255 255 255;
+    --outline-variant: 210 210 210;
+  }
+
+  .dark {
+    /* Premium biotech dark palette — base #0D0D0D, accent gold #EAB308, bronze #854D0E */
+    --background: 0 0% 5%;
+    --foreground: 220 9% 84%;
+    --card: 0 0% 8%;
+    --card-foreground: 0 0% 100%;
+    --popover: 0 0% 7%;
+    --popover-foreground: 220 9% 84%;
+    --primary: 45 93% 47%;
+    --primary-foreground: 0 0% 5%;
+    --secondary: 32 81% 18%;
+    --secondary-foreground: 45 40% 88%;
+    --muted: 0 0% 12%;
+    --muted-foreground: 218 11% 65%;
+    --accent: 32 35% 22%;
+    --accent-foreground: 45 93% 47%;
+    --destructive: 0 62% 35%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 30 15% 22%;
+    --input: 0 0% 14%;
+    --ring: 45 93% 47%;
+    --chart-1: 45 93% 52%;
+    --chart-2: 32 81% 45%;
+    --chart-3: 218 11% 65%;
+    --chart-4: 160 60% 45%;
+    --chart-5: 280 50% 55%;
+
+    /* RGB triplets used by Tailwind utilities (bg-surface, text-on-surface, etc.) */
+    --surface: 13 13 13;
+    --on-background: 209 213 219;
+    --on-heading: 255 255 255;
+    --on-muted: 156 163 175;
+    --surface-container-lowest: 10 10 10;
+    --surface-container-low: 20 20 22;
+    --surface-container: 26 26 28;
+    --surface-container-high: 34 34 37;
+    --surface-container-highest: 44 44 48;
+    --primary-legacy: 234 179 8;
+    --primary-container: 234 179 8;
+    --on-primary-container: 15 15 15;
+    --outline-variant: 60 55 50;
+    --brand-bronze: 133 77 14;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+}
+
+/* ── Utility classes ───────────────────────────────────────────── */
+.bg-surface-container-low { background: rgb(var(--surface-container-low)); }
+.bg-surface-container { background: rgb(var(--surface-container)); }
+.bg-surface-container-high { background: rgb(var(--surface-container-high)); }
+.text-primary-brand { color: rgb(var(--primary-legacy)); }
+.bg-primary-brand { background: rgb(var(--primary-container)); }
+.text-on-primary-container { color: rgb(var(--on-primary-container)); }
+.dark .border-brand-bronze {
+  border-color: rgb(var(--brand-bronze) / 0.35);
+}
+
+.glass {
+  backdrop-filter: blur(24px) saturate(1.4);
+  background: color-mix(in srgb, rgb(var(--surface-container-high)) 55%, transparent);
+  border: 1px solid color-mix(in srgb, rgb(var(--outline-variant)) 30%, transparent);
+}
+
+/* ── Admin Component Classes ───────────────────────────────────── */
+.admin-input {
+  width: 100%;
+  border-radius: 0.75rem;
+  border: 1px solid color-mix(in srgb, rgb(var(--outline-variant)) 20%, transparent);
+  background: rgb(var(--surface-container));
+  padding: 0.75rem 1rem;
+  font-size: 0.875rem;
+  line-height: 1.25rem;
+  color: rgb(var(--on-background));
+  outline: none;
+  transition: all 0.2s ease;
+}
+.admin-input::placeholder {
+  color: color-mix(in srgb, rgb(var(--on-background)) 25%, transparent);
+}
+.admin-input:focus {
+  border-color: color-mix(in srgb, rgb(var(--outline-variant)) 55%, transparent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, rgb(var(--primary-container)) 8%, transparent);
+}
+
+.admin-btn-primary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  border-radius: 0.75rem;
+  background: rgb(var(--primary-container));
+  padding: 0.75rem 1.5rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: rgb(var(--on-primary-container));
+  box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+  transition: all 0.2s ease;
+  border: none;
+  cursor: pointer;
+}
+.admin-btn-primary:hover {
+  box-shadow: 0 8px 25px rgba(0,0,0,0.12);
+  filter: brightness(1.1);
+}
+.admin-btn-primary:active {
+  transform: scale(0.98);
+}

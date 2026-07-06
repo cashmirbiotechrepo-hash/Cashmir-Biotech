@@ -1,0 +1,61 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model SiteSettings {
+  id               Int      @id @default(1)
+  companyName      String
+  heroTitle        String
+  heroSubtitle     String
+  heroDescription  String
+  ctaPrimaryText   String
+  ctaPrimaryHref   String
+  ctaSecondaryText String
+  ctaSecondaryHref String
+  missionStatement String
+  updatedAt        DateTime @updatedAt
+}
+
+model Product {
+  id            String   @id @default(cuid())
+  slug          String   @unique
+  name          String
+  shortBenefit  String
+  description   String
+  mrpInr        Int
+  sizeLabel     String
+  category      String
+  imageUrl      String
+  featured      Boolean  @default(false)
+  active        Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+model Patent {
+  id          String   @id @default(cuid())
+  patentCode  String   @unique
+  title       String
+  summary     String
+  status      String
+  jurisdiction String
+  publishedAt DateTime
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model TeamMember {
+  id          String   @id @default(cuid())
+  fullName    String
+  role        String
+  bio         String
+  avatarUrl   String
+  sortOrder   Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}

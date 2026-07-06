@@ -1,0 +1,4725 @@
+================================================================================
+File: .env
+================================================================================
+
+DATABASE_URL="postgresql://postgres:Moalim%40345@localhost:5432/cashmir_biotech?schema=public"
+JWT_SECRET="change-this-to-a-long-random-secret"
+ADMIN_EMAIL="admin@cashmirbiotech.com"
+# Generate with: node -e "console.log(require('bcryptjs').hashSync('StrongPassword123!', 12))"
+ADMIN_PASSWORD_HASH=""
+
+
+================================================================================
+File: .env.example
+================================================================================
+
+# After installing PostgreSQL locally, create DB + tables + seed:
+#   npm run db:setup
+# Or: npm run db:create && npx prisma migrate dev && npm run db:seed
+DATABASE_URL="postgresql://postgres:postgres@localhost:5432/cashmir_biotech?schema=public"
+# At least 32 characters (used to sign the admin session cookie)
+JWT_SECRET="change-this-to-a-long-random-secret-min-32-chars"
+ADMIN_EMAIL="admin@cashmirbiotech.com"
+# Generate with: node -e "console.log(require('bcryptjs').hashSync('StrongPassword123!', 12))"
+ADMIN_PASSWORD_HASH=""
+
+# Optional: production logging (default "info" for NODE_ENV=production)
+# LOG_LEVEL=info
+
+# Optional: Redis rate limiting for POST /admin/login (https://upstash.com — free tier available)
+# UPSTASH_REDIS_REST_URL="https://xxxx.upstash.io"
+# UPSTASH_REDIS_REST_TOKEN=""
+
+
+================================================================================
+File: .eslintrc.json
+================================================================================
+
+{
+  "extends": ["next/core-web-vitals", "next/typescript"]
+}
+
+
+================================================================================
+File: .gitignore
+================================================================================
+
+# dependencies
+node_modules
+.pnp
+.pnp.js
+
+# build
+.next
+out
+build
+dist
+
+# env and local secrets
+.env
+.env.*.local
+
+# debug
+npm-debug.log*
+.DS_Store
+
+# IDE
+.idea
+.vscode/*
+!.vscode/extensions.json
+
+# typescript
+*.tsbuildinfo
+
+# vercel
+.vercel
+
+
+================================================================================
+File: .prettierignore
+================================================================================
+
+.next
+node_modules
+package-lock.json
+
+
+================================================================================
+File: .prettierrc
+================================================================================
+
+{
+  "semi": true,
+  "singleQuote": false,
+  "trailingComma": "none",
+  "printWidth": 100
+}
+
+
+================================================================================
+File: merge_code.py
+================================================================================
+
+import os
+
+def merge_code(output_file="merged_code.txt"):
+    # Directories to completely ignore
+    ignore_dirs = {
+        'node_modules', 
+        '.next', 
+        '.git', 
+        'dist', 
+        'build', 
+        'coverage',
+        '.vscode',
+        'public', # Ignoring static assets like images
+    }
+    
+    # File extensions to ignore (binary files, images, fonts, locks)
+    ignore_exts = {
+        '.png', '.jpg', '.jpeg', '.gif', '.svg', '.ico', '.webp', '.mp4', '.webm',
+        '.woff', '.woff2', '.ttf', '.eot',
+        '.pdf', '.zip', '.tar', '.gz',
+        '.pyc', '.pyo', '.pyd', '.so', '.dll', '.class',
+        '.lock' # Ignore lock files like yarn.lock or package-lock.json (they are huge and usually not needed)
+    }
+    
+    files_merged = 0
+    
+    with open(output_file, 'w', encoding='utf-8') as outfile:
+        for root, dirs, files in os.walk('.'):
+            # Modify dirs in-place to skip ignored directories
+            dirs[:] = [d for d in dirs if d not in ignore_dirs]
+            
+            for file in files:
+                ext = os.path.splitext(file)[1].lower()
+                if ext in ignore_exts:
+                    continue
+                    
+                # Also ignore specific large files directly
+                if file in ['package-lock.json', 'yarn.lock', 'pnpm-lock.yaml']:
+                    continue
+                    
+                file_path = os.path.join(root, file)
+                
+                # Skip the output file itself
+                if os.path.basename(file_path) == output_file:
+                    continue
+                
+                try:
+                    with open(file_path, 'r', encoding='utf-8') as infile:
+                        content = infile.read()
+                        
+                        # Write separator and file path
+                        outfile.write(f"{'='*80}\n")
+                        outfile.write(f"File: {os.path.normpath(file_path)}\n")
+                        outfile.write(f"{'='*80}\n\n")
+                        
+                        # Write file content
+                        outfile.write(content)
+                        outfile.write("\n\n")
+                        
+                        files_merged += 1
+                        print(f"Merged: {file_path}")
+                        
+                except Exception as e:
+                    print(f"Skipping {file_path} (could not read as text): {e}")
+                    
+    print(f"\nSuccessfully merged {files_merged} files into {output_file}")
+
+if __name__ == "__main__":
+    merge_code()
+
+
+================================================================================
+File: next-env.d.ts
+================================================================================
+
+/// <reference types="next" />
+/// <reference types="next/image-types/global" />
+/// <reference path="./.next/types/routes.d.ts" />
+
+// NOTE: This file should not be edited
+// see https://nextjs.org/docs/app/api-reference/config/typescript for more information.
+
+
+================================================================================
+File: next.config.ts
+================================================================================
+
+import type { NextConfig } from "next";
+
+const nextConfig: NextConfig = {
+  /** Pino / thread-stream must not be bundled into vendor-chunks with broken worker paths */
+  serverExternalPackages: ["pino", "thread-stream"],
+  images: {
+    remotePatterns: [
+      { protocol: "https", hostname: "images.unsplash.com" },
+      { protocol: "https", hostname: "i.scdn.co" }
+    ]
+  },
+  async headers() {
+    return [
+      {
+        source: "/(.*)",
+        headers: [
+          { key: "X-Frame-Options", value: "DENY" },
+          { key: "X-Content-Type-Options", value: "nosniff" },
+          { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
+          { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=()" }
+        ]
+      }
+    ];
+  }
+};
+
+export default nextConfig;
+
+
+================================================================================
+File: package.json
+================================================================================
+
+{
+  "name": "cashmir-biotech-platform",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint",
+    "format": "prettier --write \"src/**/*.{ts,tsx,css}\" \"*.{ts,js,json}\"",
+    "db:generate": "prisma generate",
+    "db:create": "tsx scripts/ensure-database.ts",
+    "db:migrate": "prisma migrate dev",
+    "db:seed": "tsx prisma/seed.ts",
+    "db:setup": "npm run db:create && prisma migrate deploy && npm run db:seed"
+  },
+  "dependencies": {
+    "@prisma/client": "^5.22.0",
+    "@radix-ui/react-icons": "^1.3.2",
+    "@radix-ui/react-navigation-menu": "^1.2.14",
+    "@radix-ui/react-slot": "^1.2.4",
+    "@upstash/ratelimit": "^2.0.8",
+    "@upstash/redis": "^1.37.0",
+    "bcryptjs": "^2.4.3",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
+    "framer-motion": "^11.18.2",
+    "jose": "^5.9.6",
+    "lucide-react": "^0.468.0",
+    "motion": "^12.38.0",
+    "next": "^15.0.3",
+    "next-themes": "^0.4.3",
+    "pino": "^10.3.1",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-use-measure": "^2.1.7",
+    "server-only": "^0.0.1",
+    "tailwind-merge": "^2.5.5",
+    "tailwindcss-animate": "^1.0.7",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@types/bcryptjs": "^2.4.6",
+    "@types/node": "^22.9.0",
+    "@types/pg": "^8.11.10",
+    "@types/react": "^18.3.12",
+    "@types/react-dom": "^18.3.1",
+    "autoprefixer": "^10.5.0",
+    "eslint": "^9.14.0",
+    "eslint-config-next": "^15.0.3",
+    "pg": "^8.13.1",
+    "pino-pretty": "^13.1.3",
+    "postcss": "^8.5.10",
+    "prettier": "^3.4.2",
+    "prisma": "^5.22.0",
+    "tailwindcss": "^3.4.19",
+    "tsx": "^4.19.2",
+    "typescript": "^5.6.3"
+  },
+  "overrides": {
+    "postcss": "^8.5.10"
+  }
+}
+
+
+================================================================================
+File: postcss.config.mjs
+================================================================================
+
+export default {
+  plugins: {
+    tailwindcss: {}
+  }
+};
+
+
+================================================================================
+File: README.md
+================================================================================
+
+# Cashmir Biotech Platform
+
+Premium biotech storytelling website built with Node.js stack:
+
+- Next.js (App Router) + TypeScript + Tailwind
+- PostgreSQL + Prisma ORM
+- Dark/light mode
+- Secure admin panel (JWT cookie auth) for editing homepage, products, patents, and board members
+
+## 1) Environment setup
+
+This machine currently has no Node runtime installed. Install Node 20+ first:
+
+- Linux with nvm:
+  - `curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.1/install.sh | bash`
+  - restart shell
+  - `nvm install 20`
+  - `node -v`
+
+Then install dependencies:
+
+```bash
+npm install
+```
+
+## 2) Configure env
+
+```bash
+cp .env.example .env
+```
+
+Set:
+
+- `DATABASE_URL` (PostgreSQL connection)
+- `JWT_SECRET`
+- `ADMIN_EMAIL`
+- `ADMIN_PASSWORD_HASH` (bcrypt hash)
+
+Generate hash:
+
+```bash
+node -e "console.log(require('bcryptjs').hashSync('StrongPassword123!', 12))"
+```
+
+## 3) Database
+
+```bash
+npm run db:generate
+npm run db:migrate -- --name init
+npm run db:seed
+```
+
+## 4) Run app
+
+```bash
+npm run dev
+```
+
+Open:
+
+- Site: `http://localhost:3000`
+- Admin login: `http://localhost:3000/admin/login`
+
+## shadcn structure note
+
+This project uses the standard shadcn-style UI path:
+
+- `src/components/ui/*`
+
+Keeping reusable primitives in this folder is important because:
+
+- it centralizes design tokens and components,
+- makes imports predictable (`@/components/ui/...`),
+- simplifies scaling and future component generation.
+
+
+================================================================================
+File: tailwind.config.ts
+================================================================================
+
+import type { Config } from "tailwindcss";
+
+const config = {
+  darkMode: ["class"],
+  content: [
+    './pages/**/*.{ts,tsx}',
+    './components/**/*.{ts,tsx}',
+    './app/**/*.{ts,tsx}',
+    './src/**/*.{ts,tsx}',
+	],
+  prefix: "",
+  theme: {
+    container: {
+      center: true,
+      padding: "2rem",
+      screens: {
+        "2xl": "1400px",
+      },
+    },
+    extend: {
+      colors: {
+        border: "hsl(var(--border))",
+        input: "hsl(var(--input))",
+        ring: "hsl(var(--ring))",
+        background: "hsl(var(--background))",
+        foreground: "hsl(var(--foreground))",
+        primary: {
+          DEFAULT: "hsl(var(--primary))",
+          foreground: "hsl(var(--primary-foreground))",
+        },
+        secondary: {
+          DEFAULT: "hsl(var(--secondary))",
+          foreground: "hsl(var(--secondary-foreground))",
+        },
+        destructive: {
+          DEFAULT: "hsl(var(--destructive))",
+          foreground: "hsl(var(--destructive-foreground))",
+        },
+        muted: {
+          DEFAULT: "hsl(var(--muted))",
+          foreground: "hsl(var(--muted-foreground))",
+        },
+        accent: {
+          DEFAULT: "hsl(var(--accent))",
+          foreground: "hsl(var(--accent-foreground))",
+        },
+        popover: {
+          DEFAULT: "hsl(var(--popover))",
+          foreground: "hsl(var(--popover-foreground))",
+        },
+        card: {
+          DEFAULT: "hsl(var(--card))",
+          foreground: "hsl(var(--card-foreground))",
+        },
+        /** Design tokens (see globals.css `.dark` — #0D0D0D / #EAB308 / body #D1D5DB) */
+        surface: "rgb(var(--surface) / <alpha-value>)",
+        "on-surface": "rgb(var(--on-background) / <alpha-value>)",
+        heading: "rgb(var(--on-heading) / <alpha-value>)",
+        "on-muted": "rgb(var(--on-muted) / <alpha-value>)",
+        bronze: "rgb(var(--brand-bronze) / <alpha-value>)",
+      },
+      borderRadius: {
+        lg: "var(--radius)",
+        md: "calc(var(--radius) - 2px)",
+        sm: "calc(var(--radius) - 4px)",
+      },
+      keyframes: {
+        "accordion-down": {
+          from: { height: "0" },
+          to: { height: "var(--radix-accordion-content-height)" },
+        },
+        "accordion-up": {
+          from: { height: "var(--radix-accordion-content-height)" },
+          to: { height: "0" },
+        },
+      },
+      animation: {
+        "accordion-down": "accordion-down 0.2s ease-out",
+        "accordion-up": "accordion-up 0.2s ease-out",
+      },
+    },
+  },
+  plugins: [require("tailwindcss-animate")],
+} satisfies Config
+
+export default config
+
+
+================================================================================
+File: tsconfig.json
+================================================================================
+
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["dom", "dom.iterable", "esnext"],
+    "allowJs": false,
+    "skipLibCheck": true,
+    "strict": true,
+    "noEmit": true,
+    "esModuleInterop": true,
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "jsx": "preserve",
+    "incremental": true,
+    "plugins": [{ "name": "next" }],
+    "paths": {
+      "@/*": ["./src/*"]
+    }
+  },
+  "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts"],
+  "exclude": ["node_modules"]
+}
+
+
+================================================================================
+File: prisma\schema.prisma
+================================================================================
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model SiteSettings {
+  id               Int      @id @default(1)
+  companyName      String
+  heroTitle        String
+  heroSubtitle     String
+  heroDescription  String
+  ctaPrimaryText   String
+  ctaPrimaryHref   String
+  ctaSecondaryText String
+  ctaSecondaryHref String
+  missionStatement String
+  updatedAt        DateTime @updatedAt
+}
+
+model Product {
+  id            String   @id @default(cuid())
+  slug          String   @unique
+  name          String
+  shortBenefit  String
+  description   String
+  mrpInr        Int
+  sizeLabel     String
+  category      String
+  imageUrl      String
+  featured      Boolean  @default(false)
+  active        Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+model Patent {
+  id          String   @id @default(cuid())
+  patentCode  String   @unique
+  title       String
+  summary     String
+  status      String
+  jurisdiction String
+  publishedAt DateTime
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model TeamMember {
+  id          String   @id @default(cuid())
+  fullName    String
+  role        String
+  bio         String
+  avatarUrl   String
+  sortOrder   Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+
+================================================================================
+File: prisma\seed.ts
+================================================================================
+
+import { PrismaClient } from "@prisma/client";
+
+const prisma = new PrismaClient();
+
+async function main() {
+  await prisma.siteSettings.upsert({
+    where: { id: 1 },
+    update: {},
+    create: {
+      id: 1,
+      companyName: "Cashmir Biotech",
+      heroTitle: "The architecture of daily vitality",
+      heroSubtitle: "Proven biotech innovation from Kashmir biodiversity",
+      heroDescription:
+        "Premium supplements with scientific discipline, patent-backed innovation, and research-grade manufacturing standards.",
+      ctaPrimaryText: "Explore Catalog",
+      ctaPrimaryHref: "/products",
+      ctaSecondaryText: "View Patents",
+      ctaSecondaryHref: "/patents",
+      missionStatement:
+        "A mission to treat disorders with healthy, non-toxic, safe and accessible designer foods powered by biotechnology."
+    }
+  });
+
+  await prisma.product.createMany({
+    data: [
+      {
+        slug: "magic-food-taxo-80g",
+        name: "Magic Food TaxO",
+        shortBenefit: "Promotes prostate health",
+        description:
+          "Flagship functional food containing TaxO molecule from underutilized Kashmiri plants.",
+        mrpInr: 350,
+        sizeLabel: "80g",
+        category: "Functional Food",
+        imageUrl:
+          "https://images.unsplash.com/photo-1622484212850-eb596d769edc?auto=format&fit=crop&w=1200&q=80",
+        featured: true
+      },
+      {
+        slug: "iron-revive-herbal-200",
+        name: "Iron Revive Herbal",
+        shortBenefit: "Herbal iron supplement",
+        description:
+          "Daily iron support formulation engineered for high absorption and gentle digestion.",
+        mrpInr: 500,
+        sizeLabel: "200 count",
+        category: "Supplement",
+        imageUrl:
+          "https://images.unsplash.com/photo-1610725664285-7c57e6eeac3f?auto=format&fit=crop&w=1200&q=80"
+      }
+    ],
+    skipDuplicates: true
+  });
+
+  await prisma.patent.createMany({
+    data: [
+      {
+        patentCode: "IN-CBT-2024-001",
+        title: "TaxO Enriched Functional Food Composition",
+        summary:
+          "Composition and extraction protocol for anti-cancer functional foods from Kashmiri flora.",
+        status: "Granted",
+        jurisdiction: "India",
+        publishedAt: new Date("2024-05-10")
+      }
+    ],
+    skipDuplicates: true
+  });
+
+  await prisma.teamMember.createMany({
+    data: [
+      {
+        fullName: "Dr. Khalid Zaffar Masoodi",
+        role: "Director and Founder",
+        bio: "Associate Professor and Senior Scientist, leading scientific direction and product innovation.",
+        avatarUrl:
+          "https://images.unsplash.com/photo-1612276529731-4b21494e6d71?auto=format&fit=crop&w=800&q=80",
+        sortOrder: 1
+      },
+      {
+        fullName: "Aqib Ahmad Hurra",
+        role: "Director",
+        bio: "Co-founder driving strategic operations and faculty-student innovation model.",
+        avatarUrl:
+          "https://images.unsplash.com/photo-1560250097-0b93528c311a?auto=format&fit=crop&w=800&q=80",
+        sortOrder: 2
+      }
+    ],
+    skipDuplicates: true
+  });
+}
+
+main()
+  .then(async () => {
+    await prisma.$disconnect();
+  })
+  .catch(async (e) => {
+    // eslint-disable-next-line no-console
+    console.error(e);
+    await prisma.$disconnect();
+    process.exit(1);
+  });
+
+
+================================================================================
+File: prisma\migrations\migration_lock.toml
+================================================================================
+
+# Please do not edit this file manually
+# It should be added in your version-control system (i.e. Git)
+provider = "postgresql"
+
+================================================================================
+File: prisma\migrations\20260414074520_init\migration.sql
+================================================================================
+
+-- CreateTable
+CREATE TABLE "SiteSettings" (
+    "id" INTEGER NOT NULL DEFAULT 1,
+    "companyName" TEXT NOT NULL,
+    "heroTitle" TEXT NOT NULL,
+    "heroSubtitle" TEXT NOT NULL,
+    "heroDescription" TEXT NOT NULL,
+    "ctaPrimaryText" TEXT NOT NULL,
+    "ctaPrimaryHref" TEXT NOT NULL,
+    "ctaSecondaryText" TEXT NOT NULL,
+    "ctaSecondaryHref" TEXT NOT NULL,
+    "missionStatement" TEXT NOT NULL,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "SiteSettings_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "Product" (
+    "id" TEXT NOT NULL,
+    "slug" TEXT NOT NULL,
+    "name" TEXT NOT NULL,
+    "shortBenefit" TEXT NOT NULL,
+    "description" TEXT NOT NULL,
+    "mrpInr" INTEGER NOT NULL,
+    "sizeLabel" TEXT NOT NULL,
+    "category" TEXT NOT NULL,
+    "imageUrl" TEXT NOT NULL,
+    "featured" BOOLEAN NOT NULL DEFAULT false,
+    "active" BOOLEAN NOT NULL DEFAULT true,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "Product_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "Patent" (
+    "id" TEXT NOT NULL,
+    "patentCode" TEXT NOT NULL,
+    "title" TEXT NOT NULL,
+    "summary" TEXT NOT NULL,
+    "status" TEXT NOT NULL,
+    "jurisdiction" TEXT NOT NULL,
+    "publishedAt" TIMESTAMP(3) NOT NULL,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "Patent_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "TeamMember" (
+    "id" TEXT NOT NULL,
+    "fullName" TEXT NOT NULL,
+    "role" TEXT NOT NULL,
+    "bio" TEXT NOT NULL,
+    "avatarUrl" TEXT NOT NULL,
+    "sortOrder" INTEGER NOT NULL DEFAULT 0,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "TeamMember_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateIndex
+CREATE UNIQUE INDEX "Product_slug_key" ON "Product"("slug");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "Patent_patentCode_key" ON "Patent"("patentCode");
+
+
+================================================================================
+File: scripts\ensure-database.ts
+================================================================================
+
+/**
+ * Creates the application database if it does not exist (connects via the default `postgres` DB).
+ * Requires DATABASE_URL in .env (same as Prisma).
+ */
+import { Client } from "pg";
+import { loadEnvConfig } from "@next/env";
+
+loadEnvConfig(process.cwd());
+
+function parsePgConnection(connectionString: string): { dbName: string; adminUrl: string } {
+  const proto = connectionString.startsWith("postgres:") ? "postgres:" : "postgresql:";
+  const normalized = connectionString.replace(/^postgres(ql)?:/, "http:");
+  const u = new URL(normalized);
+  const dbName = decodeURIComponent(u.pathname.replace(/^\//, ""));
+  if (!dbName) {
+    throw new Error("DATABASE_URL must include a database name (e.g. .../cashmir_biotech)");
+  }
+  const admin = new URL(normalized);
+  admin.pathname = "/postgres";
+  const adminUrl = admin.toString().replace(/^http:/, proto);
+  return { dbName, adminUrl };
+}
+
+async function main() {
+  const databaseUrl = process.env.DATABASE_URL;
+  if (!databaseUrl) {
+    throw new Error("DATABASE_URL is not set. Copy .env.example to .env and configure it.");
+  }
+
+  const { dbName, adminUrl } = parsePgConnection(databaseUrl);
+  const client = new Client({ connectionString: adminUrl });
+
+  await client.connect();
+  try {
+    const exists = await client.query("SELECT 1 FROM pg_database WHERE datname = $1", [dbName]);
+    if (exists.rowCount) {
+      console.log(`Database "${dbName}" already exists.`);
+      return;
+    }
+    await client.query(`CREATE DATABASE "${dbName.replace(/"/g, '""')}"`);
+    console.log(`Created database "${dbName}".`);
+  } finally {
+    await client.end();
+  }
+}
+
+main().catch((err) => {
+  console.error(err);
+  process.exit(1);
+});
+
+
+================================================================================
+File: src\instrumentation.ts
+================================================================================
+
+/**
+ * @see https://nextjs.org/docs/app/building-your-application/optimizing/instrumentation
+ * Runs once when the Node server or a new serverless context starts.
+ */
+export async function register() {
+  if (process.env.NEXT_RUNTIME === "nodejs") {
+    const { logger } = await import("@/lib/logger");
+    logger.info(
+      { nodeEnv: process.env.NODE_ENV, upstash: Boolean(process.env.UPSTASH_REDIS_REST_URL) },
+      "server runtime started"
+    );
+  }
+}
+
+
+================================================================================
+File: src\middleware.ts
+================================================================================
+
+import { NextResponse } from "next/server";
+import type { NextRequest } from "next/server";
+import { ADMIN_SESSION_COOKIE } from "@/config/auth.constants";
+import { verifyAdminSessionToken } from "@/lib/auth-edge";
+import { clientIpFromRequest, getAdminLoginRatelimit } from "@/lib/rate-limit-edge";
+
+export async function middleware(request: NextRequest) {
+  const { pathname } = request.nextUrl;
+
+  if (pathname === "/admin/login" && request.method === "POST") {
+    const rl = getAdminLoginRatelimit();
+    if (rl) {
+      const ip = clientIpFromRequest(request);
+      const { success } = await rl.limit(ip);
+      if (!success) {
+        const url = request.nextUrl.clone();
+        url.searchParams.set("rateLimited", "1");
+        return NextResponse.redirect(url);
+      }
+    }
+  }
+
+  if (pathname.startsWith("/admin/dashboard")) {
+    const token = request.cookies.get(ADMIN_SESSION_COOKIE)?.value;
+    if (!token || !(await verifyAdminSessionToken(token))) {
+      const login = new URL("/admin/login", request.url);
+      const nextPath = request.nextUrl.pathname + request.nextUrl.search;
+      login.searchParams.set("next", nextPath);
+      return NextResponse.redirect(login);
+    }
+  }
+
+  return NextResponse.next();
+}
+
+export const config = {
+  matcher: ["/admin/dashboard", "/admin/dashboard/:path*", "/admin/login"]
+};
+
+
+================================================================================
+File: src\app\globals.css
+================================================================================
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 0 0% 5%;
+    --card: 0 0% 100%;
+    --card-foreground: 0 0% 5%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 0 0% 5%;
+    --primary: 0 0% 9%;
+    --primary-foreground: 0 0% 98%;
+    --secondary: 0 0% 96%;
+    --secondary-foreground: 0 0% 9%;
+    --muted: 0 0% 96%;
+    --muted-foreground: 0 0% 45%;
+    --accent: 0 0% 96%;
+    --accent-foreground: 0 0% 9%;
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 0 0% 90%;
+    --input: 0 0% 90%;
+    --ring: 0 0% 9%;
+    --radius: 0.75rem;
+    --chart-1: 220 70% 50%;
+    --chart-2: 160 60% 45%;
+    --chart-3: 30 80% 55%;
+    --chart-4: 280 65% 60%;
+    --chart-5: 340 75% 55%;
+
+    /* Admin design tokens */
+    --surface: 255 255 255;
+    --on-background: 13 13 13;
+    --surface-container-lowest: 255 255 255;
+    --surface-container-low: 250 250 250;
+    --surface-container: 245 245 245;
+    --surface-container-high: 238 238 238;
+    --surface-container-highest: 230 230 230;
+    --primary-legacy: 13 13 13;
+    --primary-container: 13 13 13;
+    --on-primary-container: 255 255 255;
+    --outline-variant: 210 210 210;
+  }
+
+  .dark {
+    /* Premium biotech dark palette — base #0D0D0D, accent gold #EAB308, bronze #854D0E */
+    --background: 0 0% 5%;
+    --foreground: 220 9% 84%;
+    --card: 0 0% 8%;
+    --card-foreground: 0 0% 100%;
+    --popover: 0 0% 7%;
+    --popover-foreground: 220 9% 84%;
+    --primary: 45 93% 47%;
+    --primary-foreground: 0 0% 5%;
+    --secondary: 32 81% 18%;
+    --secondary-foreground: 45 40% 88%;
+    --muted: 0 0% 12%;
+    --muted-foreground: 218 11% 65%;
+    --accent: 32 35% 22%;
+    --accent-foreground: 45 93% 47%;
+    --destructive: 0 62% 35%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 30 15% 22%;
+    --input: 0 0% 14%;
+    --ring: 45 93% 47%;
+    --chart-1: 45 93% 52%;
+    --chart-2: 32 81% 45%;
+    --chart-3: 218 11% 65%;
+    --chart-4: 160 60% 45%;
+    --chart-5: 280 50% 55%;
+
+    /* RGB triplets used by Tailwind utilities (bg-surface, text-on-surface, etc.) */
+    --surface: 13 13 13;
+    --on-background: 209 213 219;
+    --on-heading: 255 255 255;
+    --on-muted: 156 163 175;
+    --surface-container-lowest: 10 10 10;
+    --surface-container-low: 20 20 22;
+    --surface-container: 26 26 28;
+    --surface-container-high: 34 34 37;
+    --surface-container-highest: 44 44 48;
+    --primary-legacy: 234 179 8;
+    --primary-container: 234 179 8;
+    --on-primary-container: 15 15 15;
+    --outline-variant: 60 55 50;
+    --brand-bronze: 133 77 14;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+}
+
+/* ── Utility classes ───────────────────────────────────────────── */
+.bg-surface-container-low { background: rgb(var(--surface-container-low)); }
+.bg-surface-container { background: rgb(var(--surface-container)); }
+.bg-surface-container-high { background: rgb(var(--surface-container-high)); }
+.text-primary-brand { color: rgb(var(--primary-legacy)); }
+.bg-primary-brand { background: rgb(var(--primary-container)); }
+.text-on-primary-container { color: rgb(var(--on-primary-container)); }
+.dark .border-brand-bronze {
+  border-color: rgb(var(--brand-bronze) / 0.35);
+}
+
+.glass {
+  backdrop-filter: blur(24px) saturate(1.4);
+  background: color-mix(in srgb, rgb(var(--surface-container-high)) 55%, transparent);
+  border: 1px solid color-mix(in srgb, rgb(var(--outline-variant)) 30%, transparent);
+}
+
+/* ── Admin Component Classes ───────────────────────────────────── */
+.admin-input {
+  width: 100%;
+  border-radius: 0.75rem;
+  border: 1px solid color-mix(in srgb, rgb(var(--outline-variant)) 20%, transparent);
+  background: rgb(var(--surface-container));
+  padding: 0.75rem 1rem;
+  font-size: 0.875rem;
+  line-height: 1.25rem;
+  color: rgb(var(--on-background));
+  outline: none;
+  transition: all 0.2s ease;
+}
+.admin-input::placeholder {
+  color: color-mix(in srgb, rgb(var(--on-background)) 25%, transparent);
+}
+.admin-input:focus {
+  border-color: color-mix(in srgb, rgb(var(--outline-variant)) 55%, transparent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, rgb(var(--primary-container)) 8%, transparent);
+}
+
+.admin-btn-primary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  border-radius: 0.75rem;
+  background: rgb(var(--primary-container));
+  padding: 0.75rem 1.5rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: rgb(var(--on-primary-container));
+  box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+  transition: all 0.2s ease;
+  border: none;
+  cursor: pointer;
+}
+.admin-btn-primary:hover {
+  box-shadow: 0 8px 25px rgba(0,0,0,0.12);
+  filter: brightness(1.1);
+}
+.admin-btn-primary:active {
+  transform: scale(0.98);
+}
+
+
+================================================================================
+File: src\app\layout.tsx
+================================================================================
+
+import type { Metadata } from "next";
+import { Space_Grotesk, Inter } from "next/font/google";
+import "./globals.css";
+import { ThemeProvider } from "@/components/providers/theme-provider";
+
+const spaceGrotesk = Space_Grotesk({ subsets: ["latin"], variable: "--font-headline" });
+const inter = Inter({ subsets: ["latin"], variable: "--font-body" });
+
+export const metadata: Metadata = {
+  title: "Cashmir Biotech",
+  description: "Precision biotech innovation and patented supplements."
+};
+
+export default function RootLayout({ children }: { children: React.ReactNode }) {
+  return (
+    <html lang="en" suppressHydrationWarning>
+      <body className={`${spaceGrotesk.variable} ${inter.variable} font-sans`}>
+        <ThemeProvider attribute="class" defaultTheme="dark" enableSystem>
+          {children}
+        </ThemeProvider>
+      </body>
+    </html>
+  );
+}
+
+
+================================================================================
+File: src\app\(admin)\error.tsx
+================================================================================
+
+"use client";
+
+export default function AdminGroupError({
+  error,
+  reset
+}: {
+  error: Error & { digest?: string };
+  reset: () => void;
+}) {
+  return (
+    <div className="flex min-h-screen flex-col items-center justify-center gap-4 bg-surface px-6 text-on-surface">
+      <h1 className="text-xl font-semibold [font-family:var(--font-headline)]">Admin temporarily unavailable</h1>
+      <p className="max-w-md text-center text-sm text-on-surface/60">{error.message}</p>
+      <button
+        type="button"
+        onClick={() => reset()}
+        className="rounded-lg bg-primary-brand px-4 py-2 text-sm font-medium text-on-primary-container"
+      >
+        Try again
+      </button>
+    </div>
+  );
+}
+
+
+================================================================================
+File: src\app\(admin)\admin\page.tsx
+================================================================================
+
+import { redirect } from "next/navigation";
+import { getCurrentAdmin } from "@/lib/auth";
+
+export default async function AdminEntry() {
+  const admin = await getCurrentAdmin();
+  if (admin) redirect("/admin/dashboard");
+  redirect("/admin/login");
+}
+
+
+================================================================================
+File: src\app\(admin)\admin\dashboard\page.tsx
+================================================================================
+
+import { cookies } from "next/headers";
+import Link from "next/link";
+import { redirect } from "next/navigation";
+import { authCookieName, getCurrentAdmin, requireAdminSession } from "@/lib/auth";
+import {
+  getDashboardContent,
+  upsertHomepageContent,
+  updatePatentContent,
+  updateProductContent,
+  updateTeamMemberContent
+} from "@/modules/cms/services/content.service";
+import {
+  homepageSettingsSchema,
+  patentUpdateSchema,
+  productUpdateSchema,
+  teamMemberUpdateSchema
+} from "@/modules/cms/validations/admin";
+import { logger } from "@/lib/logger";
+
+type DashboardProps = {
+  searchParams?: Promise<Record<string, string | string[] | undefined>>;
+};
+
+export default async function DashboardPage({ searchParams }: DashboardProps) {
+  const admin = await getCurrentAdmin();
+  if (!admin) redirect("/admin/login");
+  const params = searchParams ? await searchParams : {};
+  const activeTab = typeof params.tab === "string" ? params.tab : "overview";
+  const savedState = typeof params.saved === "string" ? params.saved : "";
+  const errParam = params.error;
+  const validationError = (Array.isArray(errParam) ? errParam[0] : errParam) === "validation";
+
+  const { settings, products, patents, team } = await getDashboardContent();
+
+  async function logout() {
+    "use server";
+    await requireAdminSession();
+    (await cookies()).delete(authCookieName);
+    redirect("/admin/login");
+  }
+
+  async function updateSettings(formData: FormData) {
+    "use server";
+    await requireAdminSession();
+    const parsed = homepageSettingsSchema.safeParse({
+      heroTitle: formData.get("heroTitle"),
+      heroDescription: formData.get("heroDescription"),
+      missionStatement: formData.get("missionStatement")
+    });
+    if (!parsed.success) {
+      logger.warn({ tab: "settings", issues: parsed.error.flatten() }, "admin homepage validation failed");
+      redirect("/admin/dashboard?tab=settings&error=validation");
+    }
+    await upsertHomepageContent(parsed.data);
+    redirect("/admin/dashboard?tab=settings&saved=settings");
+  }
+
+  async function saveProduct(formData: FormData) {
+    "use server";
+    await requireAdminSession();
+    const parsed = productUpdateSchema.safeParse({
+      id: formData.get("id"),
+      name: formData.get("name"),
+      shortBenefit: formData.get("shortBenefit"),
+      description: formData.get("description"),
+      mrpInr: formData.get("mrpInr"),
+      sizeLabel: formData.get("sizeLabel"),
+      imageUrl: formData.get("imageUrl")
+    });
+    if (!parsed.success) {
+      logger.warn({ tab: "products", issues: parsed.error.flatten() }, "admin product validation failed");
+      redirect("/admin/dashboard?tab=products&error=validation");
+    }
+    const { id, ...data } = parsed.data;
+    await updateProductContent(id, data);
+    redirect("/admin/dashboard?tab=products&saved=products");
+  }
+
+  async function savePatent(formData: FormData) {
+    "use server";
+    await requireAdminSession();
+    const parsed = patentUpdateSchema.safeParse({
+      id: formData.get("id"),
+      title: formData.get("title"),
+      summary: formData.get("summary"),
+      status: formData.get("status")
+    });
+    if (!parsed.success) {
+      logger.warn({ tab: "patents", issues: parsed.error.flatten() }, "admin patent validation failed");
+      redirect("/admin/dashboard?tab=patents&error=validation");
+    }
+    const { id, ...data } = parsed.data;
+    await updatePatentContent(id, data);
+    redirect("/admin/dashboard?tab=patents&saved=patents");
+  }
+
+  async function saveTeamMember(formData: FormData) {
+    "use server";
+    await requireAdminSession();
+    const parsed = teamMemberUpdateSchema.safeParse({
+      id: formData.get("id"),
+      fullName: formData.get("fullName"),
+      role: formData.get("role"),
+      bio: formData.get("bio"),
+      avatarUrl: formData.get("avatarUrl")
+    });
+    if (!parsed.success) {
+      logger.warn({ tab: "team", issues: parsed.error.flatten() }, "admin team validation failed");
+      redirect("/admin/dashboard?tab=team&error=validation");
+    }
+    const { id, ...data } = parsed.data;
+    await updateTeamMemberContent(id, data);
+    redirect("/admin/dashboard?tab=team&saved=team");
+  }
+
+  const tabs = [
+    { key: "overview", label: "Overview", icon: "◻" },
+    { key: "settings", label: "Homepage", icon: "⚙" },
+    { key: "products", label: "Products", icon: "◆" },
+    { key: "patents", label: "Patents", icon: "◇" },
+    { key: "team", label: "Board", icon: "●" }
+  ];
+
+  return (
+    <div className="min-h-screen bg-surface">
+      {/* ─── Sidebar + Content Layout ─── */}
+      <div className="flex min-h-screen">
+        {/* ─── Sidebar ─── */}
+        <aside className="sticky top-0 hidden h-screen w-[260px] shrink-0 flex-col border-r border-[rgb(var(--outline-variant))]/20 bg-surface-container-low lg:flex">
+          {/* Brand */}
+          <div className="flex h-[72px] items-center gap-3 border-b border-[rgb(var(--outline-variant))]/20 px-6">
+            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary-brand">
+              <span className="text-sm font-bold text-on-primary-container">CB</span>
+            </div>
+            <div>
+              <p className="text-sm font-semibold tracking-tight text-on-surface [font-family:var(--font-headline)]">
+                Cashmir Biotech
+              </p>
+              <p className="text-[10px] tracking-wider text-on-surface/40 uppercase">Admin Console</p>
+            </div>
+          </div>
+
+          {/* Navigation */}
+          <nav className="flex-1 space-y-1 px-3 py-4">
+            <p className="mb-2 px-3 text-[10px] font-medium uppercase tracking-[0.15em] text-on-surface/35">
+              Management
+            </p>
+            {tabs.map((t) => (
+              <Link
+                key={t.key}
+                href={`/admin/dashboard?tab=${t.key}`}
+                className={`group flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-200 ${
+                  activeTab === t.key
+                    ? "bg-primary-brand text-on-primary-container shadow-sm"
+                    : "text-on-surface/55 hover:bg-surface-container hover:text-on-surface"
+                }`}
+              >
+                <span className={`text-xs ${activeTab === t.key ? "opacity-100" : "opacity-40 group-hover:opacity-70"}`}>
+                  {t.icon}
+                </span>
+                {t.label}
+              </Link>
+            ))}
+          </nav>
+
+          {/* Bottom */}
+          <div className="border-t border-[rgb(var(--outline-variant))]/20 p-4">
+            <form action={logout}>
+              <button className="flex w-full items-center gap-2 rounded-xl px-3 py-2.5 text-sm font-medium text-on-surface/50 transition-all duration-200 hover:bg-red-500/10 hover:text-red-500">
+                <span className="text-xs">↩</span>
+                Sign Out
+              </button>
+            </form>
+          </div>
+        </aside>
+
+        {/* ─── Main Content ─── */}
+        <main className="flex-1 overflow-y-auto">
+          {/* Top Bar */}
+          <header className="sticky top-0 z-20 flex h-[72px] items-center justify-between border-b border-[rgb(var(--outline-variant))]/20 bg-surface/80 px-6 backdrop-blur-xl lg:px-10">
+            {/* Mobile Nav */}
+            <div className="flex items-center gap-2 lg:hidden">
+              {tabs.map((t) => (
+                <Link
+                  key={t.key}
+                  href={`/admin/dashboard?tab=${t.key}`}
+                  className={`rounded-lg px-2.5 py-1.5 text-xs font-medium transition-all ${
+                    activeTab === t.key
+                      ? "bg-primary-brand text-on-primary-container"
+                      : "text-on-surface/50 hover:bg-surface-container"
+                  }`}
+                >
+                  {t.label}
+                </Link>
+              ))}
+            </div>
+
+            <div className="hidden lg:block">
+              <h1 className="text-xl font-semibold tracking-tight text-on-surface [font-family:var(--font-headline)]">
+                {tabs.find((t) => t.key === activeTab)?.label ?? "Dashboard"}
+              </h1>
+              <p className="text-xs text-on-surface/40">Manage your website content</p>
+            </div>
+
+            <div className="flex items-center gap-3">
+              <div className="hidden items-center gap-2 rounded-full bg-surface-container px-3 py-1.5 sm:flex">
+                <div className="h-2 w-2 rounded-full bg-emerald-500" />
+                <span className="text-xs font-medium text-on-surface/60">System Online</span>
+              </div>
+              <form action={logout} className="lg:hidden">
+                <button className="rounded-lg border border-[rgb(var(--outline-variant))]/20 px-3 py-1.5 text-xs font-medium text-on-surface/60 transition hover:bg-surface-container">
+                  Sign Out
+                </button>
+              </form>
+            </div>
+          </header>
+
+          {/* Content Area */}
+          <div className="p-6 lg:p-10">
+            {/* Success Toast */}
+            {validationError ? (
+              <div className="mb-6 flex items-center gap-3 rounded-xl border border-red-500/25 bg-red-500/5 px-5 py-3.5">
+                <p className="text-sm font-medium text-red-700 dark:text-red-400">
+                  Please check your input — some fields are invalid or too long.
+                </p>
+              </div>
+            ) : null}
+            {savedState ? (
+              <div className="mb-6 flex items-center gap-3 rounded-xl border border-emerald-500/20 bg-emerald-500/5 px-5 py-3.5">
+                <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-emerald-500/15">
+                  <span className="text-xs text-emerald-600">✓</span>
+                </div>
+                <p className="text-sm font-medium text-emerald-700 dark:text-emerald-400">
+                  Changes saved successfully
+                </p>
+              </div>
+            ) : null}
+
+            {/* ─── Overview Tab ─── */}
+            {activeTab === "overview" ? (
+              <div className="space-y-8">
+                {/* Welcome Banner */}
+                <div className="relative overflow-hidden rounded-2xl bg-primary-brand p-8">
+                  <div className="pointer-events-none absolute -right-8 -top-8 h-40 w-40 rounded-full bg-white/10 blur-2xl" />
+                  <div className="pointer-events-none absolute -bottom-12 -left-12 h-48 w-48 rounded-full bg-white/5 blur-3xl" />
+                  <p className="relative text-xs font-medium uppercase tracking-[0.2em] text-on-primary-container/50">
+                    Welcome back
+                  </p>
+                  <h2 className="relative mt-2 text-2xl font-bold text-on-primary-container [font-family:var(--font-headline)] sm:text-3xl">
+                    Admin Dashboard
+                  </h2>
+                  <p className="relative mt-1 text-sm text-on-primary-container/60">
+                    Here&apos;s what&apos;s happening with your website today.
+                  </p>
+                </div>
+
+                {/* Stat Cards */}
+                <section className="grid gap-5 sm:grid-cols-2 xl:grid-cols-3">
+                  <StatCard label="Products" value={products.length} icon="◆" accent="bg-blue-500" />
+                  <StatCard label="Patents" value={patents.length} icon="◇" accent="bg-violet-500" />
+                  <StatCard label="Board Members" value={team.length} icon="●" accent="bg-emerald-500" />
+                </section>
+
+                {/* Quick Access */}
+                <section>
+                  <h3 className="mb-4 text-sm font-semibold text-on-surface/40 uppercase tracking-wider">
+                    Quick Actions
+                  </h3>
+                  <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+                    {tabs.filter(t => t.key !== "overview").map((t) => (
+                      <Link
+                        key={t.key}
+                        href={`/admin/dashboard?tab=${t.key}`}
+                        className="group flex items-center gap-4 rounded-xl border border-[rgb(var(--outline-variant))]/15 bg-surface-container-low p-5 transition-all duration-300 hover:border-[rgb(var(--outline-variant))]/40 hover:shadow-lg hover:shadow-black/[0.03]"
+                      >
+                        <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-surface-container text-sm transition-transform duration-300 group-hover:scale-110">
+                          {t.icon}
+                        </span>
+                        <div>
+                          <p className="text-sm font-semibold text-on-surface/90">{t.label}</p>
+                          <p className="text-xs text-on-surface/40">Manage →</p>
+                        </div>
+                      </Link>
+                    ))}
+                  </div>
+                </section>
+              </div>
+            ) : null}
+
+            {/* ─── Settings Tab ─── */}
+            {activeTab === "settings" ? (
+              <section className="mx-auto max-w-2xl">
+                <div className="mb-6">
+                  <h2 className="text-xl font-semibold text-on-surface [font-family:var(--font-headline)]">Homepage Content</h2>
+                  <p className="mt-1 text-sm text-on-surface/40">Update your website&apos;s hero section and mission statement.</p>
+                </div>
+                <form action={updateSettings} className="space-y-5">
+                  <FormField label="Hero Title">
+                    <input
+                      name="heroTitle"
+                      defaultValue={settings?.heroTitle ?? ""}
+                      className="admin-input"
+                      placeholder="Enter hero title..."
+                    />
+                  </FormField>
+                  <FormField label="Hero Description">
+                    <textarea
+                      name="heroDescription"
+                      defaultValue={settings?.heroDescription ?? ""}
+                      className="admin-input min-h-[100px] resize-y"
+                      placeholder="Enter hero description..."
+                    />
+                  </FormField>
+                  <FormField label="Mission Statement">
+                    <textarea
+                      name="missionStatement"
+                      defaultValue={settings?.missionStatement ?? ""}
+                      className="admin-input min-h-[100px] resize-y"
+                      placeholder="Enter mission statement..."
+                    />
+                  </FormField>
+                  <div className="flex justify-end pt-2">
+                    <button className="admin-btn-primary">
+                      Save Changes
+                    </button>
+                  </div>
+                </form>
+              </section>
+            ) : null}
+
+            {/* ─── Products Tab ─── */}
+            {activeTab === "products" ? (
+              <section>
+                <div className="mb-6">
+                  <h2 className="text-xl font-semibold text-on-surface [font-family:var(--font-headline)]">Products</h2>
+                  <p className="mt-1 text-sm text-on-surface/40">Edit product details including pricing and descriptions.</p>
+                </div>
+                <div className="space-y-5">
+                  {products.map((p, index) => (
+                    <form
+                      key={p.id}
+                      action={saveProduct}
+                      className="group rounded-2xl border border-[rgb(var(--outline-variant))]/15 bg-surface-container-low p-6 transition-all duration-300 hover:border-[rgb(var(--outline-variant))]/30 hover:shadow-lg hover:shadow-black/[0.03]"
+                    >
+                      <input type="hidden" name="id" value={p.id} />
+                      <div className="mb-4 flex items-center gap-3">
+                        <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-surface-container text-xs font-bold text-on-surface/40">
+                          {String(index + 1).padStart(2, "0")}
+                        </span>
+                        <h3 className="text-sm font-semibold text-on-surface/70">{p.name || "Untitled Product"}</h3>
+                      </div>
+                      <div className="grid gap-4 md:grid-cols-2">
+                        <FormField label="Product Name">
+                          <input name="name" defaultValue={p.name} className="admin-input" />
+                        </FormField>
+                        <FormField label="Short Benefit">
+                          <input name="shortBenefit" defaultValue={p.shortBenefit} className="admin-input" />
+                        </FormField>
+                        <FormField label="Size Label">
+                          <input name="sizeLabel" defaultValue={p.sizeLabel} className="admin-input" />
+                        </FormField>
+                        <FormField label="Price (INR)">
+                          <input name="mrpInr" type="number" defaultValue={p.mrpInr} className="admin-input" />
+                        </FormField>
+                        <FormField label="Image URL" className="md:col-span-2">
+                          <input name="imageUrl" defaultValue={p.imageUrl} className="admin-input" />
+                        </FormField>
+                        <FormField label="Description" className="md:col-span-2">
+                          <textarea name="description" defaultValue={p.description} className="admin-input min-h-[80px] resize-y" />
+                        </FormField>
+                      </div>
+                      <div className="mt-5 flex justify-end">
+                        <button className="admin-btn-primary">Save Product</button>
+                      </div>
+                    </form>
+                  ))}
+                </div>
+              </section>
+            ) : null}
+
+            {/* ─── Patents Tab ─── */}
+            {activeTab === "patents" ? (
+              <section>
+                <div className="mb-6">
+                  <h2 className="text-xl font-semibold text-on-surface [font-family:var(--font-headline)]">Patents</h2>
+                  <p className="mt-1 text-sm text-on-surface/40">Update patent details and publication status.</p>
+                </div>
+                <div className="space-y-5">
+                  {patents.map((p, index) => (
+                    <form
+                      key={p.id}
+                      action={savePatent}
+                      className="group rounded-2xl border border-[rgb(var(--outline-variant))]/15 bg-surface-container-low p-6 transition-all duration-300 hover:border-[rgb(var(--outline-variant))]/30 hover:shadow-lg hover:shadow-black/[0.03]"
+                    >
+                      <input type="hidden" name="id" value={p.id} />
+                      <div className="mb-4 flex items-center gap-3">
+                        <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-surface-container text-xs font-bold text-on-surface/40">
+                          {String(index + 1).padStart(2, "0")}
+                        </span>
+                        <h3 className="text-sm font-semibold text-on-surface/70">{p.title || "Untitled Patent"}</h3>
+                      </div>
+                      <div className="grid gap-4">
+                        <FormField label="Patent Title">
+                          <input name="title" defaultValue={p.title} className="admin-input" />
+                        </FormField>
+                        <FormField label="Status">
+                          <input name="status" defaultValue={p.status} className="admin-input" />
+                        </FormField>
+                        <FormField label="Summary">
+                          <textarea name="summary" defaultValue={p.summary} className="admin-input min-h-[80px] resize-y" />
+                        </FormField>
+                      </div>
+                      <div className="mt-5 flex justify-end">
+                        <button className="admin-btn-primary">Save Patent</button>
+                      </div>
+                    </form>
+                  ))}
+                </div>
+              </section>
+            ) : null}
+
+            {/* ─── Team Tab ─── */}
+            {activeTab === "team" ? (
+              <section>
+                <div className="mb-6">
+                  <h2 className="text-xl font-semibold text-on-surface [font-family:var(--font-headline)]">Board Members</h2>
+                  <p className="mt-1 text-sm text-on-surface/40">Update team member profiles and biographies.</p>
+                </div>
+                <div className="space-y-5">
+                  {team.map((m, index) => (
+                    <form
+                      key={m.id}
+                      action={saveTeamMember}
+                      className="group rounded-2xl border border-[rgb(var(--outline-variant))]/15 bg-surface-container-low p-6 transition-all duration-300 hover:border-[rgb(var(--outline-variant))]/30 hover:shadow-lg hover:shadow-black/[0.03]"
+                    >
+                      <input type="hidden" name="id" value={m.id} />
+                      <div className="mb-4 flex items-center gap-3">
+                        <span className="flex h-8 w-8 items-center justify-center rounded-full bg-primary-brand text-xs font-bold text-on-primary-container">
+                          {m.fullName?.[0]?.toUpperCase() ?? String(index + 1)}
+                        </span>
+                        <h3 className="text-sm font-semibold text-on-surface/70">{m.fullName || "Unnamed Member"}</h3>
+                      </div>
+                      <div className="grid gap-4 md:grid-cols-2">
+                        <FormField label="Full Name">
+                          <input name="fullName" defaultValue={m.fullName} className="admin-input" />
+                        </FormField>
+                        <FormField label="Role / Title">
+                          <input name="role" defaultValue={m.role} className="admin-input" />
+                        </FormField>
+                        <FormField label="Avatar URL" className="md:col-span-2">
+                          <input name="avatarUrl" defaultValue={m.avatarUrl} className="admin-input" />
+                        </FormField>
+                        <FormField label="Biography" className="md:col-span-2">
+                          <textarea name="bio" defaultValue={m.bio} className="admin-input min-h-[80px] resize-y" />
+                        </FormField>
+                      </div>
+                      <div className="mt-5 flex justify-end">
+                        <button className="admin-btn-primary">Save Member</button>
+                      </div>
+                    </form>
+                  ))}
+                </div>
+              </section>
+            ) : null}
+          </div>
+        </main>
+      </div>
+    </div>
+  );
+}
+
+/* ── Stat Card Component ─────────────────────────────────────── */
+function StatCard({ label, value, icon, accent }: { label: string; value: number; icon: string; accent: string }) {
+  return (
+    <article className="group relative overflow-hidden rounded-2xl border border-[rgb(var(--outline-variant))]/15 bg-surface-container-low p-6 transition-all duration-300 hover:border-[rgb(var(--outline-variant))]/30 hover:shadow-xl hover:shadow-black/[0.04]">
+      <div className="flex items-start justify-between">
+        <div>
+          <p className="text-xs font-medium uppercase tracking-wider text-on-surface/40">{label}</p>
+          <p className="mt-3 text-4xl font-bold tracking-tight text-on-surface [font-family:var(--font-headline)]">
+            {value}
+          </p>
+        </div>
+        <span className={`flex h-11 w-11 items-center justify-center rounded-xl ${accent}/10 text-sm transition-transform duration-300 group-hover:scale-110`}>
+          {icon}
+        </span>
+      </div>
+      <div className="mt-4 h-1 w-12 rounded-full bg-surface-container transition-all duration-300 group-hover:w-20">
+        <div className={`h-full rounded-full ${accent} w-full`} />
+      </div>
+    </article>
+  );
+}
+
+/* ── Form Field Wrapper ──────────────────────────────────────── */
+function FormField({
+  label,
+  children,
+  className = ""
+}: {
+  label: string;
+  children: React.ReactNode;
+  className?: string;
+}) {
+  return (
+    <div className={className}>
+      <label className="mb-1.5 block text-[11px] font-medium uppercase tracking-wider text-on-surface/40">
+        {label}
+      </label>
+      {children}
+    </div>
+  );
+}
+
+
+================================================================================
+File: src\app\(admin)\admin\login\page.tsx
+================================================================================
+
+import { cookies } from "next/headers";
+import { redirect } from "next/navigation";
+import { authCookieName, credentialsAreValid, signAdminSession } from "@/lib/auth";
+import { logger } from "@/lib/logger";
+
+function safeReturnPath(next: string | undefined) {
+  if (!next || !next.startsWith("/") || next.startsWith("//")) return "/admin/dashboard";
+  return next;
+}
+
+type LoginPageProps = {
+  searchParams?: Promise<{ next?: string; rateLimited?: string }>;
+};
+
+export default async function AdminLoginPage({ searchParams }: LoginPageProps) {
+  const sp = searchParams ? await searchParams : {};
+  const returnTo = safeReturnPath(sp.next);
+  const rateLimited = sp.rateLimited === "1" || sp.rateLimited === "true";
+
+  async function login(formData: FormData) {
+    "use server";
+    const email = String(formData.get("email") ?? "");
+    const password = String(formData.get("password") ?? "");
+    const nextRaw = String(formData.get("next") ?? "/admin/dashboard");
+    if (!credentialsAreValid(email, password)) {
+      logger.warn({ event: "admin_login_rejected" }, "invalid admin credentials");
+      return;
+    }
+    const token = await signAdminSession(email);
+    (await cookies()).set(authCookieName, token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+      path: "/"
+    });
+    redirect(safeReturnPath(nextRaw));
+  }
+
+  return (
+    <main className="relative flex min-h-screen items-center justify-center overflow-hidden bg-surface px-6">
+      {/* Ambient Background */}
+      <div className="pointer-events-none absolute inset-0">
+        <div className="absolute left-1/2 top-[-200px] h-[500px] w-[700px] -translate-x-1/2 rounded-full bg-surface-container blur-[120px]" />
+        <div className="absolute -left-20 top-[40%] h-72 w-72 rounded-full bg-surface-container-high/40 blur-[100px]" />
+        <div className="absolute -right-20 bottom-[15%] h-80 w-80 rounded-full bg-surface-container/50 blur-[100px]" />
+      </div>
+
+      {/* Grid pattern */}
+      <div
+        className="pointer-events-none absolute inset-0 opacity-[0.02]"
+        style={{
+          backgroundImage: `linear-gradient(rgb(var(--on-background)) 1px, transparent 1px), linear-gradient(90deg, rgb(var(--on-background)) 1px, transparent 1px)`,
+          backgroundSize: "60px 60px"
+        }}
+      />
+
+      <div className="relative z-10 w-full max-w-md">
+        {/* Brand */}
+        {rateLimited ? (
+          <div className="mb-6 rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-center text-sm text-amber-800 dark:text-amber-200">
+            Too many sign-in attempts from this network. Please wait a minute, then try again.
+          </div>
+        ) : null}
+        <div className="mb-8 text-center">
+          <div className="mx-auto mb-5 flex h-14 w-14 items-center justify-center rounded-2xl bg-primary-brand shadow-lg shadow-black/10">
+            <span className="text-lg font-bold text-on-primary-container [font-family:var(--font-headline)]">CB</span>
+          </div>
+          <h1 className="text-2xl font-bold tracking-tight text-on-surface [font-family:var(--font-headline)]">
+            Welcome back
+          </h1>
+          <p className="mt-1.5 text-sm text-on-surface/40">
+            Sign in to the Cashmir Biotech admin console
+          </p>
+        </div>
+
+        {/* Login Card */}
+        <form
+          action={login}
+          className="rounded-2xl border border-[rgb(var(--outline-variant))]/20 bg-surface-container-low p-8 shadow-2xl shadow-black/[0.06]"
+        >
+          <input type="hidden" name="next" value={returnTo} />
+          <div className="space-y-5">
+            <div>
+              <label className="mb-1.5 block text-[11px] font-medium uppercase tracking-wider text-on-surface/40">
+                Email Address
+              </label>
+              <input
+                name="email"
+                type="email"
+                required
+                placeholder="admin@cashmirbiotech.com"
+                className="admin-input"
+              />
+            </div>
+
+            <div>
+              <label className="mb-1.5 block text-[11px] font-medium uppercase tracking-wider text-on-surface/40">
+                Password
+              </label>
+              <input
+                name="password"
+                type="password"
+                required
+                placeholder="••••••••"
+                className="admin-input"
+              />
+            </div>
+          </div>
+
+          <button className="admin-btn-primary mt-7 w-full">
+            Sign In
+          </button>
+        </form>
+
+        {/* Footer */}
+        <p className="mt-6 text-center text-xs text-on-surface/25">
+          Cashmir Biotech © {new Date().getFullYear()} — Secure Admin Portal
+        </p>
+      </div>
+    </main>
+  );
+}
+
+
+================================================================================
+File: src\app\(public)\page.tsx
+================================================================================
+
+import { Header2 } from "@/components/ui/header-2";
+import { Footer } from "@/components/ui/footer";
+import { PremiumHome } from "@/components/home/premium-home";
+import { getPublicHomeContent } from "@/modules/cms/services/content.service";
+
+export const dynamic = "force-dynamic";
+
+export default async function HomePage() {
+  const { settings, products, patents } = await getPublicHomeContent();
+
+  const preparedSettings = {
+    heroTitle: settings?.heroTitle ?? "The architecture of daily vitality",
+    heroDescription:
+      settings?.heroDescription ??
+      "Premium supplements with scientific discipline, patent-backed innovation, and research-grade manufacturing standards.",
+    heroSubtitle: settings?.heroSubtitle ?? "Proven biotech innovation from Kashmir biodiversity",
+    ctaPrimaryText: settings?.ctaPrimaryText ?? "Explore Catalog",
+    ctaPrimaryHref: settings?.ctaPrimaryHref ?? "/products",
+    ctaSecondaryText: settings?.ctaSecondaryText ?? "View Patents",
+    ctaSecondaryHref: settings?.ctaSecondaryHref ?? "/patents"
+  };
+
+  return (
+    <div suppressHydrationWarning className="min-h-screen bg-surface text-on-surface">
+      <Header2 />
+      <PremiumHome settings={preparedSettings} products={products} patents={patents} />
+      <Footer />
+    </div>
+  );
+}
+
+
+================================================================================
+File: src\app\(public)\patents\page.tsx
+================================================================================
+
+import { Navbar } from "@/components/site/navbar";
+import { Footer } from "@/components/site/footer";
+import { listPatents } from "@/modules/cms/services/content.service";
+
+export const dynamic = "force-dynamic";
+
+export default async function PatentsPage() {
+  const patents = await listPatents();
+
+  return (
+    <div>
+      <Navbar />
+      <main className="mx-auto max-w-7xl px-6 py-16">
+        <h1 className="mb-10 text-4xl font-bold">Patents & Scientific Registry</h1>
+        <div className="grid gap-6 md:grid-cols-2">
+          {patents.map((p) => (
+            <article key={p.id} className="rounded-xl bg-surface-container-low p-6">
+              <p className="text-xs uppercase tracking-[0.15em] text-primary-brand">{p.patentCode}</p>
+              <h2 className="mt-2 text-2xl font-semibold">{p.title}</h2>
+              <p className="mt-3 text-neutral-500">{p.summary}</p>
+              <p className="mt-4 text-sm text-neutral-500">
+                {p.jurisdiction} · {p.status}
+              </p>
+            </article>
+          ))}
+        </div>
+      </main>
+      <Footer />
+    </div>
+  );
+}
+
+
+================================================================================
+File: src\app\(public)\products\page.tsx
+================================================================================
+
+import Image from "next/image";
+import { Navbar } from "@/components/site/navbar";
+import { Footer } from "@/components/site/footer";
+import { listActiveProducts } from "@/modules/cms/services/content.service";
+
+export const dynamic = "force-dynamic";
+
+export default async function ProductsPage() {
+  const products = await listActiveProducts();
+
+  return (
+    <div>
+      <Navbar />
+      <main className="mx-auto max-w-7xl px-6 py-16">
+        <h1 className="mb-10 text-4xl font-bold">Product Catalog</h1>
+        <div className="grid gap-6 md:grid-cols-3">
+          {products.map((p) => (
+            <article key={p.id} className="rounded-xl bg-surface-container-low p-4">
+              <Image src={p.imageUrl} alt={p.name} width={900} height={900} className="h-56 w-full rounded-lg object-cover" />
+              <h2 className="mt-3 text-xl font-semibold">{p.name}</h2>
+              <p className="text-sm text-neutral-500">{p.description}</p>
+              <p className="mt-2 text-primary-brand">MRP ₹{p.mrpInr}</p>
+            </article>
+          ))}
+        </div>
+      </main>
+      <Footer />
+    </div>
+  );
+}
+
+
+================================================================================
+File: src\app\(public)\team\page.tsx
+================================================================================
+
+import Image from "next/image";
+import { Navbar } from "@/components/site/navbar";
+import { Footer } from "@/components/site/footer";
+import { listTeamMembers } from "@/modules/cms/services/content.service";
+
+export const dynamic = "force-dynamic";
+
+export default async function TeamPage() {
+  const members = await listTeamMembers();
+
+  return (
+    <div>
+      <Navbar />
+      <main className="mx-auto max-w-7xl px-6 py-16">
+        <h1 className="mb-10 text-4xl font-bold">Board Members</h1>
+        <div className="grid gap-6 md:grid-cols-2">
+          {members.map((m) => (
+            <article key={m.id} className="rounded-xl bg-surface-container-low p-5">
+              <div className="flex items-center gap-4">
+                <Image src={m.avatarUrl} alt={m.fullName} width={100} height={100} className="h-16 w-16 rounded-full object-cover" />
+                <div>
+                  <h2 className="text-xl font-semibold">{m.fullName}</h2>
+                  <p className="text-sm text-primary-brand">{m.role}</p>
+                </div>
+              </div>
+              <p className="mt-4 text-neutral-500">{m.bio}</p>
+            </article>
+          ))}
+        </div>
+      </main>
+      <Footer />
+    </div>
+  );
+}
+
+
+================================================================================
+File: src\components\home\premium-home.tsx
+================================================================================
+
+"use client";
+
+import React from "react";
+import Image from "next/image";
+import Link from "next/link";
+import { motion, useReducedMotion, useScroll, useTransform, useMotionValueEvent } from "framer-motion";
+import { ArrowRight, Atom, ShieldCheck, FlaskConical, ChevronRight, Microscope, Leaf, TestTube, Award, Package } from "lucide-react";
+import { SpotlightCard } from "@/components/ui/spotlight-card";
+import { InfiniteSlider } from "@/components/ui/infinite-slider";
+import { ProgressiveBlur } from "@/components/ui/progressive-blur";
+import { ProductRevealCard } from "@/components/ui/product-reveal-card";
+
+type ProductItem = {
+  id: string;
+  name: string;
+  shortBenefit: string;
+  description: string;
+  mrpInr: number;
+  sizeLabel: string;
+  imageUrl: string;
+};
+
+type PatentItem = {
+  id: string;
+  patentCode: string;
+  title: string;
+  summary: string;
+  jurisdiction: string;
+  status: string;
+};
+
+type Settings = {
+  heroTitle: string;
+  heroDescription: string;
+  heroSubtitle: string;
+  ctaPrimaryText: string;
+  ctaPrimaryHref: string;
+  ctaSecondaryText: string;
+  ctaSecondaryHref: string;
+};
+
+export function PremiumHome({
+  settings,
+  products,
+  patents
+}: {
+  settings: Settings;
+  products: ProductItem[];
+  patents: PatentItem[];
+}) {
+  const reducedMotionPref = useReducedMotion();
+  const [motionReady, setMotionReady] = React.useState(false);
+  React.useEffect(() => {
+    setMotionReady(true);
+  }, []);
+  const reduceMotion = motionReady ? Boolean(reducedMotionPref) : false;
+  const storyRef = React.useRef<HTMLDivElement>(null);
+  const { scrollYProgress: storyProgress } = useScroll({
+    target: storyRef,
+    offset: ["start start", "end end"]
+  });
+
+  // Hero text fades out (0% to 20% scroll)
+  const storyHeroOpacity = useTransform(storyProgress, [0, 0.1, 0.2], [1, 1, 0]);
+  const storyHeroY = useTransform(storyProgress, [0, 0.2], [0, reduceMotion ? 0 : -60]);
+
+  // Product: starts right side, moves to left (0% to 60% scroll)
+  // Moving from x=0 to x = -700px (approx to reach left side on desktop, less on mobile)
+  const storyProductX = useTransform(storyProgress, [0, 0.1, 0.6], [0, reduceMotion ? 0 : -20, reduceMotion ? 0 : -550]);
+  const storyProductRotate = useTransform(storyProgress, [0, 0.4], [-6, reduceMotion ? -6 : 0]);
+  const storyProductScale = useTransform(storyProgress, [0, 0.5], [1, reduceMotion ? 1 : 1.05]);
+
+  // Golden glow fades in behind product (30% to 60%)
+  const storyGlowOpacity = useTransform(storyProgress, [0.3, 0.6], [0, reduceMotion ? 0 : 0.8]);
+
+  // Details panel reveals (50% to 80%)
+  const storyDetailsOpacity = useTransform(storyProgress, [0.5, 0.8], [0, reduceMotion ? 0 : 1]);
+  const storyDetailsY = useTransform(storyProgress, [0.5, 0.8], [reduceMotion ? 0 : 40, 0]);
+
+  // Floating badge cards fade out early (0% to 15%)
+  const storyBadgeOpacity = useTransform(storyProgress, [0, 0.05, 0.15], [1, 1, 0]);
+
+  const ambientOpacity = useTransform(storyProgress, [0, 0.4], [1, reduceMotion ? 1 : 0.4]);
+
+  const sectionVariants = {
+    hidden: { opacity: 0, y: 26, filter: "blur(8px)" },
+    show: {
+      opacity: 1,
+      y: 0,
+      filter: "blur(0px)",
+      transition: { duration: 0.9, ease: [0.16, 1, 0.3, 1] }
+    }
+  };
+
+  return (
+    <main className="relative overflow-x-hidden">
+      {/* ── Scroll-Driven Product Storytelling ── */}
+      <section ref={storyRef} className="relative" style={{ height: "250vh" }}>
+        <div className="sticky top-0 h-screen">
+          {/* Ambient Background */}
+          <motion.div style={{ opacity: ambientOpacity }} className="absolute inset-0 -z-10">
+            <AmbientBackground />
+          </motion.div>
+
+          <div className="flex h-full items-center">
+            <div className="relative mx-auto w-full max-w-7xl px-6">
+
+              {/* ─── Hero Text Content (fades out on scroll) ─── */}
+              <motion.div
+                initial={{ opacity: 0, y: 28, filter: "blur(8px)" }}
+                animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
+                transition={{ duration: reduceMotion ? 0.01 : 1, ease: [0.2, 0.8, 0.2, 1] }}
+              >
+                <motion.div style={{ opacity: storyHeroOpacity, y: storyHeroY }} className="max-w-xl relative z-10">
+                  <div className="mb-6 flex items-center">
+                    <span className="bg-gradient-to-r from-primary/90 via-amber-400/90 to-primary/90 bg-clip-text text-[10px] font-extrabold uppercase tracking-[0.25em] text-transparent drop-shadow-sm">
+                      {settings.heroSubtitle || "Proven biotech innovation from Kashmir biodiversity"}
+                    </span>
+                  </div>
+
+                  <h1 className="max-w-2xl pb-1 text-5xl font-bold leading-[1.02] tracking-[-0.025em] text-heading md:text-7xl [font-family:var(--font-headline)]">
+                    {formatHeroTitle(settings.heroTitle)}
+                  </h1>
+
+                  <p className="mt-5 max-w-xl text-base font-medium leading-[1.8] text-on-surface/70 md:text-[1.1rem]">
+                    {settings.heroDescription}
+                  </p>
+
+                  <div className="mt-7 flex flex-wrap items-center gap-4">
+                    <Link
+                      href={settings.ctaPrimaryHref || "/products"}
+                      className="group inline-flex items-center gap-2 rounded-md bg-primary-brand px-7 py-3.5 text-sm font-bold uppercase tracking-[0.13em] text-on-primary-container shadow-[0_15px_40px_rgba(234,179,8,0.22)] transition duration-300 motion-safe:hover:scale-[1.015] hover:brightness-110"
+                    >
+                      {settings.ctaPrimaryText || "Explore Catalog"}
+                      <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
+                    </Link>
+                    <Link
+                      href={settings.ctaSecondaryHref || "/patents"}
+                      className="inline-flex items-center gap-2 rounded-md border border-primary/25 bg-transparent px-7 py-3.5 text-sm font-semibold uppercase tracking-[0.13em] text-heading transition hover:border-primary/50 hover:text-primary"
+                    >
+                      {settings.ctaSecondaryText || "View Science"}
+                    </Link>
+                  </div>
+
+                  <div className="mt-10 flex items-center gap-10 md:gap-16">
+                    {[
+                      { label: "Purity Match", value: "99.7%" },
+                      { label: "Clinical Confidence", value: "94%" },
+                      { label: "Patents", value: "10+" }
+                    ].map((m) => (
+                      <div key={m.label} className="flex flex-col">
+                        <p className="text-3xl font-bold tracking-tight text-heading [font-family:var(--font-headline)] md:text-4xl">{m.value}</p>
+                        <p className="mt-1.5 text-[10px] font-semibold uppercase tracking-[0.2em] text-on-muted/80">{m.label}</p>
+                      </div>
+                    ))}
+                  </div>
+                </motion.div>
+              </motion.div>
+
+              {/* ─── Product Image + Badges (scroll-animated: right → left) ─── */}
+              <motion.div
+                initial={{ opacity: 0, scale: 0.95, filter: "blur(8px)" }}
+                animate={{ opacity: 1, scale: 1, filter: "blur(0px)" }}
+                transition={{ duration: reduceMotion ? 0.01 : 1.15, delay: reduceMotion ? 0 : 0.15 }}
+                style={{ x: storyProductX, scale: storyProductScale }}
+                className="absolute right-0 lg:right-6 top-1/2 -translate-y-1/2 w-[320px] h-[420px] md:w-[450px] md:h-[550px] z-20"
+              >
+                {/* Golden glow - fades in as product settles */}
+                <motion.div
+                  style={{ opacity: storyGlowOpacity }}
+                  className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 h-[500px] w-[500px] rounded-full bg-[radial-gradient(circle_at_50%_50%,rgba(250,204,21,0.35),transparent_60%)] blur-[60px] pointer-events-none"
+                />
+                <motion.div
+                  style={{ opacity: storyGlowOpacity }}
+                  className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 h-[350px] w-[350px] rounded-full bg-[radial-gradient(circle_at_50%_50%,rgba(217,119,6,0.5),transparent_50%)] blur-3xl pointer-events-none"
+                />
+                
+                {/* Product Image (Rotates on scroll) */}
+                <motion.div style={{ rotate: storyProductRotate }} className="absolute inset-0 z-10">
+                  <Image
+                    src="/product%201.png"
+                    alt="Cashmir Biotech Magic Food TaxO"
+                    fill
+                    priority
+                    className="object-contain drop-shadow-[0_30px_40px_rgba(0,0,0,0.9)]"
+                  />
+                </motion.div>
+
+                {/* Badge Cards - attached to product container (but don't rotate), fade out on scroll */}
+                <motion.div
+                  style={{ opacity: storyBadgeOpacity }}
+                  className="pointer-events-none absolute inset-0 z-30"
+                >
+                  <div className="absolute -left-6 md:-left-16 top-12 md:top-20">
+                    <div className="rounded-xl border border-white/10 bg-black/40 p-3.5 shadow-[0_8px_30px_rgb(0,0,0,0.5)] backdrop-blur-2xl">
+                      <p className="text-[10px] uppercase tracking-[0.18em] text-primary">Status</p>
+                      <p className="mt-1 flex items-center gap-2 text-sm font-semibold text-white">
+                        <ShieldCheck className="h-4 w-4 text-primary" />
+                        Verified
+                      </p>
+                    </div>
+                  </div>
+                  <div className="absolute -right-2 md:-right-8 bottom-16 md:bottom-24">
+                    <div className="rounded-xl border border-white/10 bg-black/40 px-5 py-3 shadow-[0_8px_30px_rgb(0,0,0,0.5)] backdrop-blur-2xl">
+                      <p className="text-[10px] uppercase tracking-[0.18em] text-primary">Purity</p>
+                      <p className="mt-1 text-sm font-semibold text-white">Clinical Grade</p>
+                    </div>
+                  </div>
+                </motion.div>
+              </motion.div>
+
+              {/* ─── Product Details Panel (reveals on right after product moves left) ─── */}
+              <motion.div
+                style={{ opacity: storyDetailsOpacity, y: storyDetailsY }}
+                className="absolute right-[5%] top-[12%] max-w-lg z-10"
+              >
+                <p className="text-[10px] font-bold uppercase tracking-[0.25em] text-primary">Flagship Formulation</p>
+                <h2 className="mt-4 text-5xl font-bold leading-[1.05] tracking-tight text-white [font-family:var(--font-headline)] md:text-6xl">
+                  Magic Food<br /><span className="bg-gradient-to-r from-primary to-[rgb(250_204_21)] bg-clip-text text-transparent">TaxO</span>
+                </h2>
+                <p className="mt-5 text-lg leading-relaxed text-white/60">
+                  A SKUAST-K research-backed formulation containing essential nutrients, minerals, and vitamins for daily vitality.
+                </p>
+
+                <div className="mt-8 space-y-4">
+                  {[
+                    { icon: <TestTube className="h-4 w-4" />, text: "Contains nutrients, minerals & vitamins" },
+                    { icon: <Leaf className="h-4 w-4" />, text: "100% Natural · No Synthetics" },
+                    { icon: <Award className="h-4 w-4" />, text: "SKUAST-K Verified Research" },
+                    { icon: <Package className="h-4 w-4" />, text: "Net Weight: 250g" },
+                  ].map((item, i) => (
+                    <div key={i} className="flex items-center gap-4">
+                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-primary/20 bg-primary/10 text-primary">
+                        {item.icon}
+                      </div>
+                      <p className="text-sm font-medium text-white/80">{item.text}</p>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="mt-10">
+                  <Link
+                    href="/products"
+                    className="group inline-flex items-center gap-3 rounded-xl bg-gradient-to-r from-primary to-[rgb(250_204_21)] px-8 py-4 text-sm font-bold uppercase tracking-[0.12em] text-black shadow-[0_0_25px_rgba(250,204,21,0.3)] transition-all hover:brightness-110"
+                  >
+                    Explore Product
+                    <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
+                  </Link>
+                </div>
+              </motion.div>
+
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <motion.section
+        variants={sectionVariants}
+        initial="hidden"
+        whileInView="show"
+        viewport={{ once: true, margin: "-80px" }}
+        className="mx-auto max-w-7xl px-6 pb-20"
+      >
+        <div className="relative overflow-hidden rounded-3xl border border-white/10 bg-black/40 shadow-[0_8px_40px_rgb(0,0,0,0.5)] backdrop-blur-2xl">
+          <div className="[mask-image:linear-gradient(to_right,transparent,black_15%,black_85%,transparent)]">
+            <InfiniteSlider gap={16} duration={40} durationOnHover={80}>
+              <InfoTile icon={<Atom className="h-5 w-5" />} title="+42%" subtitle="Neural Path Density" />
+              <InfoTile icon={<FlaskConical className="h-5 w-5" />} title="LC-MS" subtitle="Third-Party Verification" />
+              <InfoTile icon={<ShieldCheck className="h-5 w-5" />} title="ISO Ready" subtitle="Quality System Discipline" />
+              <InfoTile icon={<Microscope className="h-5 w-5" />} title="100%" subtitle="Phyto-active Extract" />
+              <InfoTile icon={<ShieldCheck className="h-5 w-5" />} title="GMP" subtitle="Certified Facility" />
+              <InfoTile icon={<Atom className="h-5 w-5" />} title="10+" subtitle="Global Patents" />
+            </InfiniteSlider>
+          </div>
+        </div>
+      </motion.section>
+
+      <motion.section
+        variants={sectionVariants}
+        initial="hidden"
+        whileInView="show"
+        viewport={{ once: true, margin: "-100px" }}
+        className="mx-auto max-w-7xl px-6 py-12"
+      >
+        <motion.div
+          className="mb-10 flex items-end justify-between gap-5"
+        >
+          <div>
+            <p className="text-xs uppercase tracking-[0.2em] text-primary">Product Architecture</p>
+            <h2 className="mt-2 text-3xl font-bold tracking-tight text-heading [font-family:var(--font-headline)] md:text-4xl">
+              Featured Formulations
+            </h2>
+          </div>
+          <Link href="/products" className="group hidden items-center gap-2 text-sm font-semibold text-on-muted md:flex">
+            View all products <ChevronRight className="h-4 w-4 group-hover:translate-x-1 transition-transform" />
+          </Link>
+        </motion.div>
+
+        <div className="grid gap-6 md:grid-cols-3">
+          {products.map((p, idx) => (
+            <motion.article
+              key={p.id}
+              initial={{ opacity: 0, y: 30, filter: "blur(6px)" }}
+              whileInView={{ opacity: 1, y: 0, filter: "blur(0px)" }}
+              viewport={{ once: true, margin: "-80px" }}
+              transition={{ duration: 0.75, delay: idx * 0.09, ease: [0.16, 1, 0.3, 1] }}
+            >
+              <ProductRevealCard
+                name={p.name}
+                price={`₹${p.mrpInr}`}
+                image={p.imageUrl}
+                description={p.description}
+                rating={4.9}
+                reviewCount={100 + idx * 42}
+                className="w-full"
+              />
+            </motion.article>
+          ))}
+        </div>
+      </motion.section>
+
+      <motion.section
+        variants={sectionVariants}
+        initial="hidden"
+        whileInView="show"
+        viewport={{ once: true, margin: "-100px" }}
+        className="mx-auto max-w-7xl px-6 py-16"
+      >
+        <motion.div className="rounded-3xl border border-outline-variant/20 bg-surface-container-low p-7 md:p-10">
+          <div className="mb-12 flex flex-col items-start justify-between gap-6 md:flex-row md:items-end">
+            <div>
+              <p className="text-xs uppercase tracking-[0.2em] font-semibold text-primary">Proof Layer</p>
+              <h2 className="mt-3 text-4xl font-bold tracking-tight text-white [font-family:var(--font-headline)] md:text-5xl">
+                Patents & Research Registry
+              </h2>
+            </div>
+            <Link href="/patents" className="group flex items-center gap-2 text-sm font-semibold text-white/60 hover:text-primary transition-colors">
+              Full Registry <ChevronRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
+            </Link>
+          </div>
+
+          <div className="grid gap-6 md:grid-cols-3">
+            {patents.map((patent, idx) => (
+              <motion.article
+                key={patent.id}
+                initial={{ opacity: 0, y: 20 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ duration: 0.7, delay: idx * 0.1, ease: [0.16, 1, 0.3, 1] }}
+                className="group relative overflow-hidden rounded-3xl border border-white/10 bg-black/40 shadow-[0_8px_40px_rgb(0,0,0,0.5)] backdrop-blur-xl transition-colors hover:bg-black/60"
+              >
+                <SpotlightCard className="h-full p-8" glowColor="gold">
+                  <div className="inline-flex h-12 w-12 items-center justify-center rounded-xl border border-primary/30 bg-primary/10 text-primary shadow-[0_0_15px_rgba(250,204,21,0.15)] transition-transform duration-500 group-hover:scale-110">
+                    <Microscope className="h-5 w-5" />
+                  </div>
+                  <p className="mt-6 text-[10px] font-bold uppercase tracking-[0.2em] text-primary">
+                    {patent.patentCode}
+                  </p>
+                  <h3 className="mt-3 text-xl font-bold leading-tight tracking-tight text-white [font-family:var(--font-headline)]">
+                    {patent.title}
+                  </h3>
+                  <p className="mt-4 text-sm leading-relaxed text-white/60 line-clamp-4">
+                    {patent.summary}
+                  </p>
+                  <div className="mt-8 border-t border-white/10 pt-6">
+                    <p className="text-[11px] font-semibold uppercase tracking-widest text-white/40">
+                      {patent.jurisdiction} <span className="mx-2 text-white/20">•</span>{" "}
+                      <span className="text-primary/90">{patent.status}</span>
+                    </p>
+                  </div>
+                </SpotlightCard>
+              </motion.article>
+            ))}
+          </div>
+        </motion.div>
+      </motion.section>
+
+      <motion.section
+        variants={sectionVariants}
+        initial="hidden"
+        whileInView="show"
+        viewport={{ once: true }}
+        className="mx-auto max-w-7xl px-6 pb-32 pt-12"
+      >
+        <motion.div
+          className="relative overflow-hidden rounded-[2.5rem] border border-white/10 bg-black/60 shadow-[0_8px_40px_rgb(0,0,0,0.6)] backdrop-blur-2xl p-10 md:p-20"
+        >
+          <div className="pointer-events-none absolute -right-20 -top-20 h-96 w-96 rounded-full bg-[radial-gradient(circle,rgba(250,204,21,0.15),transparent_70%)] blur-3xl" />
+          <div className="pointer-events-none absolute -left-20 -bottom-20 h-96 w-96 rounded-full bg-[radial-gradient(circle,rgba(217,119,6,0.15),transparent_70%)] blur-3xl" />
+          
+          <div className="relative z-10 max-w-3xl">
+            <h3 className="text-4xl font-bold leading-tight tracking-tight text-white [font-family:var(--font-headline)] md:text-5xl lg:text-6xl">
+              Join the elite academic network around biotech precision.
+            </h3>
+            <p className="mt-6 max-w-xl text-lg text-white/70">
+              Get exclusive access to white papers, formulation updates, and early-stage clinical insights from Cashmir Biotech.
+            </p>
+            <div className="mt-10 flex max-w-xl flex-col gap-4 sm:flex-row">
+              <input
+                placeholder="Institutional Email"
+                className="h-14 flex-1 rounded-xl border border-white/10 bg-white/5 px-5 text-sm text-white placeholder:text-white/40 outline-none transition-colors focus:border-primary focus:bg-white/10"
+              />
+              <button className="h-14 shrink-0 rounded-xl bg-gradient-to-r from-primary to-[rgb(250_204_21)] px-8 text-sm font-bold uppercase tracking-[0.12em] text-black shadow-[0_0_20px_rgba(250,204,21,0.3)] transition-all hover:brightness-110">
+                Apply Now
+              </button>
+            </div>
+            <p className="mt-6 flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.2em] text-white/40">
+              <ShieldCheck className="h-4 w-4 text-primary/50" />
+              Strict verification protocols required
+            </p>
+          </div>
+        </motion.div>
+      </motion.section>
+    </main>
+  );
+}
+
+function AmbientBackground() {
+  return (
+    <div className="pointer-events-none absolute inset-0 -z-10 overflow-hidden">
+      <motion.div
+        animate={{ opacity: [0.45, 0.75, 0.45], scale: [0.95, 1.05, 0.95] }}
+        transition={{ duration: 10, repeat: Infinity }}
+        className="absolute left-1/2 top-[-220px] h-[420px] w-[620px] -translate-x-1/2 rounded-full bg-[radial-gradient(circle,rgba(234,179,8,0.18),transparent_70%)] blur-3xl md:h-[560px] md:w-[900px]"
+      />
+    </div>
+  );
+}
+
+function InfoTile({ icon, title, subtitle }: { icon: React.ReactNode; title: string; subtitle: string }) {
+  return (
+    <div className="flex w-[280px] shrink-0 items-center p-6 text-left md:w-[320px] md:p-8 hover:bg-white/[0.02] transition-colors rounded-2xl cursor-pointer">
+      <div className="mr-4 flex h-14 w-14 shrink-0 items-center justify-center rounded-full border border-primary/30 bg-primary/10 text-primary shadow-[0_0_15px_rgba(250,204,21,0.2)] md:mr-5">
+        {icon}
+      </div>
+      <div>
+        <p className="text-2xl font-bold tracking-tight text-white [font-family:var(--font-headline)] md:text-3xl">{title}</p>
+        <p className="mt-0.5 text-[10px] font-semibold uppercase tracking-[0.2em] text-white/50">{subtitle}</p>
+      </div>
+    </div>
+  );
+}
+
+function formatHeroTitle(title: string) {
+  const needle = "daily vitality";
+  if (!title.toLowerCase().includes(needle)) return title;
+
+  const idx = title.toLowerCase().indexOf(needle);
+  const before = title.slice(0, idx).trimEnd();
+  const focus = title.slice(idx, idx + needle.length);
+
+  return (
+    <>
+      <span>{before} </span>
+      <span className="bg-gradient-to-r from-primary to-[rgb(250_204_21)] bg-clip-text italic text-transparent">{focus}</span>
+    </>
+  );
+}
+
+
+================================================================================
+File: src\components\providers\theme-provider.tsx
+================================================================================
+
+"use client";
+
+import { ThemeProvider as NextThemesProvider, type ThemeProviderProps } from "next-themes";
+
+export function ThemeProvider({ children, ...props }: ThemeProviderProps) {
+  return <NextThemesProvider {...props}>{children}</NextThemesProvider>;
+}
+
+
+================================================================================
+File: src\components\ui\animated-section.tsx
+================================================================================
+
+"use client";
+import React from 'react';
+import { motion } from 'framer-motion';
+
+export function AnimatedSection({ children, className, delay = 0.1 }: { children: React.ReactNode, className?: string, delay?: number }) {
+    return (
+        <motion.div
+            initial={{ opacity: 0, y: 40, filter: 'blur(4px)' }}
+            whileInView={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
+            viewport={{ once: true, margin: "-100px" }}
+            transition={{ duration: 1, delay, ease: [0.25, 0.4, 0.25, 1] }}
+            className={className}
+        >
+            {children}
+        </motion.div>
+    );
+}
+
+export function AnimatedStaggerGroup({ children, className }: { children: React.ReactNode, className?: string }) {
+    const container = {
+        hidden: { opacity: 0 },
+        show: {
+            opacity: 1,
+            transition: { staggerChildren: 0.15 }
+        }
+    };
+
+    return (
+        <motion.div
+            variants={container}
+            initial="hidden"
+            whileInView="show"
+            viewport={{ once: true, margin: "-50px" }}
+            className={className}
+        >
+            {children}
+        </motion.div>
+    );
+}
+
+export function AnimatedStaggerItem({ children, className }: { children: React.ReactNode, className?: string }) {
+    const item = {
+        hidden: { opacity: 0, y: 30, filter: 'blur(4px)' },
+        show: { opacity: 1, y: 0, filter: 'blur(0px)', transition: { duration: 0.8, ease: [0.25, 0.4, 0.25, 1] } }
+    };
+
+    return (
+        <motion.div variants={item} className={className}>
+            {children}
+        </motion.div>
+    );
+}
+
+
+================================================================================
+File: src\components\ui\button.tsx
+================================================================================
+
+import * as React from "react"
+import { Slot } from "@radix-ui/react-slot"
+import { cva, type VariantProps } from "class-variance-authority"
+
+import { cn } from "@/lib/utils"
+
+const buttonVariants = cva(
+  "inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50",
+  {
+    variants: {
+      variant: {
+        default: "bg-primary text-primary-foreground hover:bg-primary/90",
+        destructive:
+          "bg-destructive text-destructive-foreground hover:bg-destructive/90",
+        outline:
+          "border border-input bg-background hover:bg-accent hover:text-accent-foreground",
+        secondary:
+          "bg-secondary text-secondary-foreground hover:bg-secondary/80",
+        ghost: "hover:bg-accent hover:text-accent-foreground",
+        link: "text-primary underline-offset-4 hover:underline",
+      },
+      size: {
+        default: "h-10 px-4 py-2",
+        sm: "h-9 rounded-md px-3",
+        lg: "h-11 rounded-md px-8",
+        icon: "h-10 w-10",
+      },
+    },
+    defaultVariants: {
+      variant: "default",
+      size: "default",
+    },
+  },
+)
+
+export interface ButtonProps
+  extends React.ButtonHTMLAttributes<HTMLButtonElement>,
+    VariantProps<typeof buttonVariants> {
+  asChild?: boolean
+}
+
+const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
+  ({ className, variant, size, asChild = false, ...props }, ref) => {
+    const Comp = asChild ? Slot : "button"
+    return (
+      <Comp
+        className={cn(buttonVariants({ variant, size, className }))}
+        ref={ref}
+        {...props}
+      />
+    )
+  },
+)
+Button.displayName = "Button"
+
+export { Button, buttonVariants }
+
+
+================================================================================
+File: src\components\ui\footer.tsx
+================================================================================
+
+'use client';
+import React from 'react';
+import type { ComponentProps, ReactNode } from 'react';
+import { motion, useReducedMotion } from 'framer-motion';
+import { FacebookIcon, FlaskConical, InstagramIcon, LinkedinIcon, YoutubeIcon } from 'lucide-react';
+
+interface FooterLink {
+	title: string;
+	href: string;
+	icon?: React.ComponentType<{ className?: string }>;
+}
+
+interface FooterSection {
+	label: string;
+	links: FooterLink[];
+}
+
+const footerLinks: FooterSection[] = [
+	{
+		label: 'Formulations',
+		links: [
+			{ title: 'All Products', href: '/products' },
+			{ title: 'Functional Foods', href: '/products' },
+			{ title: 'Clinical Supplements', href: '/products' },
+			{ title: 'Institutional Orders', href: '/contact' },
+		],
+	},
+	{
+		label: 'Science',
+		links: [
+			{ title: 'Our Patents', href: '/patents' },
+			{ title: 'Research Registry', href: '/patents' },
+			{ title: 'Quality Standards', href: '/quality' },
+			{ title: 'Certifications', href: '/science' },
+		],
+	},
+	{
+		label: 'Company',
+		links: [
+			{ title: 'About Cashmir Biotech', href: '/about' },
+			{ title: 'Board Members', href: '/team' },
+			{ title: 'Privacy Policy', href: '/privacy' },
+			{ title: 'Terms of Service', href: '/terms' }
+		],
+	},
+	{
+		label: 'Connect',
+		links: [
+			{ title: 'Facebook', href: '#', icon: FacebookIcon },
+			{ title: 'Instagram', href: '#', icon: InstagramIcon },
+			{ title: 'Youtube', href: '#', icon: YoutubeIcon },
+			{ title: 'LinkedIn', href: '#', icon: LinkedinIcon },
+		],
+	},
+];
+
+export function Footer() {
+	return (
+		<motion.footer
+			initial={{ opacity: 0, y: 40 }}
+			whileInView={{ opacity: 1, y: 0 }}
+			viewport={{ once: true, margin: '-50px' }}
+			transition={{ duration: 0.8, ease: 'easeOut' }}
+			className="relative mx-auto mt-20 w-full max-w-6xl rounded-t-[2.3rem] border-t border-outline-variant/30 bg-[radial-gradient(35%_150px_at_50%_0%,theme(colors.primary.DEFAULT/12%),transparent)] px-6 py-12 lg:py-16"
+		>
+			<div className="absolute left-1/2 top-0 h-px w-1/3 -translate-x-1/2 -translate-y-1/2 rounded-full bg-primary/25 blur-sm" />
+			<div className="grid w-full gap-8 xl:grid-cols-3 xl:gap-10">
+				<AnimatedContainer className="space-y-4">
+					<div className="mb-4 flex items-center gap-2 text-primary">
+						<FlaskConical className="size-7" />
+						<span className="text-xl font-bold tracking-tight text-heading [font-family:var(--font-headline)]">
+							Cashmir Biotech
+						</span>
+					</div>
+					<p className="mt-8 max-w-xs text-sm leading-relaxed text-on-muted md:mt-0">
+						Precision biotech innovation built on Kashmiri biodiversity, scientific rigor, and patented
+						formulation pathways.
+					</p>
+					<p className="text-xs uppercase tracking-[0.16em] text-on-muted">
+						© {new Date().getFullYear()} Cashmir Biotech Pvt Ltd
+					</p>
+				</AnimatedContainer>
+
+				<div className="mt-10 grid grid-cols-2 gap-8 md:grid-cols-4 xl:col-span-2 xl:mt-0">
+					{footerLinks.map((section, index) => (
+						<AnimatedContainer key={section.label} delay={0.1 + index * 0.1}>
+							<div className="mb-10 md:mb-0">
+								<h3 className="text-xs font-semibold uppercase tracking-[0.2em] text-primary">{section.label}</h3>
+								<ul className="mt-6 space-y-3 text-sm text-on-muted">
+									{section.links.map((link, i) => (
+										<li key={i}>
+											<a
+												href={link.href}
+												className="inline-flex items-center transition-all duration-300 hover:text-primary"
+											>
+												{link.icon && <link.icon className="me-2 size-4 opacity-70" />}
+												{link.title}
+											</a>
+										</li>
+									))}
+								</ul>
+							</div>
+						</AnimatedContainer>
+					))}
+				</div>
+			</div>
+		</motion.footer>
+	);
+}
+
+type ViewAnimationProps = {
+	delay?: number;
+	className?: ComponentProps<typeof motion.div>['className'];
+	children: ReactNode;
+};
+
+function AnimatedContainer({ className, delay = 0.1, children }: ViewAnimationProps) {
+	const reducedPref = useReducedMotion();
+	const [motionReady, setMotionReady] = React.useState(false);
+	React.useEffect(() => {
+		setMotionReady(true);
+	}, []);
+	/** Avoid div vs motion.div mismatch: defer reduced-motion until after first paint. */
+	const shouldReduceMotion = motionReady && Boolean(reducedPref);
+
+	if (shouldReduceMotion) {
+		return <div className={className}>{children}</div>;
+	}
+
+	return (
+		<motion.div
+			initial={{ filter: 'blur(4px)', translateY: -8, opacity: 0 }}
+			whileInView={{ filter: 'blur(0px)', translateY: 0, opacity: 1 }}
+			viewport={{ once: true }}
+			transition={{ delay, duration: 0.8 }}
+			className={className}
+		>
+			{children}
+		</motion.div>
+	);
+}
+
+
+================================================================================
+File: src\components\ui\glow-card.tsx
+================================================================================
+
+import React, { useEffect, useRef, ReactNode } from 'react';
+
+interface GlowCardProps {
+  children: ReactNode;
+  className?: string;
+  glowColor?: 'blue' | 'purple' | 'green' | 'red' | 'orange' | 'gold';
+  size?: 'sm' | 'md' | 'lg';
+  width?: string | number;
+  height?: string | number;
+  customSize?: boolean; // When true, ignores size prop and uses width/height or className
+}
+
+const glowColorMap = {
+  blue: { base: 220, spread: 200 },
+  purple: { base: 280, spread: 300 },
+  green: { base: 120, spread: 200 },
+  red: { base: 0, spread: 200 },
+  orange: { base: 30, spread: 200 },
+  gold: { base: 45, spread: 50 }, // Added gold for Cashmir theme
+};
+
+const sizeMap = {
+  sm: 'w-48 h-64',
+  md: 'w-64 h-80',
+  lg: 'w-80 h-96'
+};
+
+const GlowCard: React.FC<GlowCardProps> = ({ 
+  children, 
+  className = '', 
+  glowColor = 'blue',
+  size = 'md',
+  width,
+  height,
+  customSize = false
+}) => {
+  const cardRef = useRef<HTMLDivElement>(null);
+  const innerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const syncPointer = (e: PointerEvent) => {
+      const { clientX: x, clientY: y } = e;
+      
+      if (cardRef.current) {
+        cardRef.current.style.setProperty('--x', x.toFixed(2));
+        cardRef.current.style.setProperty('--xp', (x / window.innerWidth).toFixed(2));
+        cardRef.current.style.setProperty('--y', y.toFixed(2));
+        cardRef.current.style.setProperty('--yp', (y / window.innerHeight).toFixed(2));
+      }
+    };
+
+    document.addEventListener('pointermove', syncPointer);
+    return () => document.removeEventListener('pointermove', syncPointer);
+  }, []);
+
+  const { base, spread } = glowColorMap[glowColor];
+
+  // Determine sizing
+  const getSizeClasses = () => {
+    if (customSize) {
+      return ''; // Let className or inline styles handle sizing
+    }
+    return sizeMap[size];
+  };
+
+  const getInlineStyles = () => {
+    const baseStyles = {
+      '--base': base,
+      '--spread': spread,
+      '--radius': '14',
+      '--border': '1',
+      '--backdrop': 'transparent',
+      '--backup-border': 'var(--backdrop)',
+      '--size': '250',
+      '--outer': '1',
+      '--border-size': 'calc(var(--border, 2) * 1px)',
+      '--spotlight-size': 'calc(var(--size, 150) * 1px)',
+      '--hue': 'calc(var(--base) + (var(--xp, 0) * var(--spread, 0)))',
+      backgroundImage: `radial-gradient(
+        var(--spotlight-size) var(--spotlight-size) at
+        calc(var(--x, 0) * 1px)
+        calc(var(--y, 0) * 1px),
+        hsl(var(--hue, 210) calc(var(--saturation, 100) * 1%) calc(var(--lightness, 70) * 1%) / var(--bg-spot-opacity, 0.1)), transparent
+      )`,
+      backgroundColor: 'var(--backdrop, transparent)',
+      backgroundSize: 'calc(100% + (2 * var(--border-size))) calc(100% + (2 * var(--border-size)))',
+      backgroundPosition: '50% 50%',
+      backgroundAttachment: 'fixed',
+      border: 'var(--border-size) solid var(--backup-border)',
+      position: 'relative' as const,
+      touchAction: 'none' as const,
+    };
+
+    // Add width and height if provided
+    if (width !== undefined) {
+      baseStyles.width = typeof width === 'number' ? `${width}px` : width;
+    }
+    if (height !== undefined) {
+      baseStyles.height = typeof height === 'number' ? `${height}px` : height;
+    }
+
+    return baseStyles as React.CSSProperties;
+  };
+
+  const beforeAfterStyles = `
+    [data-glow]::before,
+    [data-glow]::after {
+      pointer-events: none;
+      content: "";
+      position: absolute;
+      inset: calc(var(--border-size) * -1);
+      border: var(--border-size) solid transparent;
+      border-radius: calc(var(--radius) * 1px);
+      background-attachment: fixed;
+      background-size: calc(100% + (2 * var(--border-size))) calc(100% + (2 * var(--border-size)));
+      background-repeat: no-repeat;
+      background-position: 50% 50%;
+      mask: linear-gradient(transparent, transparent), linear-gradient(white, white);
+      mask-clip: padding-box, border-box;
+      mask-composite: intersect;
+    }
+    
+    [data-glow]::before {
+      background-image: radial-gradient(
+        calc(var(--spotlight-size) * 0.75) calc(var(--spotlight-size) * 0.75) at
+        calc(var(--x, 0) * 1px)
+        calc(var(--y, 0) * 1px),
+        hsl(var(--hue, 210) calc(var(--saturation, 100) * 1%) calc(var(--lightness, 50) * 1%) / var(--border-spot-opacity, 1)), transparent 100%
+      );
+      filter: brightness(2);
+    }
+    
+    [data-glow]::after {
+      background-image: radial-gradient(
+        calc(var(--spotlight-size) * 0.5) calc(var(--spotlight-size) * 0.5) at
+        calc(var(--x, 0) * 1px)
+        calc(var(--y, 0) * 1px),
+        hsl(0 100% 100% / var(--border-light-opacity, 1)), transparent 100%
+      );
+    }
+    
+    [data-glow] [data-glow] {
+      position: absolute;
+      inset: 0;
+      will-change: filter;
+      opacity: var(--outer, 1);
+      border-radius: calc(var(--radius) * 1px);
+      border-width: calc(var(--border-size) * 20);
+      filter: blur(calc(var(--border-size) * 10));
+      background: none;
+      pointer-events: none;
+      border: none;
+    }
+    
+    [data-glow] > [data-glow]::before {
+      inset: -10px;
+      border-width: 10px;
+    }
+  `;
+
+  return (
+    <>
+      <style dangerouslySetInnerHTML={{ __html: beforeAfterStyles }} />
+      <div
+        ref={cardRef}
+        data-glow
+        style={getInlineStyles()}
+        className={`
+          ${getSizeClasses()}
+          ${!customSize ? 'aspect-[3/4]' : ''}
+          rounded-2xl 
+          relative 
+          backdrop-blur-[5px]
+          overflow-hidden
+          ${className}
+        `}
+      >
+        <div ref={innerRef} data-glow></div>
+        <div className="relative z-10 w-full h-full">
+          {children}
+        </div>
+      </div>
+    </>
+  );
+};
+
+export { GlowCard };
+
+
+================================================================================
+File: src\components\ui\header-2.tsx
+================================================================================
+
+'use client';
+import React, { useState, useEffect } from 'react';
+import Link from 'next/link';
+import { usePathname } from 'next/navigation';
+import { Button, buttonVariants } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
+import { MenuToggleIcon } from '@/components/ui/menu-toggle-icon';
+import { useScroll } from '@/components/ui/use-scroll';
+import { motion, AnimatePresence } from 'framer-motion';
+import { ChevronDown, FlaskConical, ArrowUpRight } from 'lucide-react';
+
+type NavItem =
+  | { label: string; href: string }
+  | {
+      label: string;
+      children: { label: string; href: string; description?: string }[];
+    };
+
+const NAV_ITEMS: NavItem[] = [
+  {
+    label: 'Company',
+    children: [
+      { label: 'About Us', href: '/about', description: 'Our mission and values' },
+      { label: 'Board Members', href: '/team', description: 'Leadership and advisors' },
+      { label: 'Certifications', href: '/certifications', description: 'Quality and compliance' },
+    ],
+  },
+  { label: 'Our Products', href: '/products' },
+  { label: 'News & Media', href: '/news' },
+  { label: 'Contact Us', href: '#contact' },
+];
+
+export function Header2() {
+  const pathname = usePathname();
+  const [open, setOpen] = useState(false);
+  const [dropdownOpen, setDropdownOpen] = useState<string | null>(null);
+  const scrolled = useScroll(10);
+
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  useEffect(() => {
+    if (open) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+    return () => {
+      document.body.style.overflow = '';
+    };
+  }, [open]);
+
+  useEffect(() => {
+    const onEscape = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setOpen(false);
+    };
+    window.addEventListener('keydown', onEscape);
+    return () => window.removeEventListener('keydown', onEscape);
+  }, []);
+
+  const isScrolled = mounted ? scrolled : false;
+
+  return (
+    <header
+      suppressHydrationWarning
+      className={cn(
+        'sticky top-3 md:top-4 z-50 mx-auto w-[calc(100%-1.5rem)] md:w-[calc(100%-2rem)] max-w-6xl transition-all duration-300 ease-out',
+        {
+          'rounded-2xl bg-surface/90 supports-[backdrop-filter]:bg-surface/60 backdrop-blur-xl shadow-[0_8px_30px_rgb(0,0,0,0.12)]':
+            isScrolled && !open,
+          'rounded-2xl bg-transparent': !isScrolled && !open,
+          'rounded-2xl bg-surface/95 backdrop-blur-xl': open,
+        }
+      )}
+    >
+      <nav
+        className={cn(
+          'flex w-full items-center justify-between px-4 transition-all duration-300 ease-out',
+          scrolled ? 'h-16 md:h-16 md:px-6' : 'h-20 md:h-20 md:px-4'
+        )}
+      >
+        {/* Restore Original Cashmir Biotech Logo */}
+        <Link
+          href="/"
+          className="group flex min-w-0 shrink-0 items-center gap-2.5 md:gap-3"
+          onClick={() => setOpen(false)}
+        >
+          <span className="relative inline-flex h-9 w-9 items-center justify-center rounded-xl border border-primary/35 bg-gradient-to-br from-primary/15 to-primary/5 shadow-[0_0_24px_rgba(234,179,8,0.12)] transition-all duration-300 group-hover:border-primary/55 group-hover:shadow-[0_0_28px_rgba(234,179,8,0.2)] md:h-10 md:w-10">
+            <FlaskConical className="h-[18px] w-[18px] text-primary md:h-5 md:w-5" />
+          </span>
+          <div className="flex flex-col leading-none">
+            <span className="text-[11px] font-semibold uppercase tracking-[0.22em] text-primary/90">
+              Cashmir
+            </span>
+            <span className="mt-0.5 text-base font-bold tracking-tight text-heading [font-family:var(--font-headline)] md:text-lg">
+              Biotech
+            </span>
+          </div>
+        </Link>
+
+        {/* Desktop Navigation */}
+        <div className="hidden items-center gap-1 md:flex md:flex-1 md:justify-center">
+          {NAV_ITEMS.map((item) =>
+            'href' in item ? (
+              <Link
+                key={item.href}
+                href={item.href}
+                className={cn(
+                  buttonVariants({ variant: 'ghost' }),
+                  'rounded-full px-4 font-medium transition-colors hover:bg-primary/10 hover:text-primary',
+                  pathname === item.href || pathname?.startsWith(item.href + '/') ? 'text-primary bg-primary/5' : 'text-on-muted hover:text-heading'
+                )}
+              >
+                {item.label}
+              </Link>
+            ) : (
+              <div
+                key={item.label}
+                className="relative"
+                onMouseEnter={() => setDropdownOpen(item.label)}
+                onMouseLeave={() => setDropdownOpen(null)}
+              >
+                <button
+                  type="button"
+                  className={cn(
+                    buttonVariants({ variant: 'ghost' }),
+                    'flex items-center gap-1 rounded-full px-4 font-medium transition-colors hover:bg-primary/10 hover:text-primary',
+                    dropdownOpen === item.label ? 'bg-primary/10 text-primary' : 'text-on-muted hover:text-heading'
+                  )}
+                  aria-expanded={dropdownOpen === item.label}
+                >
+                  {item.label}
+                  <ChevronDown
+                    className={cn(
+                      'h-3.5 w-3.5 opacity-70 transition-transform duration-300',
+                      dropdownOpen === item.label && 'rotate-180'
+                    )}
+                  />
+                </button>
+                <AnimatePresence>
+                  {dropdownOpen === item.label && (
+                    <motion.div
+                      initial={{ opacity: 0, y: 8 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: 6 }}
+                      transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
+                      className="absolute left-1/2 top-full z-50 mt-2 w-64 -translate-x-1/2"
+                    >
+                      <div className="rounded-2xl bg-surface/95 p-2 shadow-2xl shadow-black/50 backdrop-blur-xl">
+                        {item.children.map((sub) => (
+                          <Link
+                            key={sub.href}
+                            href={sub.href}
+                            className="group flex flex-col gap-0.5 rounded-xl px-4 py-3 text-left transition-colors hover:bg-primary/10"
+                          >
+                            <span className="flex items-center justify-between gap-2 text-sm font-semibold text-heading group-hover:text-primary">
+                              {sub.label}
+                              <ArrowUpRight className="h-3.5 w-3.5 shrink-0 opacity-40 transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5" />
+                            </span>
+                            {sub.description && (
+                              <span className="text-xs text-on-muted">{sub.description}</span>
+                            )}
+                          </Link>
+                        ))}
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
+            )
+          )}
+        </div>
+
+        <div className="hidden items-center gap-3 md:flex shrink-0">
+          <Link
+            href="/admin/login"
+            className={cn(
+              buttonVariants({ variant: 'outline' }),
+              'h-10 rounded-full border-none bg-surface-container-low text-[12px] font-semibold uppercase tracking-wider hover:bg-primary/10 hover:text-primary'
+            )}
+          >
+            Sign In
+          </Link>
+          <Link
+            href="/products"
+            className={cn(
+              buttonVariants({ variant: 'default' }),
+              'h-10 rounded-full bg-primary-brand font-semibold text-on-primary-container shadow-[0_4px_14px_rgba(234,179,8,0.25)] hover:brightness-110'
+            )}
+          >
+            Get Started
+          </Link>
+        </div>
+
+        <Button
+          size="icon"
+          variant="outline"
+          onClick={() => setOpen(!open)}
+          className="md:hidden h-10 w-10 rounded-xl border-none bg-surface-container-low/50 hover:bg-surface-container-high"
+        >
+          <MenuToggleIcon open={open} className="size-5 text-heading" duration={300} />
+        </Button>
+      </nav>
+
+      {/* Mobile Menu */}
+      <AnimatePresence>
+        {open && (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: 'auto' }}
+            exit={{ opacity: 0, height: 0 }}
+            className="md:hidden mt-2 rounded-2xl bg-surface/95 backdrop-blur-xl overflow-hidden shadow-xl"
+          >
+            <div className="flex flex-col gap-2 p-4">
+              {NAV_ITEMS.map((item) =>
+                'href' in item ? (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    onClick={() => setOpen(false)}
+                    className={cn(
+                      buttonVariants({ variant: 'ghost', className: 'justify-start' }),
+                      'rounded-xl text-base font-semibold',
+                      pathname === item.href ? 'bg-primary/10 text-primary' : 'text-heading'
+                    )}
+                  >
+                    {item.label}
+                  </Link>
+                ) : (
+                  <div key={item.label} className="py-2">
+                    <p className="mb-2 px-4 text-xs font-semibold uppercase tracking-wider text-on-muted">
+                      {item.label}
+                    </p>
+                    <div className="flex flex-col gap-1 pl-4 ml-2">
+                      {item.children.map((sub) => (
+                        <Link
+                          key={sub.href}
+                          href={sub.href}
+                          onClick={() => setOpen(false)}
+                          className="flex flex-col rounded-xl px-4 py-2 text-heading hover:bg-primary/5 hover:text-primary transition-colors"
+                        >
+                          <span className="font-semibold text-sm">{sub.label}</span>
+                        </Link>
+                      ))}
+                    </div>
+                  </div>
+                )
+              )}
+              <div className="mt-4 flex flex-col gap-3 pt-4 border-t border-surface-container">
+                <Link
+                  href="/admin/login"
+                  onClick={() => setOpen(false)}
+                  className={cn(
+                    buttonVariants({ variant: 'outline' }),
+                    'w-full h-12 rounded-xl border-none bg-surface-container-low font-semibold'
+                  )}
+                >
+                  Sign In
+                </Link>
+                <Link
+                  href="/products"
+                  onClick={() => setOpen(false)}
+                  className={cn(
+                    buttonVariants({ variant: 'default' }),
+                    'w-full h-12 rounded-xl bg-primary-brand font-semibold text-on-primary-container'
+                  )}
+                >
+                  Get Started
+                </Link>
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </header>
+  );
+}
+
+
+================================================================================
+File: src\components\ui\header.tsx
+================================================================================
+
+"use client";
+
+import React from "react";
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
+import {
+  FlaskConical,
+  ChevronDown,
+  ShoppingCart,
+  LayoutGrid,
+  Microscope,
+  Users,
+  Sparkles,
+  ArrowUpRight
+} from "lucide-react";
+import { Button, buttonVariants } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
+import { MenuToggleIcon } from "@/components/ui/menu-toggle-icon";
+import { useScrollPinned } from "@/components/ui/use-scroll";
+
+type NavItem =
+  | { label: string; href: string; icon?: React.ReactNode }
+  | {
+      label: string;
+      icon?: React.ReactNode;
+      children: { label: string; href: string; description?: string }[];
+    };
+
+const NAV_ITEMS: NavItem[] = [
+  { label: "Catalog", href: "/products", icon: <LayoutGrid className="h-3.5 w-3.5" /> },
+  { label: "Patents", href: "/patents", icon: <Microscope className="h-3.5 w-3.5" /> },
+  { label: "Board", href: "/team", icon: <Users className="h-3.5 w-3.5" /> },
+  {
+    label: "Resources",
+    icon: <Sparkles className="h-3.5 w-3.5" />,
+    children: [
+      { label: "Research registry", href: "/patents", description: "Patents & filings" },
+      { label: "Product catalog", href: "/products", description: "Formulations & SKUs" },
+      { label: "Leadership", href: "/team", description: "Board & advisors" },
+      { label: "Contact", href: "#contact", description: "Partnerships & press" }
+    ]
+  }
+];
+
+export function Header() {
+  const pathname = usePathname();
+  const scrolled = useScrollPinned(36, 14);
+  const [open, setOpen] = React.useState(false);
+  const [dropdownOpen, setDropdownOpen] = React.useState(false);
+  const reducedMotionPref = useReducedMotion();
+  const [motionReady, setMotionReady] = React.useState(false);
+
+  React.useEffect(() => setMotionReady(true), []);
+  const reduceMotion = motionReady ? Boolean(reducedMotionPref) : false;
+
+  React.useEffect(() => {
+    document.body.style.overflow = open ? "hidden" : "";
+    return () => {
+      document.body.style.overflow = "";
+    };
+  }, [open]);
+
+  React.useEffect(() => {
+    const onEscape = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setOpen(false);
+    };
+    window.addEventListener("keydown", onEscape);
+    return () => window.removeEventListener("keydown", onEscape);
+  }, []);
+
+  return (
+    <header className="pointer-events-none fixed inset-x-0 top-0 z-50">
+      <div
+        className={cn(
+          "pointer-events-none mx-auto max-w-7xl px-4 transition-[padding] duration-300 ease-out sm:px-6 lg:px-8",
+          scrolled ? "pt-3 pb-2 md:pt-4 md:pb-3" : "pt-4 pb-0 md:pt-6"
+        )}
+      >
+        <nav
+          className={cn(
+            "pointer-events-auto relative flex min-h-[52px] w-full items-center justify-between gap-3 border backdrop-blur-xl transition-[border-radius,background-color,box-shadow,border-color] duration-300 ease-out md:min-h-[56px] md:gap-4",
+            scrolled
+              ? "rounded-2xl border-primary/25 bg-surface/93 px-3 py-2 shadow-[0_22px_56px_rgba(0,0,0,0.52),0_0_0_1px_rgba(234,179,8,0.08)_inset] md:px-5"
+              : "rounded-none border-transparent bg-[rgba(13,13,13,0.48)] px-3 py-2 shadow-none md:px-4"
+          )}
+        >
+          {/* Brand */}
+          <Link
+            href="/"
+            className="group flex min-w-0 shrink-0 items-center gap-2.5 md:gap-3"
+            onClick={() => setOpen(false)}
+          >
+            <span className="relative inline-flex h-9 w-9 items-center justify-center rounded-xl border border-primary/35 bg-gradient-to-br from-primary/15 to-primary/5 shadow-[0_0_24px_rgba(234,179,8,0.12)] transition-all duration-300 group-hover:border-primary/55 group-hover:shadow-[0_0_28px_rgba(234,179,8,0.2)] md:h-10 md:w-10">
+              <FlaskConical className="h-[18px] w-[18px] text-primary md:h-5 md:w-5" />
+            </span>
+            <div className="flex flex-col leading-none">
+              <span className="text-[11px] font-semibold uppercase tracking-[0.22em] text-primary/90">
+                Cashmir
+              </span>
+              <span className="mt-0.5 text-base font-bold tracking-tight text-heading [font-family:var(--font-headline)] md:text-lg">
+                Biotech
+              </span>
+            </div>
+          </Link>
+
+          {/* Center nav — desktop (true center between logo & CTAs) */}
+          <div className="hidden min-w-0 flex-1 justify-center md:flex">
+            <div className="flex max-w-full flex-wrap items-center justify-center gap-0.5 rounded-full border border-outline-variant/15 bg-surface-container-low/50 px-1 py-1 shadow-inner shadow-black/20 backdrop-blur-sm">
+              {NAV_ITEMS.map((item) =>
+                "href" in item ? (
+                  <DesktopNavLink key={item.href} href={item.href} pathname={pathname} icon={item.icon}>
+                    {item.label}
+                  </DesktopNavLink>
+                ) : (
+                  <div
+                    key={item.label}
+                    className="relative"
+                    onMouseEnter={() => setDropdownOpen(true)}
+                    onMouseLeave={() => setDropdownOpen(false)}
+                  >
+                    <button
+                      type="button"
+                      className={cn(
+                        "flex items-center gap-1.5 rounded-full px-3 py-2 text-[11px] font-semibold uppercase tracking-[0.14em] transition-colors",
+                        dropdownOpen ? "bg-primary/15 text-primary" : "text-on-muted hover:bg-surface-container-high/80 hover:text-heading"
+                      )}
+                      aria-expanded={dropdownOpen}
+                      aria-haspopup="true"
+                    >
+                      {item.icon}
+                      {item.label}
+                      <ChevronDown
+                        className={cn(
+                          "h-3.5 w-3.5 opacity-70 transition-transform duration-300",
+                          dropdownOpen && "rotate-180"
+                        )}
+                      />
+                    </button>
+                    <AnimatePresence>
+                      {dropdownOpen && (
+                        <motion.div
+                          initial={reduceMotion ? false : { opacity: 0, y: 8 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          exit={reduceMotion ? undefined : { opacity: 0, y: 6 }}
+                          transition={{ duration: reduceMotion ? 0 : 0.22, ease: [0.22, 1, 0.36, 1] }}
+                          className="absolute left-1/2 top-full z-50 mt-3 w-[min(100vw-2rem,280px)] -translate-x-1/2"
+                        >
+                          <div className="rounded-xl border border-primary/20 bg-surface/95 p-1.5 shadow-2xl shadow-black/50 backdrop-blur-xl">
+                            {item.children.map((sub) => (
+                              <Link
+                                key={sub.href + sub.label}
+                                href={sub.href}
+                                className="flex flex-col gap-0.5 rounded-lg px-3 py-2.5 text-left transition-colors hover:bg-primary/10"
+                              >
+                                <span className="flex items-center justify-between gap-2 text-sm font-medium text-heading">
+                                  {sub.label}
+                                  <ArrowUpRight className="h-3.5 w-3.5 shrink-0 opacity-40" />
+                                </span>
+                                {sub.description ? (
+                                  <span className="text-[11px] text-on-muted">{sub.description}</span>
+                                ) : null}
+                              </Link>
+                            ))}
+                          </div>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                  </div>
+                )
+              )}
+            </div>
+          </div>
+
+          {/* Actions */}
+          <div className="flex shrink-0 items-center justify-end gap-2 md:gap-2.5">
+            <Link
+              href="/admin/login"
+              className={cn(
+                buttonVariants({ variant: "outline", size: "sm" }),
+                "hidden h-9 border-primary/25 bg-transparent text-[11px] font-semibold uppercase tracking-[0.12em] text-heading hover:border-primary/40 hover:bg-primary/10 hover:text-primary md:inline-flex"
+              )}
+            >
+              Admin
+            </Link>
+            <Button
+              size="sm"
+              className="hidden h-9 gap-2 bg-primary-brand px-4 text-[11px] font-bold uppercase tracking-[0.12em] text-on-primary-container shadow-[0_8px_28px_rgba(234,179,8,0.22)] transition hover:brightness-110 md:inline-flex"
+              asChild
+            >
+              <Link href="/products">
+                <ShoppingCart className="h-4 w-4" />
+                <span>Inquire</span>
+              </Link>
+            </Button>
+
+            <Button
+              size="icon"
+              variant="ghost"
+              className="h-10 w-10 text-on-muted hover:bg-surface-container-high/60 hover:text-heading md:hidden"
+              asChild
+            >
+              <Link href="/products" aria-label="Catalog">
+                <ShoppingCart className="h-5 w-5" />
+              </Link>
+            </Button>
+            <Button
+              size="icon"
+              variant="outline"
+              className="h-10 w-10 border-primary/20 bg-surface-container-low/50 hover:bg-surface-container-high md:hidden"
+              onClick={() => setOpen((o) => !o)}
+              aria-label={open ? "Close menu" : "Open menu"}
+              aria-expanded={open}
+            >
+              <MenuToggleIcon open={open} className="size-5 text-heading" duration={280} />
+            </Button>
+          </div>
+        </nav>
+      </div>
+
+      {/* Mobile drawer */}
+      <AnimatePresence>
+        {open ? (
+          <>
+            <motion.button
+              type="button"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: reduceMotion ? 0 : 0.25 }}
+              className="fixed inset-0 z-40 bg-black/65 backdrop-blur-[2px] md:hidden"
+              aria-label="Close menu"
+              onClick={() => setOpen(false)}
+            />
+            <motion.aside
+              role="dialog"
+              aria-modal="true"
+              initial={reduceMotion ? false : { x: "100%" }}
+              animate={{ x: 0 }}
+              exit={reduceMotion ? undefined : { x: "100%" }}
+              transition={
+                reduceMotion
+                  ? { duration: 0 }
+                  : { type: "spring", damping: 30, stiffness: 320, mass: 0.85 }
+              }
+              className="fixed bottom-0 right-0 top-0 z-50 flex w-[min(100%,400px)] flex-col border-l border-primary/20 bg-surface shadow-[-24px_0_48px_rgba(0,0,0,0.45)] backdrop-blur-xl md:hidden"
+            >
+              <div className="flex items-center justify-between border-b border-outline-variant/25 px-5 py-4">
+                <span className="text-xs font-semibold uppercase tracking-[0.2em] text-primary">Navigate</span>
+                <button
+                  type="button"
+                  onClick={() => setOpen(false)}
+                  className="rounded-lg p-2 text-on-muted hover:bg-surface-container-high hover:text-heading"
+                  aria-label="Close"
+                >
+                  <MenuToggleIcon open className="size-5" duration={200} />
+                </button>
+              </div>
+              <nav className="flex flex-1 flex-col gap-1 overflow-y-auto px-3 py-4">
+                {NAV_ITEMS.map((item, idx) =>
+                  "href" in item ? (
+                    <motion.div
+                      key={item.href}
+                      initial={reduceMotion ? false : { opacity: 0, x: 16 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ delay: reduceMotion ? 0 : idx * 0.05 }}
+                    >
+                      <Link
+                        href={item.href}
+                        onClick={() => setOpen(false)}
+                        className={cn(
+                          "flex items-center gap-3 rounded-xl px-4 py-3.5 text-base font-semibold transition-colors",
+                          pathname === item.href || pathname.startsWith(item.href + "/")
+                            ? "bg-primary/15 text-primary"
+                            : "text-heading hover:bg-surface-container-high"
+                        )}
+                      >
+                        <span className="flex h-9 w-9 items-center justify-center rounded-lg border border-outline-variant/30 bg-surface-container-low text-primary">
+                          {item.icon}
+                        </span>
+                        {item.label}
+                      </Link>
+                    </motion.div>
+                  ) : (
+                    <div key={item.label} className="py-2">
+                      <p className="mb-2 px-4 text-[10px] font-semibold uppercase tracking-[0.2em] text-on-muted">
+                        {item.label}
+                      </p>
+                      <div className="flex flex-col gap-0.5">
+                        {item.children.map((sub, j) => (
+                          <motion.div
+                            key={sub.href + sub.label}
+                            initial={reduceMotion ? false : { opacity: 0, x: 12 }}
+                            animate={{ opacity: 1, x: 0 }}
+                            transition={{ delay: reduceMotion ? 0 : 0.08 + j * 0.04 }}
+                          >
+                            <Link
+                              href={sub.href}
+                              onClick={() => setOpen(false)}
+                              className="flex flex-col rounded-xl px-4 py-3 text-heading hover:bg-surface-container-high"
+                            >
+                              <span className="font-medium">{sub.label}</span>
+                              {sub.description ? (
+                                <span className="mt-0.5 text-xs text-on-muted">{sub.description}</span>
+                              ) : null}
+                            </Link>
+                          </motion.div>
+                        ))}
+                      </div>
+                    </div>
+                  )
+                )}
+              </nav>
+              <div className="border-t border-outline-variant/25 p-4 space-y-3">
+                <Link
+                  href="/admin/login"
+                  onClick={() => setOpen(false)}
+                  className={cn(
+                    buttonVariants({ variant: "outline" }),
+                    "w-full h-11 border-primary/30 font-semibold uppercase tracking-[0.1em] text-heading"
+                  )}
+                >
+                  Admin login
+                </Link>
+                <Button className="h-11 w-full bg-primary-brand font-bold uppercase tracking-[0.12em] text-on-primary-container shadow-lg shadow-primary/20" asChild>
+                  <Link href="/products" onClick={() => setOpen(false)}>
+                    Inquire / Catalog
+                  </Link>
+                </Button>
+              </div>
+            </motion.aside>
+          </>
+        ) : null}
+      </AnimatePresence>
+    </header>
+  );
+}
+
+function DesktopNavLink({
+  href,
+  pathname,
+  children,
+  icon
+}: {
+  href: string;
+  pathname: string | null;
+  children: React.ReactNode;
+  icon?: React.ReactNode;
+}) {
+  const active = pathname === href || (href !== "/" && pathname?.startsWith(href));
+
+  return (
+    <Link
+      href={href}
+      className={cn(
+        "group relative flex items-center gap-2 rounded-full px-3 py-2 text-[11px] font-semibold uppercase tracking-[0.14em] transition-colors duration-200",
+        active ? "text-primary" : "text-on-muted hover:bg-surface-container-high/70 hover:text-heading"
+      )}
+    >
+      {icon ? <span className={cn("opacity-70 transition-opacity", active && "text-primary opacity-100")}>{icon}</span> : null}
+      <span className="relative">
+        {children}
+        <span
+          className={cn(
+            "absolute -bottom-1 left-0 right-0 mx-auto h-[2px] max-w-[75%] rounded-full bg-primary transition-[opacity,transform] duration-300 ease-out",
+            active ? "opacity-100 scale-x-100" : "scale-x-0 opacity-0 group-hover:scale-x-75 group-hover:opacity-40"
+          )}
+          aria-hidden
+        />
+      </span>
+    </Link>
+  );
+}
+
+export const WordmarkIcon = (props: React.ComponentProps<"svg">) => (
+  <svg viewBox="0 0 84 24" fill="currentColor" {...props}>
+    <path d="M45.035 23.984c-1.34-.062-2.566-.441-3.777-1.16-1.938-1.152-3.465-3.187-4.02-5.36-.199-.784-.238-1.128-.234-2.058 0-.691.008-.87.062-1.207.23-1.5.852-2.883 1.852-4.144.297-.371 1.023-1.09 1.41-1.387 1.399-1.082 2.84-1.68 4.406-1.816.536-.047 1.528-.02 2.047.054 1.227.184 2.227.543 3.106 1.121 1.277.84 2.5 2.184 3.367 3.7.098.168.172.308.172.312-.004 0-1.047.723-2.32 1.598l-2.711 1.867c-.61.422-2.91 2.008-2.993 2.062l-.074.047-1-1.574c-.55-.867-1.008-1.594-1.012-1.61-.007-.019.922-.648 2.188-1.476 1.215-.793 2.2-1.453 2.191-1.46-.02-.032-.508-.27-.691-.34a5 5 0 0 0-.465-.13c-.371-.09-1.105-.125-1.426-.07-1.285.219-2.336 1.3-2.777 2.852-.215.761-.242 1.636-.074 2.355.129.527.383 1.102.691 1.543.234.332.727.82 1.047 1.031.664.434 1.195.586 1.969.555.613-.023 1.027-.129 1.64-.426 1.184-.574 2.16-1.554 2.828-2.843.122-.235.208-.372.227-.368.082.032 3.77 1.938 3.79 1.961.034.032-.407.93-.696 1.414a12 12 0 0 1-1.051 1.477c-.36.422-1.102 1.14-1.492 1.445a9.9 9.9 0 0 1-3.23 1.684 9.2 9.2 0 0 1-2.95.351M74.441 23.996c-1.488-.043-2.8-.363-4.066-.992-1.687-.848-2.992-2.14-3.793-3.774-.605-1.234-.863-2.402-.863-3.894.004-1.149.176-2.156.527-3.11.14-.378.531-1.171.75-1.515 1.078-1.703 2.758-2.934 4.805-3.524.847-.242 1.465-.332 2.433-.351 1.032-.024 1.743.055 2.48.277l.31.09.007 2.48c.004 1.364 0 2.481-.008 2.481a1 1 0 0 1-.12-.055c-.688-.347-2.09-.488-2.962-.296-.754.167-1.296.453-1.785.945a3.7 3.7 0 0 0-1.043 2.11c-.047.382-.02 1.109.055 1.437a3.4 3.4 0 0 0 .941 1.738c.75.75 1.715 1.102 2.875 1.05.645-.03 1.118-.14 1.563-.366q1.721-.864 2.02-3.145c.035-.293.042-1.266.042-7.957V0H84l-.012 8.434c-.008 7.851-.011 8.457-.054 8.757-.196 1.274-.586 2.25-1.301 3.243-1.293 1.808-3.555 3.07-6.145 3.437-.664.098-1.43.14-2.047.125M9.848 23.574a14 14 0 0 1-1.137-.152c-2.352-.426-4.555-1.781-6.117-3.774-.27-.335-.75-1.05-.95-1.406-1.156-2.047-1.695-4.27-1.64-6.77.047-1.995.43-3.66 1.23-5.316.524-1.086 1.04-1.87 1.793-2.715C4.567 1.72 6.652.535 8.793.171 9.68.02 10.093 0 12.297 0h1.789v5.441l-.961.016c-2.36.04-3.441.215-4.441.719-.836.414-1.278.879-1.895 1.976-.219.399-.535 1.02-.535 1.063 0 .02 1.285.027 3.918.027h3.914v5.113h-3.914c-2.54 0-3.918.008-3.918.028 0 .05.254.597.441.953.344.656.649 1.086 1.051 1.48.668.657 1.356.985 2.445 1.16.645.106 1.274.145 2.61.16l1.285.016v5.442l-2.055-.004a120 120 0 0 1-2.183-.016M16.469 14.715c0-5.504.011-9.04.031-9.29a5.54 5.54 0 0 1 1.527-3.48c.778-.82 1.922-1.457 3.118-1.734C21.915.035 22.422 0 24.39 0h1.652v4.914h-1.426c-1.324 0-1.445.004-1.644.055-.739.191-1.059.699-1.106 1.754l-.015.355h4.191v4.914h-4.184v11.602h-5.39ZM27.023 14.727c0-5.223.012-9.04.028-9.278.129-1.98 1.234-3.68 3.012-4.62.87-.462 1.777-.716 2.851-.802A61 61 0 0 1 34.945 0h1.649v4.914h-1.426c-1.32 0-1.441.004-1.64.055-.739.191-1.063.699-1.106 1.754l-.02.355h4.192v4.914H32.41v11.602h-5.387ZM55.48 15.406V7.22h4.66v1.363c0 1.3.005 1.363.051 1.363.04 0 .075-.054.133-.203.38-.98.969-1.68 1.711-2.031.563-.266 1.422-.43 2.492-.48l.414-.02v4.914l-.414.035c-.738.063-1.597.195-2.058.313-.297.082-.688.28-.875.449-.324.289-.532.703-.625 1.254-.094.547-.098.879-.098 5.144v4.274h-5.39Zm0 0" />
+  </svg>
+);
+
+
+================================================================================
+File: src\components\ui\index.ts
+================================================================================
+
+export * from "./button";
+export * from "./menu-toggle-icon";
+export * from "./navigation-menu";
+export * from "./use-scroll";
+
+
+================================================================================
+File: src\components\ui\infinite-slider.tsx
+================================================================================
+
+'use client';
+
+import { cn } from '@/lib/utils';
+import { useMotionValue, animate, motion } from 'framer-motion';
+import { useState, useEffect } from 'react';
+import useMeasure from 'react-use-measure';
+
+type InfiniteSliderProps = {
+  children: React.ReactNode;
+  gap?: number;
+  duration?: number;
+  durationOnHover?: number;
+  direction?: 'horizontal' | 'vertical';
+  reverse?: boolean;
+  className?: string;
+};
+
+export function InfiniteSlider({
+  children,
+  gap = 16,
+  duration = 25,
+  durationOnHover,
+  direction = 'horizontal',
+  reverse = false,
+  className,
+}: InfiniteSliderProps) {
+  const [currentDuration, setCurrentDuration] = useState(duration);
+  const [ref, { width, height }] = useMeasure();
+  const translation = useMotionValue(0);
+  const [isTransitioning, setIsTransitioning] = useState(false);
+  const [key, setKey] = useState(0);
+
+  useEffect(() => {
+    let controls;
+    const size = direction === 'horizontal' ? width : height;
+    const contentSize = size + gap;
+    const from = reverse ? -contentSize / 2 : 0;
+    const to = reverse ? 0 : -contentSize / 2;
+
+    if (isTransitioning) {
+      controls = animate(translation, [translation.get(), to], {
+        ease: 'linear',
+        duration:
+          currentDuration * Math.abs((translation.get() - to) / contentSize),
+        onComplete: () => {
+          setIsTransitioning(false);
+          setKey((prevKey) => prevKey + 1);
+        },
+      });
+    } else {
+      controls = animate(translation, [from, to], {
+        ease: 'linear',
+        duration: currentDuration,
+        repeat: Infinity,
+        repeatType: 'loop',
+        repeatDelay: 0,
+        onRepeat: () => {
+          translation.set(from);
+        },
+      });
+    }
+
+    return controls?.stop;
+  }, [
+    key,
+    translation,
+    currentDuration,
+    width,
+    height,
+    gap,
+    isTransitioning,
+    direction,
+    reverse,
+  ]);
+
+  const hoverProps = durationOnHover
+    ? {
+        onHoverStart: () => {
+          setIsTransitioning(true);
+          setCurrentDuration(durationOnHover);
+        },
+        onHoverEnd: () => {
+          setIsTransitioning(true);
+          setCurrentDuration(duration);
+        },
+      }
+    : {};
+
+  return (
+    <div className={cn('overflow-hidden', className)}>
+      <motion.div
+        className='flex w-max'
+        style={{
+          ...(direction === 'horizontal'
+            ? { x: translation }
+            : { y: translation }),
+          gap: `${gap}px`,
+          flexDirection: direction === 'horizontal' ? 'row' : 'column',
+        }}
+        ref={ref}
+        {...hoverProps}
+      >
+        {children}
+        {children}
+      </motion.div>
+    </div>
+  );
+}
+
+
+================================================================================
+File: src\components\ui\menu-toggle-icon.tsx
+================================================================================
+
+"use client";
+import React from 'react';
+import { cn } from '@/lib/utils';
+
+type MenuToggleProps = React.ComponentProps<'svg'> & {
+	open: boolean;
+	duration?: number;
+};
+
+export function MenuToggleIcon({
+	open,
+	className,
+	fill = 'none',
+	stroke = 'currentColor',
+	strokeWidth = 2.5,
+	strokeLinecap = 'round',
+	strokeLinejoin = 'round',
+	duration = 500,
+	...props
+}: MenuToggleProps) {
+	return (
+		<svg
+			strokeWidth={strokeWidth}
+			fill={fill}
+			stroke={stroke}
+			viewBox="0 0 32 32"
+			strokeLinecap={strokeLinecap}
+			strokeLinejoin={strokeLinejoin}
+			className={cn(
+				'transition-transform ease-in-out',
+				open && '-rotate-45',
+				className,
+			)}
+			style={{
+				transitionDuration: `${duration}ms`,
+			}}
+			{...props}
+		>
+			<path
+				className={cn(
+					'transition-all ease-in-out',
+					open
+						? '[stroke-dasharray:20_300] [stroke-dashoffset:-32.42px]'
+						: '[stroke-dasharray:12_63]',
+				)}
+				style={{
+					transitionDuration: `${duration}ms`,
+				}}
+				d="M27 10 13 10C10.8 10 9 8.2 9 6 9 3.5 10.8 2 13 2 15.2 2 17 3.8 17 6L17 26C17 28.2 18.8 30 21 30 23.2 30 25 28.2 25 26 25 23.8 23.2 22 21 22L7 22"
+			/>
+			<path d="M7 16 27 16" />
+		</svg>
+	);
+}
+
+
+================================================================================
+File: src\components\ui\navigation-menu.tsx
+================================================================================
+
+import * as React from "react"
+import { ChevronDownIcon } from "@radix-ui/react-icons"
+import * as NavigationMenuPrimitive from "@radix-ui/react-navigation-menu"
+import { cva } from "class-variance-authority"
+
+import { cn } from "@/lib/utils"
+
+const NavigationMenu = React.forwardRef<
+  React.ElementRef<typeof NavigationMenuPrimitive.Root>,
+  React.ComponentPropsWithoutRef<typeof NavigationMenuPrimitive.Root>
+>(({ className, children, ...props }, ref) => (
+  <NavigationMenuPrimitive.Root
+    ref={ref}
+    className={cn(
+      "relative z-10 flex max-w-max flex-1 items-center justify-center",
+      className
+    )}
+    {...props}
+  >
+    {children}
+    <NavigationMenuViewport />
+  </NavigationMenuPrimitive.Root>
+))
+NavigationMenu.displayName = NavigationMenuPrimitive.Root.displayName
+
+const NavigationMenuList = React.forwardRef<
+  React.ElementRef<typeof NavigationMenuPrimitive.List>,
+  React.ComponentPropsWithoutRef<typeof NavigationMenuPrimitive.List>
+>(({ className, ...props }, ref) => (
+  <NavigationMenuPrimitive.List
+    ref={ref}
+    className={cn(
+      "group flex flex-1 list-none items-center justify-center space-x-1",
+      className
+    )}
+    {...props}
+  />
+))
+NavigationMenuList.displayName = NavigationMenuPrimitive.List.displayName
+
+const NavigationMenuItem = NavigationMenuPrimitive.Item
+
+const navigationMenuTriggerStyle = cva(
+  "group inline-flex h-9 w-max items-center justify-center rounded-md bg-background px-4 py-2 text-sm font-medium transition-colors hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground focus:outline-none disabled:pointer-events-none disabled:opacity-50 data-[active]:bg-accent/50 data-[state=open]:bg-accent/50"
+)
+
+const NavigationMenuTrigger = React.forwardRef<
+  React.ElementRef<typeof NavigationMenuPrimitive.Trigger>,
+  React.ComponentPropsWithoutRef<typeof NavigationMenuPrimitive.Trigger>
+>(({ className, children, ...props }, ref) => (
+  <NavigationMenuPrimitive.Trigger
+    ref={ref}
+    className={cn(navigationMenuTriggerStyle(), "group", className)}
+    {...props}
+  >
+    {children}{" "}
+    <ChevronDownIcon
+      className="relative top-[1px] ml-1 h-3 w-3 transition duration-300 group-data-[state=open]:rotate-180"
+      aria-hidden="true"
+    />
+  </NavigationMenuPrimitive.Trigger>
+))
+NavigationMenuTrigger.displayName = NavigationMenuPrimitive.Trigger.displayName
+
+const NavigationMenuContent = React.forwardRef<
+  React.ElementRef<typeof NavigationMenuPrimitive.Content>,
+  React.ComponentPropsWithoutRef<typeof NavigationMenuPrimitive.Content>
+>(({ className, ...props }, ref) => (
+  <NavigationMenuPrimitive.Content
+    ref={ref}
+    className={cn(
+      "left-0 top-0 w-full data-[motion^=from-]:animate-in data-[motion^=to-]:animate-out data-[motion^=from-]:fade-in data-[motion^=to-]:fade-out data-[motion=from-end]:slide-in-from-right-52 data-[motion=from-start]:slide-in-from-left-52 data-[motion=to-end]:slide-out-to-right-52 data-[motion=to-start]:slide-out-to-left-52 md:absolute md:w-auto ",
+      className
+    )}
+    {...props}
+  />
+))
+NavigationMenuContent.displayName = NavigationMenuPrimitive.Content.displayName
+
+const NavigationMenuLink = NavigationMenuPrimitive.Link
+
+const NavigationMenuViewport = React.forwardRef<
+  React.ElementRef<typeof NavigationMenuPrimitive.Viewport>,
+  React.ComponentPropsWithoutRef<typeof NavigationMenuPrimitive.Viewport>
+>(({ className, ...props }, ref) => (
+  <div className={cn("absolute left-0 top-full flex justify-center")}>
+    <NavigationMenuPrimitive.Viewport
+      className={cn(
+        "origin-top-center relative mt-1.5 h-[var(--radix-navigation-menu-viewport-height)] w-full overflow-hidden rounded-md border bg-popover text-popover-foreground shadow data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-90 md:w-[var(--radix-navigation-menu-viewport-width)]",
+        className
+      )}
+      ref={ref}
+      {...props}
+    />
+  </div>
+))
+NavigationMenuViewport.displayName =
+  NavigationMenuPrimitive.Viewport.displayName
+
+const NavigationMenuIndicator = React.forwardRef<
+  React.ElementRef<typeof NavigationMenuPrimitive.Indicator>,
+  React.ComponentPropsWithoutRef<typeof NavigationMenuPrimitive.Indicator>
+>(({ className, ...props }, ref) => (
+  <NavigationMenuPrimitive.Indicator
+    ref={ref}
+    className={cn(
+      "top-full z-[1] flex h-1.5 items-end justify-center overflow-hidden data-[state=visible]:animate-in data-[state=hidden]:animate-out data-[state=hidden]:fade-out data-[state=visible]:fade-in",
+      className
+    )}
+    {...props}
+  >
+    <div className="relative top-[60%] h-2 w-2 rotate-45 rounded-tl-sm bg-border shadow-md" />
+  </NavigationMenuPrimitive.Indicator>
+))
+NavigationMenuIndicator.displayName =
+  NavigationMenuPrimitive.Indicator.displayName
+
+export {
+  navigationMenuTriggerStyle,
+  NavigationMenu,
+  NavigationMenuList,
+  NavigationMenuItem,
+  NavigationMenuContent,
+  NavigationMenuTrigger,
+  NavigationMenuLink,
+  NavigationMenuIndicator,
+  NavigationMenuViewport,
+}
+
+
+================================================================================
+File: src\components\ui\product-reveal-card.tsx
+================================================================================
+
+"use client"
+
+import { motion, useReducedMotion } from "framer-motion"
+import { buttonVariants } from "@/components/ui/button"
+import { ShoppingCart, Star, Heart } from "lucide-react"
+import { useState } from "react"
+import { cn } from "@/lib/utils"
+
+interface ProductRevealCardProps {
+  name?: string
+  price?: string
+  originalPrice?: string
+  image?: string
+  description?: string
+  rating?: number
+  reviewCount?: number
+  onAdd?: () => void
+  onFavorite?: () => void
+  enableAnimations?: boolean
+  className?: string
+}
+
+export function ProductRevealCard({
+  name = "Premium Wireless Headphones",
+  price = "$199",
+  originalPrice = "$299",
+  image = "https://images.unsplash.com/photo-1618366712010-f4ae9c647dcb?w=800&h=600&fit=crop", // Premium headphones
+  description = "Experience studio-quality sound with advanced noise cancellation and 30-hour battery life. Perfect for music lovers and professionals.",
+  rating = 4.8,
+  reviewCount = 124,
+  onAdd,
+  onFavorite,
+  enableAnimations = true,
+  className,
+}: ProductRevealCardProps) {
+  const [isFavorite, setIsFavorite] = useState(false)
+  const shouldReduceMotion = useReducedMotion()
+  const shouldAnimate = enableAnimations && !shouldReduceMotion
+
+  const handleFavorite = () => {
+    setIsFavorite(!isFavorite)
+    onFavorite?.()
+  }
+
+  const containerVariants = {
+    rest: { 
+      scale: 1,
+      y: 0,
+      filter: "blur(0px)",
+    },
+    hover: shouldAnimate ? { 
+      scale: 1.03, 
+      y: -8,
+      filter: "blur(0px)",
+      transition: { 
+        type: "spring", 
+        stiffness: 300, 
+        damping: 30,
+        mass: 0.8,
+      }
+    } : {},
+  }
+
+  const imageVariants = {
+    rest: { scale: 1 },
+    hover: { scale: 1.1 },
+  }
+
+  const overlayVariants = {
+    rest: { 
+      y: "100%", 
+      opacity: 0,
+    },
+    hover: { 
+      y: "0%", 
+      opacity: 1,
+      transition: {
+        type: "spring",
+        stiffness: 400,
+        damping: 28,
+        mass: 0.6,
+        staggerChildren: 0.1,
+        delayChildren: 0.1,
+      },
+    },
+  }
+
+  const backdropVariants = {
+    rest: { opacity: 0 },
+    hover: { 
+      opacity: 1,
+      transition: { duration: 0.3, ease: "easeOut" }
+    },
+  }
+
+  const contentVariants = {
+    rest: { 
+      opacity: 0, 
+      y: 20,
+      scale: 0.95,
+    },
+    hover: { 
+      opacity: 1, 
+      y: 0,
+      scale: 1,
+      transition: {
+        type: "spring",
+        stiffness: 400,
+        damping: 25,
+        mass: 0.5,
+      },
+    },
+  }
+
+  const buttonVariants_motion = {
+    rest: { scale: 1, y: 0 },
+    hover: shouldAnimate ? { 
+      scale: 1.05, 
+      y: -2,
+      transition: { 
+        type: "spring", 
+        stiffness: 400, 
+        damping: 25 
+      }
+    } : {},
+    tap: shouldAnimate ? { scale: 0.95 } : {},
+  }
+
+  const favoriteVariants = {
+    rest: { scale: 1, rotate: 0 },
+    favorite: { 
+      scale: [1, 1.3, 1], 
+      rotate: [0, 10, -10, 0],
+      transition: { 
+        duration: 0.5,
+        ease: "easeInOut"
+      }
+    },
+  }
+
+  return (
+    <motion.div
+      data-slot="product-reveal-card"
+      initial="rest"
+      whileHover="hover"
+      variants={containerVariants}
+      className={cn(
+        "relative w-full rounded-3xl border border-white/10 bg-black/40 backdrop-blur-xl text-white overflow-hidden",
+        "shadow-[0_8px_40px_rgb(0,0,0,0.5)] cursor-pointer group",
+        className
+      )}
+    >
+      {/* Image Container */}
+      <div className="relative overflow-hidden aspect-square">
+        <motion.img
+          src={image}
+          alt={name}
+          className="h-full w-full object-cover"
+          variants={imageVariants}
+          transition={{ type: "spring", stiffness: 300, damping: 30 }}
+        />
+        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
+        
+        {/* Favorite Button */}
+        <motion.button
+          onClick={handleFavorite}
+          variants={favoriteVariants}
+          animate={isFavorite ? "favorite" : "rest"}
+          className={cn(
+            "absolute top-4 right-4 p-2.5 rounded-full backdrop-blur-md border border-white/20 transition-colors",
+            isFavorite 
+              ? "bg-red-500 text-white" 
+              : "bg-black/40 text-white hover:bg-black/60"
+          )}
+        >
+          <Heart className={cn("w-4 h-4", isFavorite && "fill-current")} />
+        </motion.button>
+
+        {/* Discount Badge */}
+        {originalPrice && (
+          <motion.div
+            initial={{ opacity: 0, scale: 0.8, x: 20 }}
+            animate={{ opacity: 1, scale: 1, x: 0 }}
+            transition={{ delay: 0.2 }}
+            className="absolute top-4 left-4 bg-primary text-primary-foreground px-3 py-1 rounded-full text-[10px] uppercase tracking-wider font-bold shadow-lg"
+          >
+            {Math.round(((parseFloat(originalPrice.replace(/[^\d.]/g, '')) - parseFloat(price.replace(/[^\d.]/g, ''))) / parseFloat(originalPrice.replace(/[^\d.]/g, ''))) * 100)}% OFF
+          </motion.div>
+        )}
+      </div>
+
+      {/* Content */}
+      <motion.div 
+        variants={{ rest: { opacity: 1 }, hover: { opacity: 0, transition: { duration: 0.2 } } }}
+        className="p-6 space-y-3 relative z-10"
+      >
+        {/* Rating */}
+        <div className="flex items-center gap-2">
+          <div className="flex">
+            {[...Array(5)].map((_, i) => (
+              <Star
+                key={i}
+                className={cn(
+                  "w-3.5 h-3.5",
+                  i < Math.floor(rating) 
+                    ? "text-primary fill-primary" 
+                    : "text-white/20"
+                )}
+              />
+            ))}
+          </div>
+          <span className="text-xs text-white/50 font-medium">
+            ({reviewCount} reviews)
+          </span>
+        </div>
+
+        {/* Product Info */}
+        <div className="space-y-1">
+          <h3 className="text-xl font-bold leading-tight tracking-tight [font-family:var(--font-headline)]">
+            {name}
+          </h3>
+          
+          <div className="flex items-center gap-3 pt-1">
+            <span className="text-2xl font-bold text-primary">{price}</span>
+            {originalPrice && (
+              <span className="text-sm font-medium text-white/40 line-through">
+                {originalPrice}
+              </span>
+            )}
+          </div>
+        </div>
+      </motion.div>
+
+      {/* Stationary Backdrop Blur Layer */}
+      <motion.div
+        variants={backdropVariants}
+        className="absolute inset-0 bg-black/80 backdrop-blur-2xl z-10 rounded-3xl pointer-events-none"
+      />
+
+      {/* Reveal Overlay (Text & Buttons Only) */}
+      <motion.div
+        variants={overlayVariants}
+        className="absolute inset-0 flex flex-col justify-end border border-white/10 rounded-3xl z-20 overflow-hidden"
+      >
+        <div className="p-6 space-y-5">
+          {/* Product Description */}
+          <motion.div variants={contentVariants}>
+            <h4 className="font-semibold text-white mb-2 uppercase tracking-widest text-[10px] text-primary">Details</h4>
+            <p className="text-sm text-white/70 leading-relaxed">
+              {description}
+            </p>
+          </motion.div>
+
+          {/* Action Buttons */}
+          <motion.div variants={contentVariants} className="space-y-3 pt-2">
+            <motion.button
+              onClick={onAdd}
+              variants={buttonVariants_motion}
+              initial="rest"
+              whileHover="hover"
+              whileTap="tap"
+              className={cn(
+                buttonVariants({ variant: "default" }), 
+                "w-full h-12 font-bold rounded-xl",
+                "bg-gradient-to-r from-primary to-[rgb(250_204_21)] text-black",
+                "hover:brightness-110",
+                "shadow-[0_0_20px_rgba(250,204,21,0.3)]"
+              )}
+            >
+              <ShoppingCart className="w-4 h-4 mr-2" />
+              Add to Cart
+            </motion.button>
+            
+            <motion.button
+              variants={buttonVariants_motion}
+              initial="rest"
+              whileHover="hover"
+              whileTap="tap"
+              className={cn(
+                buttonVariants({ variant: "outline" }), 
+                "w-full h-10 font-semibold rounded-xl border-white/10 bg-white/5 text-white hover:bg-white/10 hover:text-white"
+              )}
+            >
+              View Details
+            </motion.button>
+          </motion.div>
+        </div>
+      </motion.div>
+    </motion.div>
+  )
+}
+
+
+================================================================================
+File: src\components\ui\progressive-blur.tsx
+================================================================================
+
+'use client';
+import { cn } from '@/lib/utils';
+import { HTMLMotionProps, motion } from 'framer-motion';
+
+export const GRADIENT_ANGLES = {
+  top: 0,
+  right: 90,
+  bottom: 180,
+  left: 270,
+};
+
+export type ProgressiveBlurProps = {
+  direction?: keyof typeof GRADIENT_ANGLES;
+  blurLayers?: number;
+  className?: string;
+  blurIntensity?: number;
+} & HTMLMotionProps<'div'>;
+
+export function ProgressiveBlur({
+  direction = 'bottom',
+  blurLayers = 8,
+  className,
+  blurIntensity = 0.25,
+  ...props
+}: ProgressiveBlurProps) {
+  const layers = Math.max(blurLayers, 2);
+  const segmentSize = 1 / (blurLayers + 1);
+
+  return (
+    <div className={cn('relative pointer-events-none', className)}>
+      {Array.from({ length: layers }).map((_, index) => {
+        const angle = GRADIENT_ANGLES[direction];
+        const gradientStops = [
+          index * segmentSize,
+          (index + 1) * segmentSize,
+          (index + 2) * segmentSize,
+          (index + 3) * segmentSize,
+        ].map(
+          (pos, posIndex) =>
+            `rgba(255, 255, 255, ${posIndex === 1 || posIndex === 2 ? 1 : 0}) ${pos * 100}%`
+        );
+
+        const gradient = `linear-gradient(${angle}deg, ${gradientStops.join(
+          ', '
+        )})`;
+
+        return (
+          <motion.div
+            key={index}
+            className='pointer-events-none absolute inset-0 rounded-[inherit]'
+            style={{
+              maskImage: gradient,
+              WebkitMaskImage: gradient,
+              backdropFilter: `blur(${index * blurIntensity}px)`,
+            }}
+            {...props}
+          />
+        );
+      })}
+    </div>
+  );
+}
+
+
+================================================================================
+File: src\components\ui\spotlight-card.tsx
+================================================================================
+
+"use client";
+
+import React, { ReactNode, useEffect, useRef } from "react";
+import { cn } from "@/lib/utils";
+
+interface SpotlightCardProps {
+  children: ReactNode;
+  className?: string;
+  glowColor?: "gold" | "amber" | "neutral";
+}
+
+const glowMap = {
+  gold: { base: 46, spread: 26 },
+  amber: { base: 36, spread: 22 },
+  neutral: { base: 220, spread: 0 }
+};
+
+export function SpotlightCard({ children, className, glowColor = "gold" }: SpotlightCardProps) {
+  const cardRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const syncPointer = (e: PointerEvent) => {
+      if (!cardRef.current) return;
+      cardRef.current.style.setProperty("--x", e.clientX.toFixed(2));
+      cardRef.current.style.setProperty("--y", e.clientY.toFixed(2));
+      cardRef.current.style.setProperty("--xp", (e.clientX / window.innerWidth).toFixed(3));
+    };
+
+    document.addEventListener("pointermove", syncPointer);
+    return () => document.removeEventListener("pointermove", syncPointer);
+  }, []);
+
+  const { base, spread } = glowMap[glowColor];
+
+  return (
+    <div
+      ref={cardRef}
+      style={
+        {
+          "--base": base,
+          "--spread": spread,
+          "--hue": "calc(var(--base) + (var(--xp) * var(--spread)))"
+        } as React.CSSProperties
+      }
+      className={cn(
+        "relative overflow-hidden rounded-2xl border border-outline-variant/25 bg-surface-container",
+        "before:pointer-events-none before:absolute before:inset-0",
+        "before:bg-[radial-gradient(240px_240px_at_calc(var(--x)*1px)_calc(var(--y)*1px),hsl(var(--hue)_90%_62%/0.12),transparent_70%)]",
+        "after:pointer-events-none after:absolute after:inset-0",
+        "after:bg-[linear-gradient(to_bottom,rgba(255,255,255,0.03),transparent_40%)]",
+        className
+      )}
+    >
+      {children}
+    </div>
+  );
+}
+
+
+================================================================================
+File: src\components\ui\theme-toggle.tsx
+================================================================================
+
+"use client";
+
+import { Moon, Sun } from "lucide-react";
+import { useTheme } from "next-themes";
+import { useEffect, useState } from "react";
+
+export function ThemeToggle() {
+  const { resolvedTheme, setTheme } = useTheme();
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => setMounted(true), []);
+
+  if (!mounted) return null;
+
+  const dark = resolvedTheme === "dark";
+
+  return (
+    <button
+      onClick={() => setTheme(dark ? "light" : "dark")}
+      className="rounded-md border border-outline-variant/20 bg-surface-container-low p-2 text-on-surface transition hover:bg-surface-container-high"
+      aria-label="Toggle theme"
+    >
+      {dark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+    </button>
+  );
+}
+
+
+================================================================================
+File: src\components\ui\use-scroll.ts
+================================================================================
+
+"use client";
+import React from "react";
+
+/**
+ * Scroll state with hysteresis — avoids flicker when bouncing near the threshold.
+ */
+export function useScrollPinned(enterAbove = 28, exitBelow = 10) {
+  const [scrolled, setScrolled] = React.useState(false);
+
+  React.useEffect(() => {
+    const onScroll = () => {
+      const y = window.scrollY;
+      setScrolled((prev) => {
+        if (y >= enterAbove) return true;
+        if (y <= exitBelow) return false;
+        return prev;
+      });
+    };
+
+    window.addEventListener("scroll", onScroll, { passive: true });
+    onScroll();
+    return () => window.removeEventListener("scroll", onScroll);
+  }, [enterAbove, exitBelow]);
+
+  return scrolled;
+}
+
+export function useScroll(threshold: number) {
+	const [scrolled, setScrolled] = React.useState(false);
+
+	const onScroll = React.useCallback(() => {
+		setScrolled(window.scrollY > threshold);
+	}, [threshold]);
+
+	React.useEffect(() => {
+		window.addEventListener('scroll', onScroll, { passive: true });
+		return () => window.removeEventListener('scroll', onScroll);
+	}, [onScroll]);
+
+	// also check on first load
+	React.useEffect(() => {
+		onScroll();
+	}, [onScroll]);
+
+	return scrolled;
+}
+
+
+================================================================================
+File: src\config\auth.constants.ts
+================================================================================
+
+/** Shared admin session cookie name — import from here in middleware to avoid pulling Node-only auth code into the Edge bundle. */
+export const ADMIN_SESSION_COOKIE = "cb_admin_session";
+
+
+================================================================================
+File: src\config\env.server.ts
+================================================================================
+
+import "server-only";
+import { z } from "zod";
+
+const serverEnvSchema = z.object({
+  DATABASE_URL: z.string().min(1),
+  JWT_SECRET: z.string().min(32),
+  /** Set in production; optional at build time if admin console is not configured. */
+  ADMIN_EMAIL: z.string().email().optional(),
+  ADMIN_PASSWORD_HASH: z.string().min(1).optional()
+});
+
+function normalizeProcessEnv() {
+  const p = { ...process.env } as Record<string, string | undefined>;
+  if (p.ADMIN_EMAIL === "") p.ADMIN_EMAIL = undefined;
+  if (p.ADMIN_PASSWORD_HASH === "") p.ADMIN_PASSWORD_HASH = undefined;
+  return p;
+}
+
+/**
+ * Validated server-side environment. Import only from Server Components, Route Handlers, and server-only modules.
+ */
+export type ServerEnv = z.infer<typeof serverEnvSchema>;
+
+export const env: ServerEnv = serverEnvSchema.parse(normalizeProcessEnv());
+
+
+================================================================================
+File: src\lib\auth-edge.ts
+================================================================================
+
+import { jwtVerify } from "jose";
+
+/**
+ * Edge-safe JWT check for middleware. Does not import bcrypt or full env schema (avoids DATABASE_URL in Edge path).
+ */
+export async function verifyAdminSessionToken(token: string): Promise<boolean> {
+  const key = process.env.JWT_SECRET;
+  if (!key || key.length < 32) return false;
+  try {
+    const { payload } = await jwtVerify(token, new TextEncoder().encode(key));
+    return payload.role === "admin";
+  } catch {
+    return false;
+  }
+}
+
+
+================================================================================
+File: src\lib\auth.ts
+================================================================================
+
+import { SignJWT, jwtVerify } from "jose";
+import { compareSync } from "bcryptjs";
+import { cookies } from "next/headers";
+import { redirect } from "next/navigation";
+import { ADMIN_SESSION_COOKIE } from "@/config/auth.constants";
+import { env } from "@/config/env.server";
+
+function secret() {
+  return new TextEncoder().encode(env.JWT_SECRET);
+}
+
+export async function signAdminSession(email: string) {
+  return new SignJWT({ email, role: "admin" })
+    .setProtectedHeader({ alg: "HS256" })
+    .setIssuedAt()
+    .setExpirationTime("2d")
+    .sign(secret());
+}
+
+export async function verifyAdminSession(token: string) {
+  const { payload } = await jwtVerify(token, secret());
+  return payload;
+}
+
+export function credentialsAreValid(email: string, password: string) {
+  const adminEmail = env.ADMIN_EMAIL;
+  const adminHash = env.ADMIN_PASSWORD_HASH;
+  if (!adminEmail || !adminHash) return false;
+  if (email.toLowerCase() !== adminEmail.toLowerCase()) return false;
+  return compareSync(password, adminHash);
+}
+
+export async function getCurrentAdmin() {
+  const cookieStore = await cookies();
+  const token = cookieStore.get(ADMIN_SESSION_COOKIE)?.value;
+  if (!token) return null;
+  try {
+    const payload = await verifyAdminSession(token);
+    if (payload.role !== "admin") return null;
+    return payload;
+  } catch {
+    return null;
+  }
+}
+
+/** Use at the start of admin server actions so mutations cannot be invoked without a valid session. */
+export async function requireAdminSession() {
+  const admin = await getCurrentAdmin();
+  if (!admin) redirect("/admin/login");
+  return admin;
+}
+
+export const authCookieName = ADMIN_SESSION_COOKIE;
+
+
+================================================================================
+File: src\lib\db.ts
+================================================================================
+
+import { PrismaClient } from "@prisma/client";
+
+const globalForPrisma = globalThis as unknown as { prisma?: PrismaClient };
+
+export const db =
+  globalForPrisma.prisma ??
+  new PrismaClient({
+    log: ["error", "warn"]
+  });
+
+if (process.env.NODE_ENV !== "production") globalForPrisma.prisma = db;
+
+
+================================================================================
+File: src\lib\logger.ts
+================================================================================
+
+import "server-only";
+import pino from "pino";
+
+/**
+ * JSON logs (works in Next.js dev/build — no worker/subprocess transport).
+ * Pipe dev output through `npx pino-pretty` if you want colors: `npm run dev 2>&1 | npx pino-pretty`
+ */
+export const logger = pino({
+  level: process.env.LOG_LEVEL ?? (process.env.NODE_ENV === "production" ? "info" : "debug")
+});
+
+
+================================================================================
+File: src\lib\rate-limit-edge.ts
+================================================================================
+
+import { Ratelimit } from "@upstash/ratelimit";
+/** Cloudflare/Edge build — avoids Node-only `process.version` in default `@upstash/redis` entry. */
+import { Redis } from "@upstash/redis/cloudflare";
+
+/** Sliding window: generous enough for real admins; stops scripted brute force. */
+const LOGIN_ATTEMPTS_PER_WINDOW = 15;
+const WINDOW_DURATION = "1 m";
+
+let ratelimitSingleton: Ratelimit | null | undefined;
+
+/**
+ * Edge-safe admin login rate limiter (Upstash Redis). Returns null if Redis env is not configured —
+ * enable UPSTASH_* in production or rely on host/CDN rate limits.
+ */
+export function getAdminLoginRatelimit(): Ratelimit | null {
+  if (ratelimitSingleton !== undefined) {
+    return ratelimitSingleton;
+  }
+
+  const url = process.env.UPSTASH_REDIS_REST_URL;
+  const token = process.env.UPSTASH_REDIS_REST_TOKEN;
+  if (!url || !token) {
+    ratelimitSingleton = null;
+    return null;
+  }
+
+  const redis = new Redis({ url, token });
+  ratelimitSingleton = new Ratelimit({
+    redis,
+    limiter: Ratelimit.slidingWindow(LOGIN_ATTEMPTS_PER_WINDOW, WINDOW_DURATION),
+    prefix: "cashmir:admin_login",
+    analytics: true
+  });
+  return ratelimitSingleton;
+}
+
+export function clientIpFromRequest(request: Request): string {
+  const forwarded = request.headers.get("x-forwarded-for");
+  if (forwarded) {
+    const first = forwarded.split(",")[0]?.trim();
+    if (first) return first;
+  }
+  const realIp = request.headers.get("x-real-ip");
+  if (realIp) return realIp.trim();
+  return "unknown";
+}
+
+
+================================================================================
+File: src\lib\utils.ts
+================================================================================
+
+import { clsx, type ClassValue } from "clsx";
+import { twMerge } from "tailwind-merge";
+
+export function cn(...inputs: ClassValue[]) {
+  return twMerge(clsx(inputs));
+}
+
+
+================================================================================
+File: src\modules\cms\services\content.service.ts
+================================================================================
+
+import "server-only";
+import { db } from "@/lib/db";
+import type { Patent, Product, SiteSettings, TeamMember } from "@prisma/client";
+
+export type PublicHomeData = {
+  settings: SiteSettings | null;
+  products: Product[];
+  patents: Patent[];
+};
+
+export async function getPublicHomeContent(): Promise<PublicHomeData> {
+  const [settings, products, patents] = await Promise.all([
+    db.siteSettings.findUnique({ where: { id: 1 } }),
+    db.product.findMany({ where: { active: true }, orderBy: { createdAt: "desc" }, take: 3 }),
+    db.patent.findMany({ orderBy: { publishedAt: "desc" }, take: 3 })
+  ]);
+  return { settings, products, patents };
+}
+
+export type DashboardContent = {
+  settings: SiteSettings | null;
+  products: Product[];
+  patents: Patent[];
+  team: TeamMember[];
+};
+
+export async function getDashboardContent(): Promise<DashboardContent> {
+  const [settings, products, patents, team] = await Promise.all([
+    db.siteSettings.findUnique({ where: { id: 1 } }),
+    db.product.findMany({ orderBy: { createdAt: "desc" } }),
+    db.patent.findMany({ orderBy: { publishedAt: "desc" } }),
+    db.teamMember.findMany({ orderBy: { sortOrder: "asc" } })
+  ]);
+  return { settings, products, patents, team };
+}
+
+export async function upsertHomepageContent(input: {
+  heroTitle: string;
+  heroDescription: string;
+  missionStatement: string;
+}) {
+  return db.siteSettings.upsert({
+    where: { id: 1 },
+    update: {
+      heroTitle: input.heroTitle,
+      heroDescription: input.heroDescription,
+      missionStatement: input.missionStatement
+    },
+    create: {
+      id: 1,
+      companyName: "Cashmir Biotech",
+      heroTitle: input.heroTitle,
+      heroSubtitle: "",
+      heroDescription: input.heroDescription,
+      ctaPrimaryText: "Explore Catalog",
+      ctaPrimaryHref: "/products",
+      ctaSecondaryText: "View Patents",
+      ctaSecondaryHref: "/patents",
+      missionStatement: input.missionStatement
+    }
+  });
+}
+
+export async function updateProductContent(
+  id: string,
+  data: {
+    name: string;
+    shortBenefit: string;
+    description: string;
+    mrpInr: number;
+    sizeLabel: string;
+    imageUrl: string;
+  }
+) {
+  return db.product.update({
+    where: { id },
+    data
+  });
+}
+
+export async function updatePatentContent(
+  id: string,
+  data: { title: string; summary: string; status: string }
+) {
+  return db.patent.update({
+    where: { id },
+    data
+  });
+}
+
+export async function updateTeamMemberContent(
+  id: string,
+  data: { fullName: string; role: string; bio: string; avatarUrl: string }
+) {
+  return db.teamMember.update({
+    where: { id },
+    data
+  });
+}
+
+export async function listActiveProducts() {
+  return db.product.findMany({ where: { active: true }, orderBy: { createdAt: "desc" } });
+}
+
+export async function listPatents() {
+  return db.patent.findMany({ orderBy: { publishedAt: "desc" } });
+}
+
+export async function listTeamMembers() {
+  return db.teamMember.findMany({ orderBy: { sortOrder: "asc" } });
+}
+
+
+================================================================================
+File: src\modules\cms\validations\admin.ts
+================================================================================
+
+import { z } from "zod";
+
+const nonEmpty = z.string().trim();
+
+export const homepageSettingsSchema = z.object({
+  heroTitle: nonEmpty.max(500),
+  heroDescription: nonEmpty.max(20000),
+  missionStatement: nonEmpty.max(20000)
+});
+
+export const productUpdateSchema = z.object({
+  id: z.string().min(1),
+  name: nonEmpty.max(500),
+  shortBenefit: nonEmpty.max(500),
+  description: z.string().max(50000),
+  mrpInr: z.coerce.number().int().min(0).max(100_000_000),
+  sizeLabel: nonEmpty.max(200),
+  imageUrl: z.string().min(1).max(2000)
+});
+
+export const patentUpdateSchema = z.object({
+  id: z.string().min(1),
+  title: nonEmpty.max(1000),
+  summary: z.string().max(50000),
+  status: nonEmpty.max(200)
+});
+
+export const teamMemberUpdateSchema = z.object({
+  id: z.string().min(1),
+  fullName: nonEmpty.max(200),
+  role: nonEmpty.max(200),
+  bio: z.string().max(50000),
+  avatarUrl: z.string().min(1).max(2000)
+});
+
+
