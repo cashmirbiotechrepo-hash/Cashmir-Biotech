@@ -1,6 +1,9 @@
 import { PrismaClient } from "@prisma/client";
+import { ensureDatabaseUrl } from "@/lib/database-url";
 import { assertProductionDatabasePooling, databaseUrlLooksPooled } from "@/lib/db-pool";
 import { logger } from "@/lib/logger";
+
+ensureDatabaseUrl();
 
 const globalForPrisma = globalThis as unknown as { prisma?: PrismaClient };
 

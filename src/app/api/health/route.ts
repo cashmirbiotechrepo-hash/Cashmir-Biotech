@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { ensureDatabaseUrl } from "@/lib/database-url";
 import { db } from "@/lib/db";
 
 export const dynamic = "force-dynamic";
@@ -8,17 +9,20 @@ export const dynamic = "force-dynamic";
  * Detailed probe available with Authorization: Bearer $CRON_SECRET.
  */
 export async function GET(request: Request) {
+  ensureDatabaseUrl();
   const start = Date.now();
   let dbOk = false;
   let dbLatencyMs = 0;
+  let dbError = "";
 
   try {
     const t0 = Date.now();
     await db.$queryRaw`SELECT 1 as health`;
     dbLatencyMs = Date.now() - t0;
     dbOk = true;
-  } catch {
+  } catch (err) {
     dbOk = false;
+    dbError = err instanceof Error ? err.message.slice(0, 200) : "db_error";
   }
 
   const status = dbOk ? "ok" : "degraded";
@@ -29,7 +33,12 @@ export async function GET(request: Request) {
 
   if (!detailed) {
     return NextResponse.json(
-      { status },
+      {
+        status,
+        // Safe hint so Amplify env mistakes are obvious without secrets
+        hasDatabaseUrl: Boolean(process.env.DATABASE_URL),
+        hasDbHostParts: Boolean(process.env.DB_HOST && process.env.DB_USER && process.env.DB_NAME)
+      },
       {
         status: dbOk ? 200 : 503,
         headers: {
@@ -67,6 +76,8 @@ export async function GET(request: Request) {
           latencyMs: dbLatencyMs,
           host: dbHost || null,
           hasDatabaseUrl: Boolean(process.env.DATABASE_URL),
+          hasDbHostParts: Boolean(process.env.DB_HOST && process.env.DB_USER && process.env.DB_NAME),
+          error: dbOk ? null : dbError || null,
           patents,
           products
         }
