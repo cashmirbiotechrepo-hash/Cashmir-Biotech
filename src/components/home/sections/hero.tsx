@@ -15,9 +15,10 @@ export function Hero({ content }: { content: HomeContent }) {
   return (
     <section
       id="top"
-      className="relative flex min-h-svh items-center overflow-hidden pb-16 pt-28 md:pt-32"
+      className="relative flex min-h-[100svh] items-center overflow-hidden pb-16 pt-24 md:pb-16 md:pt-32"
     >
-      <div className="frame grid w-full grid-cols-1 items-center gap-12 lg:grid-cols-[1.05fr_0.95fr] lg:gap-8">
+      <div className="frame grid w-full grid-cols-1 items-center gap-6 md:gap-10 lg:grid-cols-[1.05fr_0.95fr] lg:gap-8">
+        {/* Copy — sits under the jar on small screens; keep compact so CTAs aren’t pushed into the next scroll */}
         <div className="relative z-10 order-2 lg:order-1">
           <motion.p
             initial={{ opacity: 0, y: 12 }}
@@ -28,7 +29,7 @@ export function Hero({ content }: { content: HomeContent }) {
             {hero.eyebrow}
           </motion.p>
 
-          <h1 className="display-hero mt-7 text-[clamp(2.6rem,6.4vw,5.4rem)]">
+          <h1 className="display-hero mt-4 text-[clamp(2.15rem,7vw,5.4rem)] md:mt-7">
             <RevealText
               text={hero.title}
               accentWords={hero.accentWords}
@@ -42,7 +43,7 @@ export function Hero({ content }: { content: HomeContent }) {
             initial={{ opacity: 0, y: 20, filter: "blur(6px)" }}
             animate={ready ? { opacity: 1, y: 0, filter: "blur(0px)" } : {}}
             transition={{ duration: 1, ease: EASE_OUT_EXPO, delay: 0.7 }}
-            className="mt-8 max-w-md text-[15px] leading-relaxed text-ink-mute"
+            className="mt-4 max-w-md text-[14px] leading-relaxed text-ink-mute md:mt-8 md:text-[15px]"
           >
             {hero.description}
           </motion.p>
@@ -51,7 +52,7 @@ export function Hero({ content }: { content: HomeContent }) {
             initial={{ opacity: 0, y: 16 }}
             animate={ready ? { opacity: 1, y: 0 } : {}}
             transition={{ duration: 0.8, ease: EASE_OUT_EXPO, delay: 0.9 }}
-            className="mt-11 flex flex-wrap items-center gap-4"
+            className="mt-7 flex flex-wrap items-center gap-3 md:mt-11 md:gap-4"
           >
             <LuxeButton href={hero.ctaPrimaryHref} variant="primary" magnetic={false}>
               {hero.ctaPrimaryText}
@@ -71,16 +72,19 @@ export function Hero({ content }: { content: HomeContent }) {
           </motion.div>
         </div>
 
-        <div className="relative order-1 h-[46vh] min-h-[340px] lg:order-2 lg:h-[70vh]">
+        {/* Product — capped height on phone so it doesn’t eat the whole first screen */}
+        <div className="relative order-1 mx-auto h-[34vh] min-h-[200px] max-h-[260px] w-full sm:max-h-[300px] md:mx-0 md:h-[52vh] md:max-h-none md:min-h-[320px] lg:order-2 lg:h-[70vh]">
           <HeroProduct ready={ready} />
         </div>
       </div>
 
+      {/* Desktop only — on phones it collided with the CTA row */}
       <motion.div
         initial={{ opacity: 0 }}
         animate={ready ? { opacity: 1 } : {}}
         transition={{ duration: 0.8, delay: 1.2 }}
-        className="absolute bottom-8 left-1/2 flex -translate-x-1/2 flex-col items-center gap-3"
+        className="pointer-events-none absolute bottom-8 left-1/2 hidden -translate-x-1/2 flex-col items-center gap-3 md:flex"
+        aria-hidden
       >
         <span className="technical">Scroll</span>
         <span className="relative h-10 w-px overflow-hidden bg-ink/15">

@@ -35,9 +35,9 @@ const PRODUCTS = [
 type Chip = { label: string; className: string; depth: number };
 
 const CHIPS: Chip[] = [
-  { label: "Compound purity Δ0.03", className: "left-0 top-8", depth: 26 },
-  { label: "LC-MS verified batch", className: "-right-2 top-1/2", depth: 40 },
-  { label: "Alpine origin · Kashmir", className: "bottom-10 left-6", depth: 32 }
+  { label: "Compound purity Δ0.03", className: "left-2 top-6 lg:left-0 lg:top-8", depth: 26 },
+  { label: "LC-MS verified batch", className: "right-2 top-[42%] lg:-right-2 lg:top-1/2", depth: 40 },
+  { label: "Alpine origin · Kashmir", className: "bottom-6 left-4 lg:bottom-10 lg:left-6", depth: 32 }
 ];
 
 /**
@@ -75,7 +75,7 @@ function FloatingChip({
   return (
     <motion.div
       style={{ x, y }}
-      className={`glass absolute z-30 hidden rounded-xl px-3 py-2 font-mono text-[10px] uppercase tracking-[0.14em] text-ink-mute md:block ${chip.className}`}
+      className={`glass absolute z-30 hidden rounded-xl px-3 py-2 font-mono text-[10px] uppercase tracking-[0.14em] text-ink-mute lg:block ${chip.className}`}
     >
       {chip.label}
     </motion.div>
@@ -142,7 +142,7 @@ export function HeroProduct({ ready }: { ready: boolean }) {
         className="relative z-10 [transform-style:preserve-3d]"
       >
         <div className="animate-float">
-          <div className="relative aspect-[41/51] w-[clamp(200px,30vw,360px)]">
+          <div className="relative aspect-[41/51] w-[clamp(160px,42vw,360px)] md:w-[clamp(200px,30vw,360px)]">
             <AnimatePresence mode="wait" initial={false}>
               <motion.div
                 key={index}

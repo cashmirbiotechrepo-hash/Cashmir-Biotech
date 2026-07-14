@@ -221,7 +221,7 @@ async function main() {
       fullName: "Azmaan Shafi",
       role: "Marketing Manager",
       bio: "A skilled marketing professional with expertise in promoting biotech products and building brand presence in competitive markets. As Marketing Manager, he leads marketing strategy — developing campaigns, managing customer engagement, and expanding market reach across digital and traditional channels to bring products like Magic Food to national and international audiences, supporting the company's growth and visibility.",
-      avatarUrl: "/team/aqib-ahmad-hurra.png", // LOW-07 fallback avatar
+      avatarUrl: "",
       sortOrder: 4
     }
   ];
