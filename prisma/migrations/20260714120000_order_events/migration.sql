@@ -1,4 +1,4 @@
-﻿-- CreateTable
+-- CreateTable
 CREATE TABLE IF NOT EXISTS "OrderEvent" (
     "id" TEXT NOT NULL,
     "orderId" TEXT NOT NULL,

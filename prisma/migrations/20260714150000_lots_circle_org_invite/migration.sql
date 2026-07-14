@@ -1,6 +1,29 @@
 -- AlterTable
 ALTER TABLE "OrderItem" ADD COLUMN IF NOT EXISTS "lotCodes" TEXT NOT NULL DEFAULT '';
 
+-- Ensure CoA exists (was added in schema historically without a CREATE migration)
+CREATE TABLE IF NOT EXISTS "CertificateOfAnalysis" (
+    "id" TEXT NOT NULL,
+    "productId" TEXT NOT NULL,
+    "lotCode" TEXT NOT NULL,
+    "title" TEXT NOT NULL,
+    "fileUrl" TEXT NOT NULL,
+    "issuedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "active" BOOLEAN NOT NULL DEFAULT true,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+    "lotId" TEXT,
+    CONSTRAINT "CertificateOfAnalysis_pkey" PRIMARY KEY ("id")
+);
+
+CREATE INDEX IF NOT EXISTS "CertificateOfAnalysis_productId_active_idx" ON "CertificateOfAnalysis"("productId", "active");
+CREATE INDEX IF NOT EXISTS "CertificateOfAnalysis_lotCode_idx" ON "CertificateOfAnalysis"("lotCode");
+
+DO $$ BEGIN
+  ALTER TABLE "CertificateOfAnalysis" ADD CONSTRAINT "CertificateOfAnalysis_productId_fkey"
+    FOREIGN KEY ("productId") REFERENCES "Product"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
 -- AlterTable
 ALTER TABLE "CertificateOfAnalysis" ADD COLUMN IF NOT EXISTS "lotId" TEXT;
 
