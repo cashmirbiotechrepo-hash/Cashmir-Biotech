@@ -4,217 +4,236 @@
 
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 0 0% 5%;
-    --card: 0 0% 100%;
-    --card-foreground: 0 0% 5%;
-    --popover: 0 0% 100%;
-    --popover-foreground: 0 0% 5%;
-    --primary: 0 0% 9%;
-    --primary-foreground: 0 0% 98%;
-    --secondary: 0 0% 96%;
-    --secondary-foreground: 0 0% 9%;
-    --muted: 0 0% 96%;
-    --muted-foreground: 0 0% 45%;
-    --accent: 0 0% 96%;
-    --accent-foreground: 0 0% 9%;
-    --destructive: 0 84% 60%;
-    --destructive-foreground: 0 0% 98%;
-    --border: 0 0% 90%;
-    --input: 0 0% 90%;
-    --ring: 0 0% 9%;
-    --radius: 0.75rem;
-    --chart-1: 220 70% 50%;
-    --chart-2: 160 60% 45%;
-    --chart-3: 30 80% 55%;
-    --chart-4: 280 65% 60%;
-    --chart-5: 340 75% 55%;
+    /* The Whites */
+    --paper: 255 255 255;
+    --ivory: 251 251 249;
+    --pearl: 244 244 242;
+    --mist: 238 238 236;
+    --hairline: 228 228 225;
 
-    /* Admin design tokens */
-    --surface: 255 255 255;
-    --on-background: 13 13 13;
-    --surface-container-lowest: 255 255 255;
-    --surface-container-low: 250 250 250;
-    --surface-container: 245 245 245;
-    --surface-container-high: 238 238 238;
-    --surface-container-highest: 230 230 230;
-    --primary-legacy: 13 13 13;
-    --primary-container: 13 13 13;
-    --on-primary-container: 255 255 255;
-    --outline-variant: 210 210 210;
-    /* Light-mode values for tokens previously defined only in .dark (text-heading etc. were invisible) */
-    --on-heading: 13 13 13;
-    --on-muted: 90 90 95;
-    --brand-bronze: 133 77 14;
+    /* Ink */
+    --ink: 17 17 17;
+    --ink-soft: 45 45 45;
+    --ink-mute: 92 94 96;
+    --ink-faint: 150 152 154;
+
+    /* Champagne gold — the signature */
+    --gold: 184 148 88;
+    --gold-soft: 209 184 140;
+
+    /* Scientific sky blue */
+    --sky: 169 201 222;
+    --crystal: 111 168 206;
+
+    --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+    --ease-out-quart: cubic-bezier(0.23, 1, 0.32, 1);
+
+    /* shadcn / admin console tokens — champagne gold accent */
+    --background: 251 251 249;
+    --foreground: 17 17 17;
+    --card: 255 255 255;
+    --card-foreground: 17 17 17;
+    --popover: 255 255 255;
+    --popover-foreground: 17 17 17;
+    --primary: 184 148 88;
+    --primary-foreground: 255 255 255;
+    --secondary: 244 244 242;
+    --secondary-foreground: 45 45 45;
+    --muted: 238 238 236;
+    --muted-foreground: 92 94 96;
+    --accent: 209 184 140;
+    --accent-foreground: 17 17 17;
+    --destructive: 220 38 38;
+    --destructive-foreground: 255 255 255;
+    --border: 228 228 225;
+    --input: 228 228 225;
+    --ring: 184 148 88;
+    --radius: 0.625rem;
+    --sidebar: 255 255 255;
+    --sidebar-foreground: 17 17 17;
+    --sidebar-primary: 184 148 88;
+    --sidebar-primary-foreground: 255 255 255;
+    --sidebar-accent: 251 251 249;
+    --sidebar-accent-foreground: 17 17 17;
+    --sidebar-border: 228 228 225;
+    --sidebar-ring: 184 148 88;
   }
 
-  .dark {
-    /* Premium biotech dark palette — base #0D0D0D, accent gold #EAB308, bronze #854D0E */
-    --background: 0 0% 5%;
-    --foreground: 220 9% 84%;
-    --card: 0 0% 8%;
-    --card-foreground: 0 0% 100%;
-    --popover: 0 0% 7%;
-    --popover-foreground: 220 9% 84%;
-    --primary: 45 93% 47%;
-    --primary-foreground: 0 0% 5%;
-    --secondary: 32 81% 18%;
-    --secondary-foreground: 45 40% 88%;
-    --muted: 0 0% 12%;
-    --muted-foreground: 218 11% 65%;
-    --accent: 32 35% 22%;
-    --accent-foreground: 45 93% 47%;
-    --destructive: 0 62% 35%;
-    --destructive-foreground: 0 0% 98%;
-    --border: 30 15% 22%;
-    --input: 0 0% 14%;
-    --ring: 45 93% 47%;
-    --chart-1: 45 93% 52%;
-    --chart-2: 32 81% 45%;
-    --chart-3: 218 11% 65%;
-    --chart-4: 160 60% 45%;
-    --chart-5: 280 50% 55%;
+  /*
+   * Admin console theme — deliberately NOT the marketing aesthetic.
+   * Pure white surfaces, neutral zinc scale, near-black primary. Scoped so it
+   * never leaks into the public site or the bioinformatics tools.
+   */
+  .admin-scope {
+    --hairline: 228 228 231;
 
-    /* RGB triplets used by Tailwind utilities (bg-surface, text-on-surface, etc.) */
-    --surface: 13 13 13;
-    --on-background: 209 213 219;
-    --on-heading: 255 255 255;
-    --on-muted: 156 163 175;
-    --surface-container-lowest: 10 10 10;
-    --surface-container-low: 20 20 22;
-    --surface-container: 26 26 28;
-    --surface-container-high: 34 34 37;
-    --surface-container-highest: 44 44 48;
-    --primary-legacy: 234 179 8;
-    --primary-container: 234 179 8;
-    --on-primary-container: 15 15 15;
-    --outline-variant: 60 55 50;
-    --brand-bronze: 133 77 14;
+    --background: 255 255 255;
+    --foreground: 24 24 27;
+    --card: 255 255 255;
+    --card-foreground: 24 24 27;
+    --popover: 255 255 255;
+    --popover-foreground: 24 24 27;
+    --primary: 24 24 27;
+    --primary-foreground: 250 250 250;
+    --secondary: 244 244 245;
+    --secondary-foreground: 24 24 27;
+    --muted: 244 244 245;
+    --muted-foreground: 113 113 122;
+    --accent: 244 244 245;
+    --accent-foreground: 24 24 27;
+    --destructive: 220 38 38;
+    --destructive-foreground: 250 250 250;
+    --border: 228 228 231;
+    --input: 228 228 231;
+    --ring: 24 24 27;
+
+    --sidebar: 250 250 250;
+    --sidebar-foreground: 24 24 27;
+    --sidebar-primary: 24 24 27;
+    --sidebar-primary-foreground: 250 250 250;
+    --sidebar-accent: 244 244 245;
+    --sidebar-accent-foreground: 24 24 27;
+    --sidebar-border: 228 228 231;
+    --sidebar-ring: 24 24 27;
+
+    font-family: var(--font-admin), ui-sans-serif, system-ui, sans-serif;
+    background-color: rgb(var(--background));
+    color: rgb(var(--foreground));
   }
-}
 
-@layer base {
   * {
-    @apply border-border;
+    border-color: rgb(var(--hairline));
   }
-  body {
-    @apply bg-background text-foreground;
+
+  html {
+    scroll-behavior: smooth;
     -webkit-font-smoothing: antialiased;
-    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+  }
+
+  body {
+    background-color: rgb(var(--ivory));
+    color: rgb(var(--ink));
+    font-family: var(--font-sans), system-ui, sans-serif;
+    overflow-x: hidden;
+  }
+
+  ::selection {
+    background: rgb(var(--gold) / 0.22);
+    color: rgb(var(--ink));
+  }
+
+  ::-webkit-scrollbar {
+    width: 9px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: rgb(var(--ink) / 0.16);
+    border-radius: 10px;
+    border: 3px solid rgb(var(--ivory));
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: rgb(var(--ink) / 0.28);
+  }
+
+  /* When the custom cursor is active we hide the native one on fine pointers */
+  html.cursor-hidden,
+  html.cursor-hidden * {
+    cursor: none !important;
+  }
+
+  /* Keyboard focus must always be obvious — the custom cursor never replaces it. */
+  :focus-visible {
+    outline: 2px solid rgb(var(--gold));
+    outline-offset: 3px;
+    border-radius: 2px;
+  }
+
+  /* Keyboard users get the native caret/pointer back the moment they tab. */
+  html.cursor-hidden *:focus-visible {
+    cursor: auto !important;
   }
 }
 
-/* ── Utility classes ───────────────────────────────────────────── */
-.bg-surface-container-low { background: rgb(var(--surface-container-low)); }
-.bg-surface-container { background: rgb(var(--surface-container)); }
-.bg-surface-container-high { background: rgb(var(--surface-container-high)); }
-.text-primary-brand { color: rgb(var(--primary-legacy)); }
-.bg-primary-brand { background: rgb(var(--primary-container)); }
-.text-on-primary-container { color: rgb(var(--on-primary-container)); }
-.dark .border-brand-bronze {
-  border-color: rgb(var(--brand-bronze) / 0.35);
+@layer components {
+  .frame {
+    @apply mx-auto w-full max-w-frame px-6 md:px-10 lg:px-16;
+  }
+
+  /* Technical laboratory label */
+  .technical {
+    font-family: var(--font-mono), ui-monospace, monospace;
+    font-size: 0.6875rem;
+    line-height: 1.2;
+    letter-spacing: 0.24em;
+    text-transform: uppercase;
+    color: rgb(var(--ink-mute));
+  }
+
+  .display-hero {
+    font-family: var(--font-sans), system-ui, sans-serif;
+    font-weight: 300;
+    letter-spacing: -0.045em;
+    line-height: 0.95;
+  }
+
+  /* Optical glass layer */
+  .glass {
+    background: rgb(255 255 255 / 0.55);
+    backdrop-filter: blur(20px) saturate(150%);
+    -webkit-backdrop-filter: blur(20px) saturate(150%);
+    border: 1px solid rgb(255 255 255 / 0.7);
+    box-shadow:
+      0 20px 50px -30px rgb(17 17 17 / 0.16),
+      inset 0 1px 0 rgb(255 255 255 / 0.8);
+  }
+
+  .glass-strong {
+    background: rgb(255 255 255 / 0.72);
+    backdrop-filter: blur(28px) saturate(160%);
+    -webkit-backdrop-filter: blur(28px) saturate(160%);
+    border: 1px solid rgb(255 255 255 / 0.85);
+  }
+
+  .hairline-x {
+    background: linear-gradient(
+      90deg,
+      transparent,
+      rgb(var(--ink) / 0.16),
+      transparent
+    );
+  }
+
+  .portal-action {
+    @apply rounded-full border border-ink/15 px-5 py-2.5 text-xs text-ink-mute transition hover:border-ink/30 hover:text-ink;
+  }
 }
 
-/* ── Homepage atmosphere (design-system: cinematic dark + gold) ── */
-.home-atmosphere {
-  position: relative;
-  background-color: rgb(var(--surface));
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+
+  .grain-layer {
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.82' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+    background-size: 200px 200px;
+  }
+
+  .mask-fade-b {
+    -webkit-mask-image: linear-gradient(to bottom, black 60%, transparent);
+    mask-image: linear-gradient(to bottom, black 60%, transparent);
+  }
 }
 
-.home-atmosphere::before {
-  content: "";
-  pointer-events: none;
-  position: fixed;
-  inset: 0;
-  z-index: 0;
-  opacity: 0.35;
-  background-image:
-    radial-gradient(circle at 20% 10%, rgb(234 179 8 / 0.08), transparent 42%),
-    radial-gradient(circle at 80% 30%, rgb(133 77 14 / 0.12), transparent 38%),
-    linear-gradient(rgb(255 255 255 / 0.02) 1px, transparent 1px),
-    linear-gradient(90deg, rgb(255 255 255 / 0.02) 1px, transparent 1px);
-  background-size: auto, auto, 64px 64px, 64px 64px;
-  mask-image: linear-gradient(to bottom, black 0%, black 55%, transparent 100%);
-}
-
-.home-grain::after {
-  content: "";
-  pointer-events: none;
-  position: absolute;
-  inset: 0;
-  opacity: 0.04;
-  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
-}
-
-.home-specimen-ring {
-  background: conic-gradient(
-    from 210deg,
-    rgb(234 179 8 / 0.55),
-    rgb(133 77 14 / 0.25),
-    transparent 55%,
-    rgb(234 179 8 / 0.35)
-  );
-}
-
-.text-balance {
-  text-wrap: balance;
-}
-
-.text-pretty {
-  text-wrap: pretty;
-}
-
-.tabular-nums {
-  font-variant-numeric: tabular-nums;
-}
-
-.glass {
-  backdrop-filter: blur(24px) saturate(1.4);
-  background: color-mix(in srgb, rgb(var(--surface-container-high)) 55%, transparent);
-  border: 1px solid color-mix(in srgb, rgb(var(--outline-variant)) 30%, transparent);
-}
-
-/* ── Admin Component Classes ───────────────────────────────────── */
-.admin-input {
-  width: 100%;
-  border-radius: 0.75rem;
-  border: 1px solid color-mix(in srgb, rgb(var(--outline-variant)) 20%, transparent);
-  background: rgb(var(--surface-container));
-  padding: 0.75rem 1rem;
-  font-size: 0.875rem;
-  line-height: 1.25rem;
-  color: rgb(var(--on-background));
-  outline: none;
-  transition: all 0.2s ease;
-}
-.admin-input::placeholder {
-  color: color-mix(in srgb, rgb(var(--on-background)) 25%, transparent);
-}
-.admin-input:focus {
-  border-color: color-mix(in srgb, rgb(var(--outline-variant)) 55%, transparent);
-  box-shadow: 0 0 0 3px color-mix(in srgb, rgb(var(--primary-container)) 8%, transparent);
-}
-
-.admin-btn-primary {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.5rem;
-  border-radius: 0.75rem;
-  background: rgb(var(--primary-container));
-  padding: 0.75rem 1.5rem;
-  font-size: 0.875rem;
-  font-weight: 600;
-  color: rgb(var(--on-primary-container));
-  box-shadow: 0 1px 3px rgba(0,0,0,0.08);
-  transition: all 0.2s ease;
-  border: none;
-  cursor: pointer;
-}
-.admin-btn-primary:hover {
-  box-shadow: 0 8px 25px rgba(0,0,0,0.12);
-  filter: brightness(1.1);
-}
-.admin-btn-primary:active {
-  transform: scale(0.98);
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
 }

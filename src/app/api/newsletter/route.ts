@@ -28,7 +28,7 @@ export async function POST(request: Request) {
     // Upsert keeps the endpoint idempotent and avoids leaking whether an email is already subscribed.
     await db.subscriber.upsert({
       where: { email },
-      update: {},
+      update: { status: "subscribed", unsubscribedAt: null },
       create: { email, source: "homepage" }
     });
   } catch (error) {

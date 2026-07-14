@@ -12,6 +12,7 @@ dist
 # env and local secrets
 .env
 .env.*.local
+MCP.json
 
 # debug
 npm-debug.log*
@@ -27,3 +28,6 @@ npm-debug.log*
 
 # vercel
 .vercel
+
+# admin uploads (user-generated, served from /public/uploads)
+/public/uploads

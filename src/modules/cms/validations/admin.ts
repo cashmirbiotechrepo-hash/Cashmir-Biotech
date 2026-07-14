@@ -2,6 +2,11 @@ import { z } from "zod";
 
 const nonEmpty = z.string().trim().min(1);
 
+export const loginSchema = z.object({
+  email: z.string().trim().email().max(320),
+  password: z.string().min(1).max(200)
+});
+
 /** Allows only site-relative paths or http(s) URLs — blocks javascript:, data: and other dangerous schemes. */
 const safeUrl = z
   .string()

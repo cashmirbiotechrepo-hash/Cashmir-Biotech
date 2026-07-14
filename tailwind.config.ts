@@ -1,90 +1,161 @@
 import type { Config } from "tailwindcss";
+import tailwindcssAnimate from "tailwindcss-animate";
 
 const config = {
   darkMode: ["class"],
-  content: [
-    './pages/**/*.{ts,tsx}',
-    './components/**/*.{ts,tsx}',
-    './app/**/*.{ts,tsx}',
-    './src/**/*.{ts,tsx}',
-	],
+  content: ["./src/**/*.{ts,tsx}"],
   prefix: "",
   theme: {
     container: {
       center: true,
-      padding: "2rem",
-      screens: {
-        "2xl": "1400px",
-      },
+      padding: { DEFAULT: "1.5rem", md: "2.5rem", lg: "5rem" },
+      screens: { "2xl": "1440px" }
     },
     extend: {
       colors: {
-        border: "hsl(var(--border))",
-        input: "hsl(var(--input))",
-        ring: "hsl(var(--ring))",
-        background: "hsl(var(--background))",
-        foreground: "hsl(var(--foreground))",
-        primary: {
-          DEFAULT: "hsl(var(--primary))",
-          foreground: "hsl(var(--primary-foreground))",
+        paper: "rgb(var(--paper) / <alpha-value>)",
+        ivory: "rgb(var(--ivory) / <alpha-value>)",
+        pearl: "rgb(var(--pearl) / <alpha-value>)",
+        mist: "rgb(var(--mist) / <alpha-value>)",
+        hairline: "rgb(var(--hairline) / <alpha-value>)",
+        ink: {
+          DEFAULT: "rgb(var(--ink) / <alpha-value>)",
+          soft: "rgb(var(--ink-soft) / <alpha-value>)",
+          mute: "rgb(var(--ink-mute) / <alpha-value>)",
+          faint: "rgb(var(--ink-faint) / <alpha-value>)"
         },
-        secondary: {
-          DEFAULT: "hsl(var(--secondary))",
-          foreground: "hsl(var(--secondary-foreground))",
+        gold: {
+          DEFAULT: "rgb(var(--gold) / <alpha-value>)",
+          soft: "rgb(var(--gold-soft) / <alpha-value>)"
         },
-        destructive: {
-          DEFAULT: "hsl(var(--destructive))",
-          foreground: "hsl(var(--destructive-foreground))",
+        sky: {
+          DEFAULT: "rgb(var(--sky) / <alpha-value>)",
+          crystal: "rgb(var(--crystal) / <alpha-value>)"
         },
-        muted: {
-          DEFAULT: "hsl(var(--muted))",
-          foreground: "hsl(var(--muted-foreground))",
-        },
-        accent: {
-          DEFAULT: "hsl(var(--accent))",
-          foreground: "hsl(var(--accent-foreground))",
+        background: "rgb(var(--background) / <alpha-value>)",
+        foreground: "rgb(var(--foreground) / <alpha-value>)",
+        card: {
+          DEFAULT: "rgb(var(--card) / <alpha-value>)",
+          foreground: "rgb(var(--card-foreground) / <alpha-value>)"
         },
         popover: {
-          DEFAULT: "hsl(var(--popover))",
-          foreground: "hsl(var(--popover-foreground))",
+          DEFAULT: "rgb(var(--popover) / <alpha-value>)",
+          foreground: "rgb(var(--popover-foreground) / <alpha-value>)"
         },
-        card: {
-          DEFAULT: "hsl(var(--card))",
-          foreground: "hsl(var(--card-foreground))",
+        primary: {
+          DEFAULT: "rgb(var(--primary) / <alpha-value>)",
+          foreground: "rgb(var(--primary-foreground) / <alpha-value>)"
         },
-        /** Design tokens (see globals.css `.dark` — #0D0D0D / #EAB308 / body #D1D5DB) */
-        surface: "rgb(var(--surface) / <alpha-value>)",
-        "on-surface": "rgb(var(--on-background) / <alpha-value>)",
-        heading: "rgb(var(--on-heading) / <alpha-value>)",
-        "on-muted": "rgb(var(--on-muted) / <alpha-value>)",
-        bronze: "rgb(var(--brand-bronze) / <alpha-value>)",
-        "outline-variant": "rgb(var(--outline-variant) / <alpha-value>)",
-        "surface-container": "rgb(var(--surface-container) / <alpha-value>)",
-        "surface-container-low": "rgb(var(--surface-container-low) / <alpha-value>)",
-        "surface-container-high": "rgb(var(--surface-container-high) / <alpha-value>)",
+        secondary: {
+          DEFAULT: "rgb(var(--secondary) / <alpha-value>)",
+          foreground: "rgb(var(--secondary-foreground) / <alpha-value>)"
+        },
+        muted: {
+          DEFAULT: "rgb(var(--muted) / <alpha-value>)",
+          foreground: "rgb(var(--muted-foreground) / <alpha-value>)"
+        },
+        accent: {
+          DEFAULT: "rgb(var(--accent) / <alpha-value>)",
+          foreground: "rgb(var(--accent-foreground) / <alpha-value>)"
+        },
+        destructive: {
+          DEFAULT: "rgb(var(--destructive) / <alpha-value>)",
+          foreground: "rgb(var(--destructive-foreground) / <alpha-value>)"
+        },
+        border: "rgb(var(--border) / <alpha-value>)",
+        input: "rgb(var(--input) / <alpha-value>)",
+        ring: "rgb(var(--ring) / <alpha-value>)",
+        sidebar: {
+          DEFAULT: "rgb(var(--sidebar) / <alpha-value>)",
+          foreground: "rgb(var(--sidebar-foreground) / <alpha-value>)",
+          primary: "rgb(var(--sidebar-primary) / <alpha-value>)",
+          "primary-foreground": "rgb(var(--sidebar-primary-foreground) / <alpha-value>)",
+          accent: "rgb(var(--sidebar-accent) / <alpha-value>)",
+          "accent-foreground": "rgb(var(--sidebar-accent-foreground) / <alpha-value>)",
+          border: "rgb(var(--sidebar-border) / <alpha-value>)",
+          ring: "rgb(var(--sidebar-ring) / <alpha-value>)"
+        }
       },
       borderRadius: {
         lg: "var(--radius)",
         md: "calc(var(--radius) - 2px)",
         sm: "calc(var(--radius) - 4px)",
+        xl: "0.75rem",
+        "2xl": "1rem",
+        "3xl": "1.5rem"
+      },
+      fontFamily: {
+        sans: ["var(--font-sans)", "system-ui", "sans-serif"],
+        display: ["var(--font-sans)", "system-ui", "sans-serif"],
+        admin: ["var(--font-admin)", "ui-sans-serif", "system-ui", "sans-serif"],
+        mono: ["var(--font-mono)", "ui-monospace", "SFMono-Regular", "monospace"]
+      },
+      letterSpacing: {
+        tightest: "-0.045em",
+        technical: "0.24em"
+      },
+      transitionTimingFunction: {
+        expo: "cubic-bezier(0.16, 1, 0.3, 1)"
+      },
+      transitionDuration: {
+        "400": "400ms"
+      },
+      maxWidth: {
+        frame: "1440px"
+      },
+      boxShadow: {
+        ambient: "0 30px 80px -40px rgb(111 168 206 / 0.28)",
+        premium: "0 24px 60px -28px rgb(17 17 17 / 0.16)",
+        glass: "0 20px 50px -24px rgb(17 17 17 / 0.12), inset 0 1px 0 rgb(255 255 255 / 0.7)",
+        gold: "0 0 0 1px rgb(184 148 88 / 0.35), 0 18px 40px -22px rgb(184 148 88 / 0.5)"
       },
       keyframes: {
-        "accordion-down": {
-          from: { height: "0" },
-          to: { height: "var(--radix-accordion-content-height)" },
+        "fade-up": {
+          from: { opacity: "0", transform: "translateY(24px)" },
+          to: { opacity: "1", transform: "translateY(0)" }
         },
-        "accordion-up": {
-          from: { height: "var(--radix-accordion-content-height)" },
-          to: { height: "0" },
+        float: {
+          "0%, 100%": { transform: "translateY(0)" },
+          "50%": { transform: "translateY(-14px)" }
         },
+        "float-slow": {
+          "0%, 100%": { transform: "translateY(0)" },
+          "50%": { transform: "translateY(12px)" }
+        },
+        breathe: {
+          "0%, 100%": { transform: "scale(1)" },
+          "50%": { transform: "scale(1.04)" }
+        },
+        "spin-slow": {
+          to: { transform: "rotate(360deg)" }
+        },
+        marquee: {
+          from: { transform: "translateX(0)" },
+          to: { transform: "translateX(-50%)" }
+        },
+        sheen: {
+          "0%": { transform: "translateX(-150%) skewX(-16deg)" },
+          "100%": { transform: "translateX(220%) skewX(-16deg)" }
+        },
+        "scroll-line": {
+          "0%": { transform: "translateY(-100%)" },
+          "100%": { transform: "translateY(120%)" }
+        }
       },
       animation: {
-        "accordion-down": "accordion-down 0.2s ease-out",
-        "accordion-up": "accordion-up 0.2s ease-out",
-      },
-    },
+        "fade-up": "fade-up 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards",
+        float: "float 7s ease-in-out infinite",
+        "float-slow": "float-slow 11s ease-in-out infinite",
+        breathe: "breathe 6s ease-in-out infinite",
+        "spin-slow": "spin-slow 32s linear infinite",
+        "spin-slow-rev": "spin-slow 46s linear infinite reverse",
+        marquee: "marquee 42s linear infinite",
+        sheen: "sheen 2.6s ease-in-out infinite",
+        "scroll-line": "scroll-line 2.4s ease-in-out infinite"
+      }
+    }
   },
-  plugins: [require("tailwindcss-animate")],
-} satisfies Config
+  plugins: [tailwindcssAnimate]
+} satisfies Config;
 
-export default config
+export default config;

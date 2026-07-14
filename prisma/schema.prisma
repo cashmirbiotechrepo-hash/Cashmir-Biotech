@@ -22,31 +22,341 @@ model SiteSettings {
 }
 
 model Product {
-  id            String   @id @default(cuid())
-  slug          String   @unique
-  name          String
-  shortBenefit  String
-  description   String
-  mrpInr        Int
-  sizeLabel     String
-  category      String
-  imageUrl      String
-  featured      Boolean  @default(false)
-  active        Boolean  @default(true)
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  id                String        @id @default(cuid())
+  slug              String        @unique
+  name              String
+  shortBenefit      String
+  description       String
+  mrpInr            Int
+  sizeLabel         String
+  category          String
+  imageUrl          String
+  images            String[]      @default([])
+  sku               String        @default("")
+  stockQty          Int           @default(0)
+  lowStockThreshold Int           @default(10)
+  leadTimeDays      Int           @default(7)
+  hasInventoryTracking Boolean    @default(true)
+  patentId          String?
+  featured          Boolean       @default(false)
+  active            Boolean       @default(true)
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+  orderItems        OrderItem[]
+  inventory         Inventory?
+  patent            Patent?       @relation(fields: [patentId], references: [id], onDelete: SetNull)
+
+  @@index([patentId])
+}
+
+enum OrderStatus {
+  pending
+  paid
+  processing
+  shipped
+  delivered
+  cancelled
+  payment_failed
+  refunded
+}
+
+model Order {
+  id              String      @id @default(cuid())
+  orderNumber     String      @unique
+  customerEmail   String?
+  customerName    String?
+  status          OrderStatus @default(pending)
+  subtotalCents   Int         @default(0)
+  taxCents        Int         @default(0)
+  shippingCents   Int         @default(0)
+  totalCents      Int         @default(0)
+  shippingAddress Json?
+  trackingNumber  String      @default("")
+  carrier         String      @default("")
+  shippedAt       DateTime?
+  adminNotes      String      @default("")
+  stockReserved   Boolean     @default(false)
+  stockDeducted   Boolean     @default(false)
+  razorpayOrderId String      @default("")
+  razorpayPaymentId String    @default("")
+  customerPhone   String      @default("")
+  customerId      String?
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+  items           OrderItem[]
+  invoices        Invoice[]
+  paymentEvents   PaymentEvent[]
+  events          OrderEvent[]
+  customer        Customer?   @relation(fields: [customerId], references: [id], onDelete: SetNull)
+
+  @@index([status, createdAt])
+  @@index([razorpayOrderId])
+  @@index([customerId])
+  @@index([customerEmail])
+}
+
+model OrderEvent {
+  id         String   @id @default(cuid())
+  orderId    String
+  type       String
+  title      String
+  detail     String   @default("")
+  actorEmail String   @default("")
+  metadata   Json?
+  createdAt  DateTime @default(now())
+  order      Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([orderId, createdAt])
+}
+
+model OrderItem {
+  id             String  @id @default(cuid())
+  orderId        String
+  productId      String?
+  productName    String
+  quantity       Int
+  unitPriceCents Int
+  order          Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product        Product? @relation(fields: [productId], references: [id], onDelete: SetNull)
+
+  @@index([orderId])
+}
+
+model PaymentEvent {
+  id             String   @id @default(cuid())
+  eventType      String
+  providerEventId String  @unique
+  orderId        String?
+  signatureValid Boolean  @default(false)
+  payload        Json?
+  createdAt      DateTime @default(now())
+  order          Order?   @relation(fields: [orderId], references: [id], onDelete: SetNull)
+
+  @@index([orderId])
+}
+
+enum InventoryChangeType {
+  initial_stock
+  order_placed
+  order_confirmed
+  order_cancelled
+  order_returned
+  manual_adjustment
+  restock
+  damaged
+}
+
+model Inventory {
+  id                String                 @id @default(cuid())
+  productId         String                 @unique
+  sku               String                 @default("")
+  quantityOnHand    Int                    @default(0)
+  quantityReserved  Int                    @default(0)
+  lowStockThreshold Int                    @default(10)
+  createdAt         DateTime               @default(now())
+  updatedAt         DateTime               @updatedAt
+  product           Product                @relation(fields: [productId], references: [id], onDelete: Cascade)
+  transactions      InventoryTransaction[]
+
+  @@index([sku])
+}
+
+model InventoryTransaction {
+  id             String              @id @default(cuid())
+  inventoryId    String
+  changeType     InventoryChangeType
+  quantityChange Int
+  quantityBefore Int
+  quantityAfter  Int
+  reservedAfter  Int                 @default(0)
+  referenceType  String              @default("manual")
+  referenceId    String?
+  note           String              @default("")
+  createdBy      String?
+  createdAt      DateTime            @default(now())
+  inventory      Inventory           @relation(fields: [inventoryId], references: [id], onDelete: Cascade)
+
+  @@index([inventoryId, createdAt])
+  @@index([referenceType, referenceId])
+}
+
+model AuditLog {
+  id         String   @id @default(cuid())
+  userEmail  String
+  action     String
+  entityType String
+  entityId   String?
+  diff       Json?
+  ipAddress  String?
+  createdAt  DateTime @default(now())
+
+  @@index([entityType, createdAt])
+  @@index([userEmail, createdAt])
+  @@index([createdAt])
+}
+
+model MediaAsset {
+  id         String   @id @default(cuid())
+  url        String
+  type       String   @default("image")
+  altText    String   @default("")
+  uploadedBy String?
+  createdAt  DateTime @default(now())
+}
+
+model BlogPost {
+  id            String    @id @default(cuid())
+  slug          String    @unique
+  title         String
+  excerpt       String    @default("")
+  coverImageUrl String    @default("")
+  body          String    @default("")
+  status        String    @default("draft")
+  publishedAt   DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
 }
 
 model Patent {
+  id                String    @id @default(cuid())
+  patentCode        String    @unique
+  applicationNumber String    @default("")
+  title             String
+  summary           String
+  status            String
+  lifecycleStatus   PatentLifecycle @default(granted)
+  jurisdiction      String
+  country           String    @default("")
+  imageUrl          String    @default("")
+  documentUrl       String    @default("")
+  inventors         Json      @default("[]")
+  filedAt           DateTime?
+  grantedAt         DateTime?
+  publishedAt       DateTime
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  products          Product[]
+
+  @@index([lifecycleStatus, publishedAt])
+}
+
+enum PatentLifecycle {
+  pending
+  granted
+  expired
+}
+
+enum ContactType {
+  lead
+  customer
+  partner
+}
+
+enum DealStage {
+  lead
+  qualified
+  proposal
+  won
+  lost
+}
+
+model Contact {
+  id        String      @id @default(cuid())
+  name      String
+  email     String?
+  company   String      @default("")
+  phone     String      @default("")
+  type      ContactType @default(lead)
+  notes     String      @default("")
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+  deals     Deal[]
+
+  @@index([type, createdAt])
+}
+
+model Deal {
+  id              String    @id @default(cuid())
+  contactId       String
+  title           String
+  stage           DealStage @default(lead)
+  valueCents      Int       @default(0)
+  expectedCloseAt DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  contact         Contact   @relation(fields: [contactId], references: [id], onDelete: Cascade)
+
+  @@index([stage, expectedCloseAt])
+  @@index([contactId])
+}
+
+enum CouponType {
+  percent
+  fixed
+}
+
+model Coupon {
+  id        String     @id @default(cuid())
+  code      String     @unique
+  type      CouponType
+  value     Int
+  expiresAt DateTime?
+  maxUses   Int?
+  usedCount Int        @default(0)
+  active    Boolean    @default(true)
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+
+  @@index([active, expiresAt])
+}
+
+model Invoice {
+  id            String   @id @default(cuid())
+  invoiceNumber String   @unique
+  orderId       String?
+  subtotalCents Int      @default(0)
+  taxCents      Int      @default(0)
+  totalCents    Int      @default(0)
+  gstDetails    Json
+  pdfUrl        String   @default("")
+  issuedAt      DateTime @default(now())
+  createdAt     DateTime @default(now())
+  order         Order?   @relation(fields: [orderId], references: [id], onDelete: SetNull)
+
+  @@index([issuedAt])
+  @@index([orderId])
+}
+
+model Expense {
   id          String   @id @default(cuid())
-  patentCode  String   @unique
   title       String
-  summary     String
-  status      String
-  jurisdiction String
-  publishedAt DateTime
+  category    String
+  amountCents Int
+  gstCents    Int      @default(0)
+  vendor      String   @default("")
+  notes       String   @default("")
+  incurredAt  DateTime @default(now())
   createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+
+  @@index([incurredAt])
+  @@index([category])
+}
+
+enum CampaignStatus {
+  draft
+  sent
+}
+
+model EmailCampaign {
+  id             String         @id @default(cuid())
+  name           String
+  subject        String
+  body           String
+  status         CampaignStatus @default(draft)
+  recipientCount Int            @default(0)
+  sentAt         DateTime?
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
 }
 
 model TeamMember {
@@ -61,8 +371,136 @@ model TeamMember {
 }
 
 model Subscriber {
-  id        String   @id @default(cuid())
-  email     String   @unique
-  source    String   @default("homepage")
-  createdAt DateTime @default(now())
+  id             String    @id @default(cuid())
+  email          String    @unique
+  source         String    @default("homepage")
+  status         String    @default("subscribed")
+  unsubscribedAt DateTime?
+  createdAt      DateTime  @default(now())
+
+  @@index([status, createdAt])
+}
+
+enum AdminRole {
+  owner
+  admin
+  editor
+}
+
+model AdminUser {
+  id                  String         @id @default(cuid())
+  email               String         @unique
+  passwordHash        String
+  name                String         @default("")
+  role                AdminRole      @default(admin)
+  failedLoginAttempts Int            @default(0)
+  lockedUntil         DateTime?
+  lastLoginAt         DateTime?
+  twoFactorSecret     String?
+  twoFactorExpires    DateTime?
+  twoFactorAttempts   Int            @default(0)
+  isTwoFactorEnabled  Boolean        @default(false)
+  active              Boolean        @default(true)
+  createdAt           DateTime       @default(now())
+  updatedAt           DateTime       @updatedAt
+  sessions            AdminSession[]
+
+  @@index([email])
+}
+
+model AdminSession {
+  id            String              @id @default(cuid())
+  userId        String
+  ipAddress     String?
+  userAgent     String?             @db.VarChar(500)
+  createdAt     DateTime            @default(now())
+  expiresAt     DateTime
+  lastUsedAt    DateTime            @default(now())
+  isRevoked     Boolean             @default(false)
+  user          AdminUser           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  refreshTokens AdminRefreshToken[]
+
+  @@index([userId, isRevoked])
+}
+
+model AdminRefreshToken {
+  id        String       @id @default(cuid())
+  sessionId String
+  tokenHash String       @unique
+  expiresAt DateTime
+  revoked   Boolean      @default(false)
+  createdAt DateTime     @default(now())
+  session   AdminSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@index([sessionId])
+}
+
+/// Storefront Research Portal — completely separate from AdminUser.
+model Customer {
+  id                  String             @id @default(cuid())
+  email               String             @unique
+  passwordHash        String?
+  name                String?
+  phone               String?
+  emailVerifiedAt     DateTime?
+  active              Boolean            @default(true)
+  failedLoginAttempts Int                @default(0)
+  lockedUntil         DateTime?
+  createdAt           DateTime           @default(now())
+  updatedAt           DateTime           @updatedAt
+  orders              Order[]
+  sessions            CustomerSession[]
+  otps                CustomerOtp[]
+  addresses           CustomerAddress[]
+
+  @@index([email])
+}
+
+model CustomerSession {
+  id         String   @id @default(cuid())
+  customerId String
+  customer   Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  ipAddress  String?
+  userAgent  String?  @db.VarChar(500)
+  isRevoked  Boolean  @default(false)
+  expiresAt  DateTime
+  lastUsedAt DateTime @default(now())
+  createdAt  DateTime @default(now())
+
+  @@index([customerId, isRevoked])
+}
+
+model CustomerOtp {
+  id         String    @id @default(cuid())
+  customerId String?
+  customer   Customer? @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  email      String
+  codeHash   String
+  purpose    String    @default("login")
+  expiresAt  DateTime
+  attempts   Int       @default(0)
+  usedAt     DateTime?
+  createdAt  DateTime  @default(now())
+
+  @@index([email, purpose])
+}
+
+model CustomerAddress {
+  id         String   @id @default(cuid())
+  customerId String
+  customer   Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  label      String   @default("Home")
+  fullName   String   @default("")
+  phone      String   @default("")
+  line1      String
+  line2      String   @default("")
+  city       String
+  state      String
+  postalCode String
+  country    String   @default("India")
+  isDefault  Boolean  @default(false)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([customerId])
 }

@@ -8,6 +8,9 @@ const WINDOW_DURATION = "1 m";
 
 let ratelimitSingleton: Ratelimit | null | undefined;
 let newsletterRatelimitSingleton: Ratelimit | null | undefined;
+let adminUploadRatelimitSingleton: Ratelimit | null | undefined;
+let checkoutRatelimitSingleton: Ratelimit | null | undefined;
+let portalOtpRatelimitSingleton: Ratelimit | null | undefined;
 
 /**
  * Edge-safe admin login rate limiter (Upstash Redis). Returns null if Redis env is not configured —
@@ -61,13 +64,94 @@ export function getNewsletterRatelimit(): Ratelimit | null {
   return newsletterRatelimitSingleton;
 }
 
+/** Rate limit image uploads — 30 per minute per IP when Redis is configured. */
+export function getAdminUploadRatelimit(): Ratelimit | null {
+  if (adminUploadRatelimitSingleton !== undefined) {
+    return adminUploadRatelimitSingleton;
+  }
+
+  const url = process.env.UPSTASH_REDIS_REST_URL;
+  const token = process.env.UPSTASH_REDIS_REST_TOKEN;
+  if (!url || !token) {
+    adminUploadRatelimitSingleton = null;
+    return null;
+  }
+
+  const redis = new Redis({ url, token });
+  adminUploadRatelimitSingleton = new Ratelimit({
+    redis,
+    limiter: Ratelimit.slidingWindow(30, "1 m"),
+    prefix: "cashmir:admin_upload",
+    analytics: true
+  });
+  return adminUploadRatelimitSingleton;
+}
+
+/** Rate limit checkout/order creation — 10 per minute per IP to stop bot order spam. */
+export function getCheckoutRatelimit(): Ratelimit | null {
+  if (checkoutRatelimitSingleton !== undefined) {
+    return checkoutRatelimitSingleton;
+  }
+
+  const url = process.env.UPSTASH_REDIS_REST_URL;
+  const token = process.env.UPSTASH_REDIS_REST_TOKEN;
+  if (!url || !token) {
+    checkoutRatelimitSingleton = null;
+    return null;
+  }
+
+  const redis = new Redis({ url, token });
+  checkoutRatelimitSingleton = new Ratelimit({
+    redis,
+    limiter: Ratelimit.slidingWindow(10, "1 m"),
+    prefix: "cashmir:checkout",
+    analytics: true
+  });
+  return checkoutRatelimitSingleton;
+}
+
+/** Rate limit portal OTP request/verify — 10 per minute per IP when Redis is configured. */
+export function getPortalOtpRatelimit(): Ratelimit | null {
+  if (portalOtpRatelimitSingleton !== undefined) {
+    return portalOtpRatelimitSingleton;
+  }
+
+  const url = process.env.UPSTASH_REDIS_REST_URL;
+  const token = process.env.UPSTASH_REDIS_REST_TOKEN;
+  if (!url || !token) {
+    portalOtpRatelimitSingleton = null;
+    return null;
+  }
+
+  const redis = new Redis({ url, token });
+  portalOtpRatelimitSingleton = new Ratelimit({
+    redis,
+    limiter: Ratelimit.slidingWindow(10, "1 m"),
+    prefix: "cashmir:portal_otp",
+    analytics: true
+  });
+  return portalOtpRatelimitSingleton;
+}
+
+/**
+ * Resolve client IP for rate limiting.
+ * Prefer platform-trusted headers (Cloudflare / proxies) over the leftmost
+ * X-Forwarded-For hop, which clients can forge.
+ */
 export function clientIpFromRequest(request: Request): string {
+  const cf = request.headers.get("cf-connecting-ip")?.trim();
+  if (cf) return cf;
+
+  const realIp = request.headers.get("x-real-ip")?.trim();
+  if (realIp) return realIp;
+
   const forwarded = request.headers.get("x-forwarded-for");
   if (forwarded) {
-    const first = forwarded.split(",")[0]?.trim();
-    if (first) return first;
+    // Prefer the right-most hop (typically appended by the edge) over the
+    // client-controlled left-most value.
+    const parts = forwarded.split(",").map((p) => p.trim()).filter(Boolean);
+    if (parts.length > 0) return parts[parts.length - 1]!;
   }
-  const realIp = request.headers.get("x-real-ip");
-  if (realIp) return realIp.trim();
+
   return "unknown";
 }

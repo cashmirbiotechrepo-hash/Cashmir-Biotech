@@ -93,7 +93,61 @@ export async function updateTeamMemberContent(
 }
 
 export async function listActiveProducts() {
-  return db.product.findMany({ where: { active: true }, orderBy: { createdAt: "desc" } });
+  return db.product.findMany({
+    where: { active: true },
+    include: {
+      patent: { select: { patentCode: true, title: true } }
+    },
+    orderBy: [{ featured: "desc" }, { createdAt: "desc" }]
+  });
+}
+
+export type ProductAvailability = {
+  /** Units a customer can actually order right now (on-hand minus reserved, or stockQty if untracked). */
+  available: number;
+  isLow: boolean;
+  tracked: boolean;
+};
+
+/** Live orderable quantity for a product, honouring inventory reservations. */
+export async function getProductAvailability(product: {
+  id: string;
+  stockQty: number;
+  lowStockThreshold: number;
+  hasInventoryTracking: boolean;
+}): Promise<ProductAvailability> {
+  if (!product.hasInventoryTracking) {
+    return { available: product.stockQty, isLow: false, tracked: false };
+  }
+  const inv = await db.inventory.findUnique({ where: { productId: product.id } });
+  const available = inv
+    ? Math.max(0, inv.quantityOnHand - inv.quantityReserved)
+    : product.stockQty;
+  const threshold = inv?.lowStockThreshold ?? product.lowStockThreshold;
+  return { available, isLow: available > 0 && available <= threshold, tracked: true };
+}
+
+export async function getActiveProductBySlug(slug: string) {
+  return db.product.findFirst({
+    where: { slug, active: true },
+    include: {
+      patent: {
+        select: {
+          id: true,
+          patentCode: true,
+          title: true,
+          summary: true,
+          status: true,
+          jurisdiction: true,
+          lifecycleStatus: true
+        }
+      }
+    }
+  });
+}
+
+export async function listActiveProductSlugs() {
+  return db.product.findMany({ where: { active: true }, select: { slug: true } });
 }
 
 export async function listPatents() {
@@ -102,4 +156,15 @@ export async function listPatents() {
 
 export async function listTeamMembers() {
   return db.teamMember.findMany({ orderBy: { sortOrder: "asc" } });
+}
+
+export async function listPublishedPosts() {
+  return db.blogPost.findMany({
+    where: { status: "published" },
+    orderBy: [{ publishedAt: "desc" }, { createdAt: "desc" }]
+  });
+}
+
+export async function getPublishedPost(slug: string) {
+  return db.blogPost.findFirst({ where: { slug, status: "published" } });
 }

@@ -1,23 +1,41 @@
 "use client";
 
-export default function AdminGroupError({
+import { useEffect } from "react";
+import Link from "next/link";
+
+export default function AdminError({
   error,
   reset
 }: {
   error: Error & { digest?: string };
   reset: () => void;
 }) {
+  useEffect(() => {
+    console.error("[admin] route error", error);
+    document.body.style.overflow = "";
+  }, [error]);
+
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center gap-4 bg-surface px-6 text-on-surface">
-      <h1 className="text-xl font-semibold [font-family:var(--font-headline)]">Admin temporarily unavailable</h1>
-      <p className="max-w-md text-center text-sm text-on-surface/60">{error.message}</p>
-      <button
-        type="button"
-        onClick={() => reset()}
-        className="rounded-lg bg-primary-brand px-4 py-2 text-sm font-medium text-on-primary-container"
-      >
-        Try again
-      </button>
-    </div>
+    <main className="flex min-h-svh flex-col items-center justify-center bg-ivory px-6 text-center">
+      <h1 className="text-2xl font-light tracking-tight text-ink">Console error</h1>
+      <p className="mt-3 max-w-sm text-sm text-ink-mute">
+        Something went wrong loading the admin console.
+      </p>
+      <div className="mt-8 flex items-center gap-3">
+        <button
+          type="button"
+          onClick={reset}
+          className="inline-flex h-11 items-center rounded-full bg-ink px-6 text-sm text-paper transition-opacity hover:opacity-90"
+        >
+          Try again
+        </button>
+        <Link
+          href="/admin/login"
+          className="inline-flex h-11 items-center rounded-full border border-ink/15 px-6 text-sm text-ink transition-colors hover:border-ink"
+        >
+          Back to login
+        </Link>
+      </div>
+    </main>
   );
 }

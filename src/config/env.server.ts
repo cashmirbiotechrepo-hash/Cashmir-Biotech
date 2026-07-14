@@ -4,7 +4,11 @@ import { z } from "zod";
 const serverEnvSchema = z.object({
   DATABASE_URL: z.string().min(1),
   JWT_SECRET: z.string().min(32),
-  /** Set in production; optional at build time if admin console is not configured. */
+  /** 32-byte ASCII key for JWE cookie encryption */
+  ENCRYPTION_KEY: z.string().length(32).optional(),
+  /** HMAC pepper for password hashing (≥32 chars recommended) */
+  PASSWORD_PEPPER: z.string().min(32).optional(),
+  /** Bootstrap owner — migrated into AdminUser table on seed */
   ADMIN_EMAIL: z.string().email().optional(),
   ADMIN_PASSWORD_HASH: z.string().min(1).optional()
 });

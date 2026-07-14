@@ -1,0 +1,3169 @@
+==============================================================================
+CASHMIR BIOTECH — FRONTEND CODE SNAPSHOT
+Generated: 2026-07-12T15:34:13
+Root: C:\Users\Javeed Ahmad\Desktop\Cashmir Biotech
+Files: 51
+==============================================================================
+
+TABLE OF CONTENTS
+------------------------------------------------------------------------------
+  1. components.json
+  2. next.config.ts
+  3. package.json
+  4. postcss.config.mjs
+  5. src/app/(admin)/admin/dashboard/page.tsx
+  6. src/app/(admin)/admin/login/page.tsx
+  7. src/app/(admin)/admin/page.tsx
+  8. src/app/(admin)/error.tsx
+  9. src/app/(admin)/loading.tsx
+ 10. src/app/(public)/error.tsx
+ 11. src/app/(public)/loading.tsx
+ 12. src/app/(public)/page.tsx
+ 13. src/app/(public)/patents/page.tsx
+ 14. src/app/(public)/products/page.tsx
+ 15. src/app/(public)/team/page.tsx
+ 16. src/app/globals.css
+ 17. src/app/layout.tsx
+ 18. src/app/not-found.tsx
+ 19. src/app/robots.ts
+ 20. src/app/sitemap.ts
+ 21. src/components/experience/ambient-background.tsx
+ 22. src/components/experience/cursor.tsx
+ 23. src/components/experience/grain.tsx
+ 24. src/components/experience/loader.tsx
+ 25. src/components/experience/scene/hero-visual.tsx
+ 26. src/components/experience/scene/molecular-scene.tsx
+ 27. src/components/experience/site-footer.tsx
+ 28. src/components/experience/site-nav.tsx
+ 29. src/components/experience/smooth-scroll.tsx
+ 30. src/components/home/content.ts
+ 31. src/components/home/home-experience.tsx
+ 32. src/components/home/sections/cta-newsletter.tsx
+ 33. src/components/home/sections/faq.tsx
+ 34. src/components/home/sections/hero.tsx
+ 35. src/components/home/sections/marquee.tsx
+ 36. src/components/home/sections/metrics.tsx
+ 37. src/components/home/sections/mission.tsx
+ 38. src/components/home/sections/patents.tsx
+ 39. src/components/home/sections/pipeline.tsx
+ 40. src/components/home/sections/platform.tsx
+ 41. src/components/home/sections/products.tsx
+ 42. src/components/ui/counter.tsx
+ 43. src/components/ui/luxe-button.tsx
+ 44. src/components/ui/magnetic.tsx
+ 45. src/components/ui/reveal.tsx
+ 46. src/components/ui/tech-chip.tsx
+ 47. src/components/ui/tilt-card.tsx
+ 48. src/lib/motion/ease.ts
+ 49. src/lib/utils.ts
+ 50. tailwind.config.ts
+ 51. tsconfig.json
+
+==============================================================================
+
+==============================================================================
+FILE 1/51: components.json
+LINES: 28
+==============================================================================
+{
+  "$schema": "https://ui.shadcn.com/schema.json",
+  "style": "base-nova",
+  "rsc": true,
+  "tsx": true,
+  "tailwind": {
+    "config": "tailwind.config.ts",
+    "css": "src/app/globals.css",
+    "baseColor": "neutral",
+    "cssVariables": true,
+    "prefix": ""
+  },
+  "iconLibrary": "lucide",
+  "rtl": false,
+  "menuColor": "default",
+  "menuAccent": "subtle",
+  "aliases": {
+    "components": "@/components",
+    "utils": "@/lib/utils",
+    "ui": "@/components/ui",
+    "lib": "@/lib",
+    "hooks": "@/hooks"
+  },
+  "registries": {
+    "@beui": "https://beui.dev/r/{name}.json",
+    "@dotmatrix": "https://dotmatrix.zzzzshawn.cloud/r/{name}.json"
+  }
+}
+
+
+==============================================================================
+FILE 2/51: next.config.ts
+LINES: 25
+==============================================================================
+import type { NextConfig } from "next";
+
+const nextConfig: NextConfig = {
+  /** Pino / thread-stream must not be bundled into vendor-chunks with broken worker paths */
+  serverExternalPackages: ["pino", "thread-stream"],
+  images: {
+    remotePatterns: [{ protocol: "https", hostname: "images.unsplash.com" }]
+  },
+  async headers() {
+    return [
+      {
+        source: "/(.*)",
+        headers: [
+          { key: "Strict-Transport-Security", value: "max-age=63072000; includeSubDomains" },
+          { key: "X-Frame-Options", value: "DENY" },
+          { key: "X-Content-Type-Options", value: "nosniff" },
+          { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
+          { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=()" }
+        ]
+      }
+    ];
+  }
+};
+
+export default nextConfig;
+
+
+==============================================================================
+FILE 3/51: package.json
+LINES: 74
+==============================================================================
+{
+  "name": "cashmir-biotech-platform",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint",
+    "format": "prettier --write \"src/**/*.{ts,tsx,css}\" \"*.{ts,js,json}\"",
+    "postinstall": "prisma generate",
+    "db:generate": "prisma generate",
+    "db:create": "tsx scripts/ensure-database.ts",
+    "db:migrate": "prisma migrate dev",
+    "db:seed": "tsx prisma/seed.ts",
+    "db:setup": "npm run db:create && prisma migrate deploy && npm run db:seed"
+  },
+  "dependencies": {
+    "@base-ui/react": "^1.6.0",
+    "@gsap/react": "^2.1.2",
+    "@paper-design/shaders-react": "^0.0.77",
+    "@prisma/client": "^5.22.0",
+    "@radix-ui/react-icons": "^1.3.2",
+    "@radix-ui/react-navigation-menu": "^1.2.14",
+    "@radix-ui/react-slot": "^1.2.4",
+    "@react-three/drei": "^9.122.0",
+    "@react-three/fiber": "^8.18.0",
+    "@upstash/ratelimit": "^2.0.8",
+    "@upstash/redis": "^1.37.0",
+    "bcryptjs": "^2.4.3",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
+    "framer-motion": "^11.18.2",
+    "gsap": "^3.15.0",
+    "jose": "^5.9.6",
+    "lenis": "^1.3.25",
+    "lucide-react": "^0.468.0",
+    "motion": "^12.38.0",
+    "next": "^15.0.3",
+    "next-themes": "^0.4.3",
+    "pino": "^10.3.1",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-use-measure": "^2.1.7",
+    "server-only": "^0.0.1",
+    "shadcn": "^4.13.0",
+    "tailwind-merge": "^2.5.5",
+    "tailwindcss-animate": "^1.0.7",
+    "three": "^0.169.0",
+    "tw-animate-css": "^1.4.0",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@types/bcryptjs": "^2.4.6",
+    "@types/node": "^22.9.0",
+    "@types/pg": "^8.11.10",
+    "@types/react": "^18.3.12",
+    "@types/react-dom": "^18.3.1",
+    "autoprefixer": "^10.5.0",
+    "eslint": "^9.14.0",
+    "eslint-config-next": "^15.0.3",
+    "pg": "^8.13.1",
+    "pino-pretty": "^13.1.3",
+    "postcss": "^8.5.10",
+    "prettier": "^3.4.2",
+    "prisma": "^5.22.0",
+    "tailwindcss": "^3.4.19",
+    "tsx": "^4.19.2",
+    "typescript": "^5.6.3"
+  },
+  "overrides": {
+    "postcss": "^8.5.10"
+  }
+}
+
+
+==============================================================================
+FILE 4/51: postcss.config.mjs
+LINES: 5
+==============================================================================
+export default {
+  plugins: {
+    tailwindcss: {}
+  }
+};
+
+
+==============================================================================
+FILE 5/51: src/app/(admin)/admin/dashboard/page.tsx
+LINES: 8
+==============================================================================
+export const metadata = {
+  title: "Admin Dashboard · Cashmir Biotech",
+  robots: { index: false, follow: false }
+};
+
+export default function DashboardPage() {
+  return null;
+}
+
+
+==============================================================================
+FILE 6/51: src/app/(admin)/admin/login/page.tsx
+LINES: 8
+==============================================================================
+export const metadata = {
+  title: "Admin Login · Cashmir Biotech",
+  robots: { index: false, follow: false }
+};
+
+export default function AdminLoginPage() {
+  return null;
+}
+
+
+==============================================================================
+FILE 7/51: src/app/(admin)/admin/page.tsx
+LINES: 8
+==============================================================================
+import { redirect } from "next/navigation";
+import { getCurrentAdmin } from "@/lib/auth";
+
+export default async function AdminEntry() {
+  const admin = await getCurrentAdmin();
+  if (admin) redirect("/admin/dashboard");
+  redirect("/admin/login");
+}
+
+
+==============================================================================
+FILE 8/51: src/app/(admin)/error.tsx
+LINES: 9
+==============================================================================
+"use client";
+
+export default function AdminGroupError({ reset }: { error: Error & { digest?: string }; reset: () => void }) {
+  return (
+    <button type="button" onClick={() => reset()}>
+      Try again
+    </button>
+  );
+}
+
+
+==============================================================================
+FILE 9/51: src/app/(admin)/loading.tsx
+LINES: 3
+==============================================================================
+export default function AdminLoading() {
+  return null;
+}
+
+
+==============================================================================
+FILE 10/51: src/app/(public)/error.tsx
+LINES: 9
+==============================================================================
+"use client";
+
+export default function PublicGroupError({ reset }: { reset: () => void }) {
+  return (
+    <button type="button" onClick={() => reset()}>
+      Try again
+    </button>
+  );
+}
+
+
+==============================================================================
+FILE 11/51: src/app/(public)/loading.tsx
+LINES: 3
+==============================================================================
+export default function Loading() {
+  return null;
+}
+
+
+==============================================================================
+FILE 12/51: src/app/(public)/page.tsx
+LINES: 18
+==============================================================================
+import { getPublicHomeContent } from "@/modules/cms/services/content.service";
+import { buildHomeContent } from "@/components/home/content";
+import { HomeExperience } from "@/components/home/home-experience";
+import { logger } from "@/lib/logger";
+
+export const dynamic = "force-dynamic";
+
+export default async function HomePage() {
+  let data = null;
+  try {
+    data = await getPublicHomeContent();
+  } catch (error) {
+    logger.error({ err: error }, "Failed to load homepage content; using fallback");
+  }
+
+  const content = buildHomeContent(data);
+  return <HomeExperience content={content} />;
+}
+
+
+==============================================================================
+FILE 13/51: src/app/(public)/patents/page.tsx
+LINES: 6
+==============================================================================
+export const dynamic = "force-dynamic";
+export const metadata = { title: "Patents & Research" };
+
+export default function PatentsPage() {
+  return null;
+}
+
+
+==============================================================================
+FILE 14/51: src/app/(public)/products/page.tsx
+LINES: 6
+==============================================================================
+export const dynamic = "force-dynamic";
+export const metadata = { title: "Products" };
+
+export default function ProductsPage() {
+  return null;
+}
+
+
+==============================================================================
+FILE 15/51: src/app/(public)/team/page.tsx
+LINES: 6
+==============================================================================
+export const dynamic = "force-dynamic";
+export const metadata = { title: "Board Members" };
+
+export default function TeamPage() {
+  return null;
+}
+
+
+==============================================================================
+FILE 16/51: src/app/globals.css
+LINES: 151
+==============================================================================
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* The Whites */
+    --paper: 255 255 255;
+    --ivory: 251 251 249;
+    --pearl: 244 244 242;
+    --mist: 238 238 236;
+    --hairline: 228 228 225;
+
+    /* Ink */
+    --ink: 17 17 17;
+    --ink-soft: 45 45 45;
+    --ink-mute: 92 94 96;
+    --ink-faint: 150 152 154;
+
+    /* Champagne gold — the signature */
+    --gold: 184 148 88;
+    --gold-soft: 209 184 140;
+
+    /* Scientific sky blue */
+    --sky: 169 201 222;
+    --crystal: 111 168 206;
+
+    --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+    --ease-out-quart: cubic-bezier(0.23, 1, 0.32, 1);
+  }
+
+  * {
+    border-color: rgb(var(--hairline));
+  }
+
+  html {
+    scroll-behavior: smooth;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  body {
+    background-color: rgb(var(--ivory));
+    color: rgb(var(--ink));
+    font-family: var(--font-sans), system-ui, sans-serif;
+    overflow-x: hidden;
+  }
+
+  ::selection {
+    background: rgb(var(--gold) / 0.22);
+    color: rgb(var(--ink));
+  }
+
+  ::-webkit-scrollbar {
+    width: 9px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: rgb(var(--ink) / 0.16);
+    border-radius: 10px;
+    border: 3px solid rgb(var(--ivory));
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: rgb(var(--ink) / 0.28);
+  }
+
+  /* When the custom cursor is active we hide the native one on fine pointers */
+  html.cursor-hidden,
+  html.cursor-hidden * {
+    cursor: none !important;
+  }
+}
+
+@layer components {
+  .frame {
+    @apply mx-auto w-full max-w-frame px-6 md:px-10 lg:px-16;
+  }
+
+  /* Technical laboratory label */
+  .technical {
+    font-family: var(--font-mono), ui-monospace, monospace;
+    font-size: 0.6875rem;
+    line-height: 1.2;
+    letter-spacing: 0.24em;
+    text-transform: uppercase;
+    color: rgb(var(--ink-mute));
+  }
+
+  .display-hero {
+    font-family: var(--font-sans), system-ui, sans-serif;
+    font-weight: 300;
+    letter-spacing: -0.045em;
+    line-height: 0.95;
+  }
+
+  /* Optical glass layer */
+  .glass {
+    background: rgb(255 255 255 / 0.55);
+    backdrop-filter: blur(20px) saturate(150%);
+    -webkit-backdrop-filter: blur(20px) saturate(150%);
+    border: 1px solid rgb(255 255 255 / 0.7);
+    box-shadow:
+      0 20px 50px -30px rgb(17 17 17 / 0.16),
+      inset 0 1px 0 rgb(255 255 255 / 0.8);
+  }
+
+  .glass-strong {
+    background: rgb(255 255 255 / 0.72);
+    backdrop-filter: blur(28px) saturate(160%);
+    -webkit-backdrop-filter: blur(28px) saturate(160%);
+    border: 1px solid rgb(255 255 255 / 0.85);
+  }
+
+  .hairline-x {
+    background: linear-gradient(
+      90deg,
+      transparent,
+      rgb(var(--ink) / 0.16),
+      transparent
+    );
+  }
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+
+  .grain-layer {
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.82' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+    background-size: 200px 200px;
+  }
+
+  .mask-fade-b {
+    -webkit-mask-image: linear-gradient(to bottom, black 60%, transparent);
+    mask-image: linear-gradient(to bottom, black 60%, transparent);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+
+==============================================================================
+FILE 17/51: src/app/layout.tsx
+LINES: 59
+==============================================================================
+import type { Metadata, Viewport } from "next";
+import { Inter, Space_Mono } from "next/font/google";
+import "./globals.css";
+
+const inter = Inter({
+  subsets: ["latin"],
+  variable: "--font-sans",
+  display: "swap",
+  weight: ["300", "400", "500", "600", "700"]
+});
+
+const spaceMono = Space_Mono({
+  subsets: ["latin"],
+  variable: "--font-mono",
+  display: "swap",
+  weight: ["400", "700"]
+});
+
+const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "https://cashmirbiotech.com";
+
+export const metadata: Metadata = {
+  metadataBase: new URL(siteUrl),
+  title: {
+    default: "Cashmir Biotech — Precision Biology from the Himalaya",
+    template: "%s · Cashmir Biotech"
+  },
+  description:
+    "Clinical-precision biotech formulations engineered from Himalayan biodiversity. Molecular research, patented actives, and evidence-led therapeutics.",
+  keywords: [
+    "biotech",
+    "Himalayan biodiversity",
+    "molecular research",
+    "precision medicine",
+    "Cashmir Biotech"
+  ],
+  openGraph: {
+    title: "Cashmir Biotech — Precision Biology from the Himalaya",
+    description:
+      "Clinical-precision biotech formulations engineered from Himalayan biodiversity.",
+    url: siteUrl,
+    siteName: "Cashmir Biotech",
+    type: "website"
+  }
+};
+
+export const viewport: Viewport = {
+  themeColor: "#fbfbf9",
+  colorScheme: "light"
+};
+
+export default function RootLayout({ children }: { children: React.ReactNode }) {
+  return (
+    <html lang="en" suppressHydrationWarning>
+      <body className={`${inter.variable} ${spaceMono.variable} font-sans antialiased`}>
+        {children}
+      </body>
+    </html>
+  );
+}
+
+
+==============================================================================
+FILE 18/51: src/app/not-found.tsx
+LINES: 3
+==============================================================================
+export default function NotFound() {
+  return null;
+}
+
+
+==============================================================================
+FILE 19/51: src/app/robots.ts
+LINES: 10
+==============================================================================
+import type { MetadataRoute } from "next";
+
+const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "https://cashmirbiotech.com";
+
+export default function robots(): MetadataRoute.Robots {
+  return {
+    rules: [{ userAgent: "*", allow: "/", disallow: ["/admin", "/api"] }],
+    sitemap: `${siteUrl}/sitemap.xml`
+  };
+}
+
+
+==============================================================================
+FILE 20/51: src/app/sitemap.ts
+LINES: 13
+==============================================================================
+import type { MetadataRoute } from "next";
+
+const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "https://cashmirbiotech.com";
+
+export default function sitemap(): MetadataRoute.Sitemap {
+  const now = new Date();
+  return ["", "/products", "/patents", "/team"].map((path) => ({
+    url: `${siteUrl}${path}`,
+    lastModified: now,
+    changeFrequency: "weekly" as const,
+    priority: path === "" ? 1 : 0.7
+  }));
+}
+
+
+==============================================================================
+FILE 21/51: src/components/experience/ambient-background.tsx
+LINES: 51
+==============================================================================
+"use client";
+
+import { useScroll, useTransform, motion } from "framer-motion";
+
+/**
+ * The room the experience lives in — never fully static. Extremely soft
+ * volumetric light (white, sky, champagne), a masked scientific grid, and
+ * depth layers that drift with scroll. White always dominates.
+ */
+export function AmbientBackground() {
+  const { scrollYProgress } = useScroll();
+  const y1 = useTransform(scrollYProgress, [0, 1], [0, -140]);
+  const y2 = useTransform(scrollYProgress, [0, 1], [0, 120]);
+  const y3 = useTransform(scrollYProgress, [0, 1], [0, -80]);
+
+  return (
+    <div aria-hidden className="pointer-events-none fixed inset-0 -z-10 overflow-hidden bg-ivory">
+      <motion.div
+        style={{ y: y1 }}
+        className="animate-float-slow absolute -left-[12%] -top-[10%] h-[52vw] w-[52vw] rounded-full opacity-70 blur-3xl"
+      >
+        <div className="h-full w-full rounded-full [background:radial-gradient(circle,rgba(169,201,222,0.30),transparent_68%)]" />
+      </motion.div>
+      <motion.div
+        style={{ y: y2 }}
+        className="animate-float absolute -bottom-[14%] -right-[10%] h-[58vw] w-[58vw] rounded-full opacity-60 blur-3xl"
+      >
+        <div className="h-full w-full rounded-full [background:radial-gradient(circle,rgba(209,184,140,0.24),transparent_70%)]" />
+      </motion.div>
+      <motion.div
+        style={{ y: y3 }}
+        className="absolute left-[46%] top-[38%] h-[34vw] w-[34vw] rounded-full opacity-50 blur-3xl"
+      >
+        <div className="h-full w-full rounded-full [background:radial-gradient(circle,rgba(255,255,255,0.9),transparent_65%)]" />
+      </motion.div>
+
+      <div
+        className="absolute inset-0 opacity-[0.5]"
+        style={{
+          backgroundImage:
+            "linear-gradient(rgba(17,17,17,0.035) 1px, transparent 1px), linear-gradient(90deg, rgba(17,17,17,0.035) 1px, transparent 1px)",
+          backgroundSize: "72px 72px",
+          maskImage:
+            "radial-gradient(circle at 50% 26%, rgba(0,0,0,0.85), transparent 72%)",
+          WebkitMaskImage:
+            "radial-gradient(circle at 50% 26%, rgba(0,0,0,0.85), transparent 72%)"
+        }}
+      />
+    </div>
+  );
+}
+
+
+==============================================================================
+FILE 22/51: src/components/experience/cursor.tsx
+LINES: 122
+==============================================================================
+"use client";
+
+import { useEffect, useRef, useState } from "react";
+
+const LERP = 0.18;
+const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
+
+/**
+ * Custom cursor: a precise ink dot, a lagging ring that swells over interactive
+ * targets, and a soft champagne glow. Fine-pointer only, and fully disabled for
+ * touch or reduced-motion users (native cursor restored).
+ */
+export function Cursor() {
+  const dotRef = useRef<HTMLDivElement>(null);
+  const ringRef = useRef<HTMLDivElement>(null);
+  const glowRef = useRef<HTMLDivElement>(null);
+  const labelRef = useRef<HTMLSpanElement>(null);
+  const [enabled, setEnabled] = useState(false);
+
+  useEffect(() => {
+    const fine = window.matchMedia("(pointer: fine)").matches;
+    const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (!fine || reduced) return;
+
+    setEnabled(true);
+    document.documentElement.classList.add("cursor-hidden");
+
+    const mouse = { x: window.innerWidth / 2, y: window.innerHeight / 2 };
+    const ring = { x: mouse.x, y: mouse.y };
+    let raf = 0;
+
+    const onMove = (event: MouseEvent) => {
+      mouse.x = event.clientX;
+      mouse.y = event.clientY;
+      if (dotRef.current) {
+        dotRef.current.style.transform = `translate3d(${mouse.x}px, ${mouse.y}px, 0) translate(-50%, -50%)`;
+      }
+      if (glowRef.current) {
+        glowRef.current.style.transform = `translate3d(${mouse.x}px, ${mouse.y}px, 0) translate(-50%, -50%)`;
+      }
+    };
+
+    const loop = () => {
+      ring.x = lerp(ring.x, mouse.x, LERP);
+      ring.y = lerp(ring.y, mouse.y, LERP);
+      if (ringRef.current) {
+        ringRef.current.style.transform = `translate3d(${ring.x}px, ${ring.y}px, 0) translate(-50%, -50%)`;
+      }
+      raf = requestAnimationFrame(loop);
+    };
+    loop();
+
+    const grow = (event: Event) => {
+      const target = (event.currentTarget as HTMLElement) ?? null;
+      ringRef.current?.classList.add("cursor-ring--big");
+      glowRef.current?.classList.add("cursor-glow--on");
+      if (labelRef.current) {
+        labelRef.current.textContent = target?.getAttribute("data-cursor") ?? "";
+      }
+    };
+    const shrink = () => {
+      ringRef.current?.classList.remove("cursor-ring--big");
+      glowRef.current?.classList.remove("cursor-glow--on");
+      if (labelRef.current) labelRef.current.textContent = "";
+    };
+
+    const interactive = Array.from(
+      document.querySelectorAll<HTMLElement>("a, button, [data-cursor], [data-tilt]")
+    );
+    interactive.forEach((el) => {
+      el.addEventListener("mouseenter", grow);
+      el.addEventListener("mouseleave", shrink);
+    });
+
+    window.addEventListener("mousemove", onMove, { passive: true });
+
+    return () => {
+      cancelAnimationFrame(raf);
+      window.removeEventListener("mousemove", onMove);
+      interactive.forEach((el) => {
+        el.removeEventListener("mouseenter", grow);
+        el.removeEventListener("mouseleave", shrink);
+      });
+      document.documentElement.classList.remove("cursor-hidden");
+    };
+  }, []);
+
+  if (!enabled) return null;
+
+  return (
+    <>
+      <div
+        ref={glowRef}
+        aria-hidden
+        className="cursor-glow pointer-events-none fixed left-0 top-0 z-[95] h-40 w-40 rounded-full opacity-0 blur-2xl transition-opacity duration-300 [background:radial-gradient(circle,rgba(184,148,88,0.28),transparent_65%)]"
+      />
+      <div
+        ref={ringRef}
+        aria-hidden
+        className="pointer-events-none fixed left-0 top-0 z-[96] flex h-9 w-9 items-center justify-center rounded-full border border-ink/40 transition-[width,height,background-color,border-color] duration-300 ease-out"
+      >
+        <span ref={labelRef} className="font-mono text-[8px] uppercase tracking-[0.15em] text-ink" />
+      </div>
+      <div
+        ref={dotRef}
+        aria-hidden
+        className="pointer-events-none fixed left-0 top-0 z-[97] h-1.5 w-1.5 rounded-full bg-ink mix-blend-difference"
+      />
+      <style jsx global>{`
+        .cursor-ring--big {
+          width: 96px;
+          height: 96px;
+          background-color: rgb(184 148 88 / 0.1);
+          border-color: rgb(184 148 88 / 0.6);
+        }
+        .cursor-glow--on {
+          opacity: 1;
+        }
+      `}</style>
+    </>
+  );
+}
+
+
+==============================================================================
+FILE 23/51: src/components/experience/grain.tsx
+LINES: 8
+==============================================================================
+export function Grain() {
+  return (
+    <div
+      aria-hidden
+      className="grain-layer pointer-events-none fixed inset-0 z-[60] opacity-[0.03] mix-blend-multiply"
+    />
+  );
+}
+
+
+==============================================================================
+FILE 24/51: src/components/experience/loader.tsx
+LINES: 69
+==============================================================================
+"use client";
+
+import { useEffect } from "react";
+import { motion } from "framer-motion";
+import { EASE_OUT_EXPO, EASE_IN_OUT } from "@/lib/motion/ease";
+
+const WORD = "CASHMIR";
+
+/**
+ * Cinematic opening: the wordmark assembles letter-by-letter out of blur, a
+ * champagne light sweeps across it, a progress line completes, then the whole
+ * sheet lifts to reveal the experience.
+ */
+export function Loader({ onComplete }: { onComplete: () => void }) {
+  useEffect(() => {
+    const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const timeout = window.setTimeout(onComplete, reduced ? 200 : 2600);
+    return () => window.clearTimeout(timeout);
+  }, [onComplete]);
+
+  return (
+    <motion.div
+      className="fixed inset-0 z-[100] flex flex-col items-center justify-center bg-paper"
+      initial={{ opacity: 1 }}
+      exit={{ opacity: 0, filter: "blur(6px)" }}
+      transition={{ duration: 0.9, ease: EASE_IN_OUT }}
+    >
+      <div className="relative mb-10 overflow-hidden px-2">
+        <div className="flex font-sans text-3xl font-light tracking-[0.42em] text-ink md:text-5xl">
+          {WORD.split("").map((letter, i) => (
+            <motion.span
+              key={`${letter}-${i}`}
+              initial={{ opacity: 0, y: 26, filter: "blur(10px)" }}
+              animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
+              transition={{ duration: 0.9, ease: EASE_OUT_EXPO, delay: 0.1 + i * 0.08 }}
+            >
+              {letter}
+            </motion.span>
+          ))}
+        </div>
+        <motion.div
+          aria-hidden
+          className="absolute inset-y-0 w-1/2 -skew-x-12 [background:linear-gradient(100deg,transparent,rgba(184,148,88,0.35),transparent)]"
+          initial={{ x: "-160%" }}
+          animate={{ x: "260%" }}
+          transition={{ duration: 1.6, ease: EASE_IN_OUT, delay: 0.7 }}
+        />
+      </div>
+
+      <div className="relative h-px w-56 overflow-hidden rounded-full bg-ink/10">
+        <motion.div
+          className="absolute inset-y-0 left-0 bg-ink"
+          initial={{ width: "0%" }}
+          animate={{ width: "100%" }}
+          transition={{ duration: 2, ease: [0.65, 0, 0.35, 1], delay: 0.35 }}
+        />
+      </div>
+
+      <motion.p
+        className="technical mt-5"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ duration: 0.6, delay: 1.4 }}
+      >
+        Calibrating the molecular interface
+      </motion.p>
+    </motion.div>
+  );
+}
+
+
+==============================================================================
+FILE 25/51: src/components/experience/scene/hero-visual.tsx
+LINES: 38
+==============================================================================
+"use client";
+
+import dynamic from "next/dynamic";
+import { useEffect, useState } from "react";
+
+const MolecularScene = dynamic(() => import("./molecular-scene"), {
+  ssr: false,
+  loading: () => null
+});
+
+/**
+ * Decides whether the WebGL apparatus should mount at all. Skips the 3D scene
+ * for reduced-motion users and shows a refined static fallback instead, so the
+ * hero never ships an idle canvas to someone who asked for calm.
+ */
+export function HeroVisual() {
+  const [enabled, setEnabled] = useState(false);
+
+  useEffect(() => {
+    const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    setEnabled(!reduced);
+  }, []);
+
+  if (!enabled) {
+    return (
+      <div aria-hidden className="absolute inset-0 flex items-center justify-center">
+        <div className="animate-breathe h-64 w-64 rounded-full [background:radial-gradient(circle_at_32%_30%,rgba(255,255,255,0.95),rgba(169,201,222,0.28)_60%,transparent)] md:h-80 md:w-80" />
+        <div className="animate-spin-slow absolute h-72 w-72 rounded-full border border-ink/10 md:h-96 md:w-96" />
+      </div>
+    );
+  }
+
+  return (
+    <div aria-hidden className="absolute inset-0">
+      <MolecularScene />
+    </div>
+  );
+}
+
+
+==============================================================================
+FILE 26/51: src/components/experience/scene/molecular-scene.tsx
+LINES: 184
+==============================================================================
+"use client";
+
+import { Suspense, useMemo, useRef } from "react";
+import { Canvas, useFrame, useThree } from "@react-three/fiber";
+import { Environment, Float, Lightformer } from "@react-three/drei";
+import * as THREE from "three";
+
+function DnaHelix() {
+  const group = useRef<THREE.Group>(null);
+  const rungs = useMemo(() => {
+    const items: { y: number; angle: number }[] = [];
+    for (let i = 0; i < 26; i++) {
+      items.push({ y: (i - 13) * 0.24, angle: i * 0.42 });
+    }
+    return items;
+  }, []);
+
+  useFrame((state) => {
+    if (group.current) group.current.rotation.y = state.clock.elapsedTime * 0.28;
+  });
+
+  const strand = new THREE.MeshStandardMaterial({
+    color: "#c9c9c9",
+    roughness: 0.25,
+    metalness: 0.7
+  });
+  const rung = new THREE.MeshStandardMaterial({
+    color: "#a9c9de",
+    roughness: 0.3,
+    metalness: 0.2
+  });
+
+  return (
+    <group ref={group} position={[0, 0, 0]} rotation={[0, 0, 0.18]} scale={0.92}>
+      {rungs.map(({ y, angle }, i) => {
+        const x1 = Math.cos(angle) * 0.95;
+        const z1 = Math.sin(angle) * 0.95;
+        const x2 = Math.cos(angle + Math.PI) * 0.95;
+        const z2 = Math.sin(angle + Math.PI) * 0.95;
+        return (
+          <group key={i}>
+            <mesh position={[x1, y, z1]} material={strand}>
+              <sphereGeometry args={[0.085, 20, 20]} />
+            </mesh>
+            <mesh position={[x2, y, z2]} material={strand}>
+              <sphereGeometry args={[0.085, 20, 20]} />
+            </mesh>
+            <mesh position={[0, y, 0]} rotation={[0, angle, Math.PI / 2]} material={rung}>
+              <cylinderGeometry args={[0.018, 0.018, 1.9, 8]} />
+            </mesh>
+          </group>
+        );
+      })}
+    </group>
+  );
+}
+
+function GlassMolecules() {
+  const group = useRef<THREE.Group>(null);
+  const seeds = useMemo(
+    () =>
+      Array.from({ length: 7 }, () => ({
+        position: [
+          (Math.random() - 0.5) * 5,
+          (Math.random() - 0.5) * 4.4,
+          (Math.random() - 0.5) * 2.5
+        ] as [number, number, number],
+        scale: 0.32 + Math.random() * 0.4,
+        speed: 0.4 + Math.random() * 0.6
+      })),
+    []
+  );
+
+  const glass = useMemo(
+    () =>
+      new THREE.MeshPhysicalMaterial({
+        color: "#ffffff",
+        transmission: 0.9,
+        thickness: 0.6,
+        roughness: 0.06,
+        metalness: 0,
+        clearcoat: 1,
+        clearcoatRoughness: 0.1,
+        ior: 1.35,
+        transparent: true,
+        opacity: 0.92
+      }),
+    []
+  );
+
+  useFrame((state) => {
+    if (!group.current) return;
+    group.current.children.forEach((child, i) => {
+      child.position.y += Math.sin(state.clock.elapsedTime * seeds[i].speed + i) * 0.0016;
+      child.rotation.x += 0.002;
+      child.rotation.y += 0.003;
+    });
+  });
+
+  return (
+    <group ref={group}>
+      {seeds.map((seed, i) => (
+        <mesh key={i} position={seed.position} scale={seed.scale} material={glass}>
+          <icosahedronGeometry args={[1, 1]} />
+        </mesh>
+      ))}
+    </group>
+  );
+}
+
+function Particles() {
+  const ref = useRef<THREE.Points>(null);
+  const positions = useMemo(() => {
+    const count = 320;
+    const arr = new Float32Array(count * 3);
+    for (let i = 0; i < arr.length; i++) arr[i] = (Math.random() - 0.5) * 22;
+    return arr;
+  }, []);
+
+  useFrame((state) => {
+    if (ref.current) {
+      ref.current.rotation.y = state.clock.elapsedTime * 0.03;
+      ref.current.rotation.x = state.clock.elapsedTime * 0.012;
+    }
+  });
+
+  return (
+    <points ref={ref}>
+      <bufferGeometry>
+        <bufferAttribute
+          attach="attributes-position"
+          count={positions.length / 3}
+          array={positions}
+          itemSize={3}
+        />
+      </bufferGeometry>
+      <pointsMaterial size={0.035} color="#6fa8ce" transparent opacity={0.5} sizeAttenuation />
+    </points>
+  );
+}
+
+function Rig() {
+  const { camera, pointer } = useThree();
+  const target = useRef(new THREE.Vector2());
+  useFrame(() => {
+    target.current.lerp(pointer, 0.04);
+    camera.position.x = target.current.x * 0.9;
+    camera.position.y = target.current.y * 0.6;
+    camera.lookAt(0, 0, 0);
+  });
+  return null;
+}
+
+/** The floating molecular apparatus behind the hero — glass, DNA, dust. */
+export default function MolecularScene() {
+  return (
+    <Canvas
+      className="h-full w-full"
+      dpr={[1, 1.8]}
+      camera={{ position: [0, 0, 9], fov: 42 }}
+      gl={{ antialias: true, alpha: true, powerPreference: "high-performance" }}
+    >
+      <ambientLight intensity={0.6} />
+      <directionalLight position={[5, 6, 5]} intensity={1.1} />
+      <pointLight position={[-4, 2, 4]} intensity={1.2} color="#a9c9de" />
+      <pointLight position={[3, -2, 3]} intensity={0.6} color="#d1b88c" />
+
+      <Suspense fallback={null}>
+        <Float speed={1.1} rotationIntensity={0.3} floatIntensity={0.6}>
+          <DnaHelix />
+        </Float>
+        <GlassMolecules />
+        <Particles />
+        <Rig />
+        {/* Local, network-free studio environment for glass reflections. */}
+        <Environment resolution={256}>
+          <Lightformer intensity={2.4} position={[0, 3, 4]} scale={[8, 3, 1]} color="#ffffff" />
+          <Lightformer intensity={1.2} position={[-4, 1, 2]} scale={[3, 3, 1]} color="#a9c9de" />
+          <Lightformer intensity={0.9} position={[4, -1, 2]} scale={[3, 3, 1]} color="#d1b88c" />
+        </Environment>
+      </Suspense>
+    </Canvas>
+  );
+}
+
+
+==============================================================================
+FILE 27/51: src/components/experience/site-footer.tsx
+LINES: 78
+==============================================================================
+import Link from "next/link";
+
+const COLUMNS: { title: string; links: { label: string; href: string }[] }[] = [
+  {
+    title: "Formulations",
+    links: [
+      { label: "Product catalog", href: "/products" },
+      { label: "Institutional inquiry", href: "mailto:contact@cashmirbiotech.com" }
+    ]
+  },
+  {
+    title: "Science",
+    links: [
+      { label: "Patent registry", href: "/patents" },
+      { label: "Research archive", href: "/patents" }
+    ]
+  },
+  {
+    title: "Company",
+    links: [
+      { label: "Home", href: "/" },
+      { label: "Board members", href: "/team" },
+      { label: "Admin console", href: "/admin/login" }
+    ]
+  }
+];
+
+export function SiteFooter() {
+  const year = new Date().getFullYear();
+  return (
+    <footer className="relative border-t border-ink/10 bg-ivory">
+      <div className="frame py-20">
+        <div className="grid grid-cols-1 gap-14 lg:grid-cols-[1.4fr_1fr_1fr_1fr]">
+          <div>
+            <p className="font-sans text-lg font-medium tracking-[0.22em] text-ink">CASHMIR</p>
+            <p className="mt-4 max-w-xs text-sm leading-relaxed text-ink-mute">
+              Precision biology from Himalayan biodiversity — patented actives engineered
+              under clinical discipline.
+            </p>
+            <p className="technical mt-8">SKUAST-K · GMP · LC-MS</p>
+          </div>
+
+          {COLUMNS.map((col) => (
+            <div key={col.title}>
+              <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-ink-faint">
+                {col.title}
+              </p>
+              <ul className="mt-5 space-y-3">
+                {col.links.map((link) => (
+                  <li key={link.label}>
+                    <Link
+                      href={link.href}
+                      className="group inline-flex items-center gap-2 text-sm text-ink-soft transition-colors hover:text-ink"
+                    >
+                      <span className="text-gold opacity-0 transition-opacity group-hover:opacity-100">
+                        +
+                      </span>
+                      {link.label}
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ))}
+        </div>
+
+        <div className="mt-16 flex flex-col items-start justify-between gap-4 border-t border-ink/10 pt-8 md:flex-row md:items-center">
+          <p className="font-mono text-[10px] uppercase tracking-[0.16em] text-ink-faint">
+            © {year} Cashmir Biotech Pvt Ltd. All rights reserved.
+          </p>
+          <p className="font-mono text-[10px] uppercase tracking-[0.16em] text-ink-faint">
+            Kashmir, India
+          </p>
+        </div>
+      </div>
+    </footer>
+  );
+}
+
+
+==============================================================================
+FILE 28/51: src/components/experience/site-nav.tsx
+LINES: 101
+==============================================================================
+"use client";
+
+import { useState } from "react";
+import Link from "next/link";
+import { motion, useMotionValueEvent, useScroll } from "framer-motion";
+import { EASE_OUT_EXPO } from "@/lib/motion/ease";
+import { Magnetic } from "@/components/ui/magnetic";
+import { cn } from "@/lib/utils";
+
+type NavLink = { label: string; href: string };
+
+const LINKS: NavLink[] = [
+  { label: "Platform", href: "#platform" },
+  { label: "Science", href: "#science" },
+  { label: "Pipeline", href: "#pipeline" },
+  { label: "Patents", href: "#patents" }
+];
+
+export function SiteNav({
+  ready,
+  ctaText,
+  ctaHref
+}: {
+  ready: boolean;
+  ctaText: string;
+  ctaHref: string;
+}) {
+  const { scrollY } = useScroll();
+  const [hidden, setHidden] = useState(false);
+  const [condensed, setCondensed] = useState(false);
+
+  useMotionValueEvent(scrollY, "change", (latest) => {
+    const previous = scrollY.getPrevious() ?? 0;
+    const nextCondensed = latest > 40;
+    const nextHidden = latest > previous && latest > 220;
+    setCondensed((prev) => (prev === nextCondensed ? prev : nextCondensed));
+    setHidden((prev) => (prev === nextHidden ? prev : nextHidden));
+  });
+
+  return (
+    <motion.header
+      initial={{ y: -24, opacity: 0 }}
+      animate={
+        ready ? { y: hidden ? -120 : 0, opacity: 1 } : { y: -24, opacity: 0 }
+      }
+      transition={
+        ready
+          ? { type: "spring", stiffness: 260, damping: 30, mass: 0.8 }
+          : { duration: 0.7, ease: EASE_OUT_EXPO }
+      }
+      style={{ willChange: "transform" }}
+      className="fixed inset-x-0 top-0 z-50 flex justify-center px-4 pt-4"
+    >
+      <nav
+        className={cn(
+          "flex w-full max-w-frame items-center justify-between rounded-full px-5 transition-[padding,background-color,box-shadow,backdrop-filter] duration-500 ease-expo md:px-7",
+          condensed ? "glass-strong py-2.5 shadow-premium" : "py-4"
+        )}
+      >
+        <Link
+          href="/"
+          className="font-sans text-[15px] font-medium tracking-[0.22em] text-ink"
+          aria-label="Cashmir Biotech home"
+        >
+          CASHMIR
+        </Link>
+
+        <ul className="hidden items-center gap-9 md:flex">
+          {LINKS.map((link, i) => (
+            <li key={link.href}>
+              <motion.a
+                href={link.href}
+                data-cursor="View"
+                initial={{ opacity: 0, y: -6 }}
+                animate={ready ? { opacity: 1, y: 0 } : {}}
+                transition={{ duration: 0.5, delay: 0.15 + i * 0.06, ease: EASE_OUT_EXPO }}
+                className="group relative font-mono text-[11px] uppercase tracking-[0.16em] text-ink-mute transition-colors hover:text-ink"
+              >
+                {link.label}
+                <span className="absolute -bottom-1.5 left-0 h-px w-0 bg-gold transition-all duration-400 ease-expo group-hover:w-full" />
+              </motion.a>
+            </li>
+          ))}
+        </ul>
+
+        <Magnetic strength={0.45}>
+          <Link
+            href={ctaHref}
+            data-cursor="Go"
+            className="group relative hidden items-center gap-2 overflow-hidden rounded-full border border-ink/15 px-5 py-2.5 font-mono text-[11px] uppercase tracking-[0.16em] text-ink transition-colors hover:border-ink md:inline-flex"
+          >
+            <span className="relative z-10 transition-colors duration-500 group-hover:text-paper">
+              {ctaText}
+            </span>
+            <span className="absolute inset-0 origin-left scale-x-0 rounded-full bg-ink transition-transform duration-500 ease-expo group-hover:scale-x-100" />
+          </Link>
+        </Magnetic>
+      </nav>
+    </motion.header>
+  );
+}
+
+
+==============================================================================
+FILE 29/51: src/components/experience/smooth-scroll.tsx
+LINES: 59
+==============================================================================
+"use client";
+
+import { createContext, useContext, useEffect, useRef, useState } from "react";
+import Lenis from "lenis";
+import { gsap } from "gsap";
+import { ScrollTrigger } from "gsap/ScrollTrigger";
+
+type ScrollContextValue = {
+  lenis: Lenis | null;
+};
+
+const ScrollContext = createContext<ScrollContextValue>({ lenis: null });
+
+export function useSmoothScroll() {
+  return useContext(ScrollContext);
+}
+
+/**
+ * Wires Lenis inertial scrolling to the GSAP ticker so ScrollTrigger-driven
+ * pinning stays perfectly in sync. Degrades to native scrolling when the user
+ * prefers reduced motion.
+ */
+export function SmoothScroll({ children }: { children: React.ReactNode }) {
+  const [lenis, setLenis] = useState<Lenis | null>(null);
+  const rafHandle = useRef<((time: number) => void) | null>(null);
+
+  useEffect(() => {
+    gsap.registerPlugin(ScrollTrigger);
+
+    const prefersReduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (prefersReduced) return;
+
+    const instance = new Lenis({
+      duration: 1.15,
+      easing: (t) => Math.min(1, 1.001 - Math.pow(2, -10 * t)),
+      smoothWheel: true,
+      touchMultiplier: 1.6
+    });
+
+    setLenis(instance);
+
+    const onScroll = () => ScrollTrigger.update();
+    instance.on("scroll", onScroll);
+
+    const raf = (time: number) => instance.raf(time * 1000);
+    rafHandle.current = raf;
+    gsap.ticker.add(raf);
+    gsap.ticker.lagSmoothing(0);
+
+    return () => {
+      instance.off("scroll", onScroll);
+      if (rafHandle.current) gsap.ticker.remove(rafHandle.current);
+      instance.destroy();
+      setLenis(null);
+    };
+  }, []);
+
+  return <ScrollContext.Provider value={{ lenis }}>{children}</ScrollContext.Provider>;
+}
+
+
+==============================================================================
+FILE 30/51: src/components/home/content.ts
+LINES: 182
+==============================================================================
+import type { PublicHomeData } from "@/modules/cms/services/content.service";
+
+export type ProductCard = {
+  id: string;
+  name: string;
+  shortBenefit: string;
+  category: string;
+  sizeLabel: string;
+  mrpInr: number;
+};
+
+export type PatentCard = {
+  id: string;
+  patentCode: string;
+  title: string;
+  summary: string;
+  status: string;
+  jurisdiction: string;
+  year: string;
+};
+
+export type HomeContent = {
+  hero: {
+    eyebrow: string;
+    title: string;
+    accentWords: number[];
+    description: string;
+    ctaPrimaryText: string;
+    ctaPrimaryHref: string;
+    ctaSecondaryText: string;
+    ctaSecondaryHref: string;
+  };
+  mission: string;
+  marquee: string[];
+  pipeline: { index: string; title: string; body: string }[];
+  metrics: { value: number; decimals?: number; suffix?: string; label: string; note: string }[];
+  products: ProductCard[];
+  patents: PatentCard[];
+  faqs: { q: string; a: string }[];
+};
+
+const DEFAULT_MARQUEE = [
+  "Phyto-active Extraction",
+  "LC-MS Verification",
+  "Himalayan Biodiversity",
+  "Precision Formulation",
+  "Patent Registry",
+  "Clinical Labeling"
+];
+
+const DEFAULT_PIPELINE = [
+  {
+    index: "01",
+    title: "Alpine Source Selection",
+    body: "Underutilised Kashmiri flora is identified with SKUAST-K and hand-selected at altitude for phytochemical density."
+  },
+  {
+    index: "02",
+    title: "Cold-Chain Phyto Isolation",
+    body: "Actives are isolated under temperature-controlled, low-oxygen conditions to protect molecular integrity end to end."
+  },
+  {
+    index: "03",
+    title: "Independent Assay",
+    body: "Every batch is verified by LC-MS at independent facilities — composition measured, documented, and traceable."
+  },
+  {
+    index: "04",
+    title: "Clinical-Ready Nutrition",
+    body: "Formulations are finished to GMP discipline with full batch records and clinical-grade labeling."
+  }
+];
+
+const DEFAULT_METRICS = [
+  { value: 99.7, decimals: 1, suffix: "%", label: "Purity Protocol", note: "Verified compound purity across production batches." },
+  { value: 10, suffix: "+", label: "Patent Filings", note: "Compositions and extraction protocols in the registry." },
+  { value: 1, label: "Research Partner", note: "SKUAST-K faculty–student innovation model." }
+];
+
+const DEFAULT_FAQS = [
+  {
+    q: "What makes Cashmir Biotech different?",
+    a: "We engineer nutrition from underutilised Himalayan biodiversity, isolating patented phyto-actives under a clinical, evidence-led discipline rather than commodity supplement practice."
+  },
+  {
+    q: "How is quality verified?",
+    a: "Every batch passes independent LC-MS assay and is produced under GMP discipline with complete batch records and traceability from alpine source to finished product."
+  },
+  {
+    q: "Who do you work with?",
+    a: "We operate a faculty–student innovation model in partnership with SKUAST-K, translating peer-reviewed research into registered, patent-backed formulations."
+  }
+];
+
+const FALLBACK_PRODUCTS: ProductCard[] = [
+  {
+    id: "magic-food-taxo",
+    name: "Magic Food TaxO",
+    shortBenefit: "Promotes prostate health",
+    category: "Functional Food",
+    sizeLabel: "80g",
+    mrpInr: 350
+  },
+  {
+    id: "iron-revive",
+    name: "Iron Revive Herbal",
+    shortBenefit: "High-absorption herbal iron support",
+    category: "Supplement",
+    sizeLabel: "200 count",
+    mrpInr: 500
+  }
+];
+
+const FALLBACK_PATENTS: PatentCard[] = [
+  {
+    id: "in-cbt-2024-001",
+    patentCode: "IN-CBT-2024-001",
+    title: "TaxO Enriched Functional Food Composition",
+    summary:
+      "Composition and extraction protocol for anti-cancer functional foods derived from Kashmiri flora.",
+    status: "Granted",
+    jurisdiction: "India",
+    year: "2024"
+  }
+];
+
+export function buildHomeContent(data: PublicHomeData | null): HomeContent {
+  const settings = data?.settings ?? null;
+
+  const products: ProductCard[] =
+    data?.products && data.products.length > 0
+      ? data.products.map((p) => ({
+          id: p.id,
+          name: p.name,
+          shortBenefit: p.shortBenefit,
+          category: p.category,
+          sizeLabel: p.sizeLabel,
+          mrpInr: p.mrpInr
+        }))
+      : FALLBACK_PRODUCTS;
+
+  const patents: PatentCard[] =
+    data?.patents && data.patents.length > 0
+      ? data.patents.map((p) => ({
+          id: p.id,
+          patentCode: p.patentCode,
+          title: p.title,
+          summary: p.summary,
+          status: p.status,
+          jurisdiction: p.jurisdiction,
+          year: new Date(p.publishedAt).getFullYear().toString()
+        }))
+      : FALLBACK_PATENTS;
+
+  const title = settings?.heroTitle ?? "Precision biology from the Himalaya.";
+  const words = title.split(" ");
+  const accentWords = words.length > 1 ? [words.length - 1] : [];
+
+  return {
+    hero: {
+      eyebrow: settings?.heroSubtitle ?? "Clinical-precision biotechnology",
+      title,
+      accentWords,
+      description:
+        settings?.heroDescription ??
+        "We isolate patented phyto-actives from underutilised Himalayan biodiversity — engineered under clinical discipline into nutrition the body can trust.",
+      ctaPrimaryText: settings?.ctaPrimaryText ?? "Explore Catalog",
+      ctaPrimaryHref: settings?.ctaPrimaryHref ?? "/products",
+      ctaSecondaryText: settings?.ctaSecondaryText ?? "View Patents",
+      ctaSecondaryHref: settings?.ctaSecondaryHref ?? "/patents"
+    },
+    mission:
+      settings?.missionStatement ??
+      "We didn't set out to make another supplement. We set out to translate the Himalaya's rarest molecules into evidence-led human health.",
+    marquee: DEFAULT_MARQUEE,
+    pipeline: DEFAULT_PIPELINE,
+    metrics: DEFAULT_METRICS,
+    products,
+    patents,
+    faqs: DEFAULT_FAQS
+  };
+}
+
+
+==============================================================================
+FILE 31/51: src/components/home/home-experience.tsx
+LINES: 74
+==============================================================================
+"use client";
+
+import { useCallback, useEffect, useState } from "react";
+import { AnimatePresence, MotionConfig } from "framer-motion";
+import { SmoothScroll } from "@/components/experience/smooth-scroll";
+import { AmbientBackground } from "@/components/experience/ambient-background";
+import { Grain } from "@/components/experience/grain";
+import { Cursor } from "@/components/experience/cursor";
+import { Loader } from "@/components/experience/loader";
+import { SiteNav } from "@/components/experience/site-nav";
+import { SiteFooter } from "@/components/experience/site-footer";
+import { Hero } from "@/components/home/sections/hero";
+import { Marquee } from "@/components/home/sections/marquee";
+import { Platform } from "@/components/home/sections/platform";
+import { Metrics } from "@/components/home/sections/metrics";
+import { Pipeline } from "@/components/home/sections/pipeline";
+import { Products } from "@/components/home/sections/products";
+import { Patents } from "@/components/home/sections/patents";
+import { Mission } from "@/components/home/sections/mission";
+import { Faq } from "@/components/home/sections/faq";
+import { CtaNewsletter } from "@/components/home/sections/cta-newsletter";
+import type { HomeContent } from "@/components/home/content";
+
+export function HomeExperience({ content }: { content: HomeContent }) {
+  const [ready, setReady] = useState(false);
+  const [loaderDone, setLoaderDone] = useState(false);
+
+  const handleLoaderComplete = useCallback(() => {
+    setLoaderDone(true);
+    setReady(true);
+  }, []);
+
+  // Prevent scrolling behind the loader sheet.
+  useEffect(() => {
+    document.body.style.overflow = loaderDone ? "" : "hidden";
+    return () => {
+      document.body.style.overflow = "";
+    };
+  }, [loaderDone]);
+
+  return (
+    <MotionConfig reducedMotion="user">
+      <AnimatePresence>
+        {!loaderDone ? <Loader key="loader" onComplete={handleLoaderComplete} /> : null}
+      </AnimatePresence>
+
+      <Cursor />
+      <Grain />
+      <AmbientBackground />
+
+      <SiteNav
+        ready={ready}
+        ctaText={content.hero.ctaPrimaryText}
+        ctaHref={content.hero.ctaPrimaryHref}
+      />
+
+      <SmoothScroll>
+        <main className="relative">
+          <Hero content={content} ready={ready} />
+          <Marquee items={content.marquee} />
+          <Platform />
+          <Metrics metrics={content.metrics} />
+          <Pipeline stages={content.pipeline} />
+          <Products products={content.products} />
+          <Patents patents={content.patents} />
+          <Mission statement={content.mission} />
+          <Faq faqs={content.faqs} />
+          <CtaNewsletter />
+        </main>
+        <SiteFooter />
+      </SmoothScroll>
+    </MotionConfig>
+  );
+}
+
+
+==============================================================================
+FILE 32/51: src/components/home/sections/cta-newsletter.tsx
+LINES: 102
+==============================================================================
+"use client";
+
+import { useState } from "react";
+import { Reveal, RevealText } from "@/components/ui/reveal";
+import { LuxeButton } from "@/components/ui/luxe-button";
+
+type Status = "idle" | "loading" | "success" | "error";
+
+export function CtaNewsletter() {
+  const [email, setEmail] = useState("");
+  const [status, setStatus] = useState<Status>("idle");
+  const [message, setMessage] = useState("");
+
+  const submit = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (status === "loading") return;
+    setStatus("loading");
+    setMessage("");
+    try {
+      const res = await fetch("/api/newsletter", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email })
+      });
+      if (res.ok) {
+        setStatus("success");
+        setMessage("You're on the list. We'll be in touch.");
+        setEmail("");
+      } else if (res.status === 422) {
+        setStatus("error");
+        setMessage("Please enter a valid email address.");
+      } else if (res.status === 429) {
+        setStatus("error");
+        setMessage("Too many attempts — try again shortly.");
+      } else {
+        setStatus("error");
+        setMessage("Something went wrong. Please try again.");
+      }
+    } catch {
+      setStatus("error");
+      setMessage("Network error. Please try again.");
+    }
+  };
+
+  return (
+    <section id="access" className="relative px-4 pb-24 md:px-8">
+      <div className="relative mx-auto max-w-frame overflow-hidden rounded-[2rem] bg-ink px-6 py-24 text-paper md:rounded-[2.5rem] md:px-16 md:py-32">
+        <div className="pointer-events-none absolute inset-0 opacity-60">
+          <div className="absolute left-1/2 top-1/2 h-[70vw] w-[70vw] -translate-x-1/2 -translate-y-1/2 rounded-full [background:radial-gradient(circle,rgba(184,148,88,0.22),transparent_60%)]" />
+          <div className="absolute -right-20 top-10 h-72 w-72 rounded-full [background:radial-gradient(circle,rgba(111,168,206,0.24),transparent_65%)]" />
+        </div>
+
+        <div className="relative z-10 mx-auto max-w-2xl text-center">
+          <p className="technical mb-6 !text-gold-soft">Institutional Access</p>
+          <h2 className="text-[clamp(2rem,4.5vw,3.75rem)] font-light leading-[1.06] tracking-tightest">
+            <RevealText
+              text="Partner in the next era of precision nutrition."
+              accentWords={[4]}
+            />
+          </h2>
+          <Reveal delay={0.1}>
+            <p className="mx-auto mt-6 max-w-md leading-relaxed text-paper/60">
+              Research collaborations and formulation enquiries open each quarter. Join the
+              list for the next release from the registry.
+            </p>
+          </Reveal>
+
+          <Reveal delay={0.18}>
+            <form onSubmit={submit} className="mx-auto mt-11 flex max-w-md flex-col gap-3 sm:flex-row">
+              <label htmlFor="newsletter-email" className="sr-only">
+                Email address
+              </label>
+              <input
+                id="newsletter-email"
+                type="email"
+                required
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="you@institution.org"
+                className="h-12 flex-1 rounded-full border border-paper/20 bg-paper/5 px-5 text-sm text-paper placeholder:text-paper/40 focus:border-gold focus:outline-none"
+              />
+              <LuxeButton type="submit" variant="light" className="h-12">
+                {status === "loading" ? "Sending…" : "Request Access"}
+              </LuxeButton>
+            </form>
+          </Reveal>
+
+          {message ? (
+            <p
+              role="status"
+              className={`mt-5 font-mono text-[11px] uppercase tracking-[0.16em] ${
+                status === "success" ? "text-gold-soft" : "text-paper/70"
+              }`}
+            >
+              {message}
+            </p>
+          ) : null}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+
+==============================================================================
+FILE 33/51: src/components/home/sections/faq.tsx
+LINES: 71
+==============================================================================
+"use client";
+
+import { useState } from "react";
+import { AnimatePresence, motion } from "framer-motion";
+import { EASE_OUT_EXPO } from "@/lib/motion/ease";
+import { Reveal, RevealText } from "@/components/ui/reveal";
+import type { HomeContent } from "@/components/home/content";
+
+export function Faq({ faqs }: { faqs: HomeContent["faqs"] }) {
+  const [open, setOpen] = useState<number | null>(0);
+
+  return (
+    <section className="relative py-32 md:py-44">
+      <div className="frame grid grid-cols-1 gap-16 lg:grid-cols-12">
+        <div className="lg:col-span-4">
+          <Reveal>
+            <p className="technical mb-5">Enquiries</p>
+          </Reveal>
+          <h2 className="text-[clamp(2rem,3.4vw,3rem)] font-light leading-[1.08] tracking-tightest">
+            <RevealText text="Answers, held to the same standard." accentWords={[1]} />
+          </h2>
+        </div>
+
+        <div className="lg:col-span-8">
+          <div className="border-t border-ink/10">
+            {faqs.map((faq, i) => {
+              const active = open === i;
+              return (
+                <div key={faq.q} className="border-b border-ink/10">
+                  <button
+                    type="button"
+                    onClick={() => setOpen(active ? null : i)}
+                    aria-expanded={active}
+                    className="flex w-full items-center justify-between gap-6 py-7 text-left"
+                  >
+                    <span className="text-lg font-light tracking-tight text-ink md:text-xl">
+                      {faq.q}
+                    </span>
+                    <span
+                      className={`grid h-8 w-8 flex-shrink-0 place-items-center rounded-full border border-ink/15 text-gold transition-transform duration-400 ${
+                        active ? "rotate-45" : ""
+                      }`}
+                      aria-hidden
+                    >
+                      +
+                    </span>
+                  </button>
+                  <AnimatePresence initial={false}>
+                    {active ? (
+                      <motion.div
+                        initial={{ height: 0, opacity: 0 }}
+                        animate={{ height: "auto", opacity: 1 }}
+                        exit={{ height: 0, opacity: 0 }}
+                        transition={{ duration: 0.5, ease: EASE_OUT_EXPO }}
+                        className="overflow-hidden"
+                      >
+                        <p className="max-w-xl pb-8 text-sm leading-relaxed text-ink-mute">
+                          {faq.a}
+                        </p>
+                      </motion.div>
+                    ) : null}
+                  </AnimatePresence>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+
+==============================================================================
+FILE 34/51: src/components/home/sections/hero.tsx
+LINES: 105
+==============================================================================
+"use client";
+
+import { motion } from "framer-motion";
+import { EASE_OUT_EXPO } from "@/lib/motion/ease";
+import { HeroVisual } from "@/components/experience/scene/hero-visual";
+import { LuxeButton } from "@/components/ui/luxe-button";
+import { RevealText } from "@/components/ui/reveal";
+import { TechChip } from "@/components/ui/tech-chip";
+import type { HomeContent } from "@/components/home/content";
+
+const FLOAT_CHIPS = [
+  { label: "Compound purity Δ0.03", className: "left-2 top-10 animate-float" },
+  { label: "LC-MS verified batch", className: "right-0 top-1/2 animate-float-slow" },
+  { label: "Alpine origin · Kashmir", className: "bottom-12 left-6 animate-float" }
+];
+
+export function Hero({ content, ready }: { content: HomeContent; ready: boolean }) {
+  const { hero } = content;
+
+  return (
+    <section
+      id="top"
+      className="relative flex min-h-svh items-center overflow-hidden pb-16 pt-28 md:pt-32"
+    >
+      <div className="frame grid w-full grid-cols-1 items-center gap-12 lg:grid-cols-[1.05fr_0.95fr] lg:gap-8">
+        <div className="relative z-10 order-2 lg:order-1">
+          <motion.div
+            initial={{ opacity: 0, y: 12 }}
+            animate={ready ? { opacity: 1, y: 0 } : {}}
+            transition={{ duration: 0.7, ease: EASE_OUT_EXPO, delay: 0.1 }}
+          >
+            <TechChip>{hero.eyebrow}</TechChip>
+          </motion.div>
+
+          <h1 className="display-hero mt-7 text-[clamp(2.6rem,6.4vw,5.4rem)]">
+            <RevealText
+              text={hero.title}
+              accentWords={hero.accentWords}
+              play={ready}
+              delay={0.35}
+              stagger={0.06}
+            />
+          </h1>
+
+          <motion.p
+            initial={{ opacity: 0, y: 20, filter: "blur(6px)" }}
+            animate={ready ? { opacity: 1, y: 0, filter: "blur(0px)" } : {}}
+            transition={{ duration: 1, ease: EASE_OUT_EXPO, delay: 0.7 }}
+            className="mt-8 max-w-md text-[15px] leading-relaxed text-ink-mute"
+          >
+            {hero.description}
+          </motion.p>
+
+          <motion.div
+            initial={{ opacity: 0, y: 16 }}
+            animate={ready ? { opacity: 1, y: 0 } : {}}
+            transition={{ duration: 0.8, ease: EASE_OUT_EXPO, delay: 0.9 }}
+            className="mt-11 flex flex-wrap items-center gap-4"
+          >
+            <LuxeButton href={hero.ctaPrimaryHref} variant="primary">
+              {hero.ctaPrimaryText}
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden>
+                <path
+                  d="M5 12h14M13 5l7 7-7 7"
+                  stroke="currentColor"
+                  strokeWidth="1.8"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+            </LuxeButton>
+            <LuxeButton href={hero.ctaSecondaryHref} variant="ghost">
+              {hero.ctaSecondaryText}
+            </LuxeButton>
+          </motion.div>
+        </div>
+
+        <div className="relative order-1 h-[42vh] min-h-[320px] lg:order-2 lg:h-[68vh]">
+          <HeroVisual />
+          {FLOAT_CHIPS.map((chip) => (
+            <div
+              key={chip.label}
+              className={`glass absolute rounded-xl px-3 py-2 font-mono text-[10px] uppercase tracking-[0.14em] text-ink-mute ${chip.className}`}
+            >
+              <span className="mr-2 inline-block h-1.5 w-1.5 rounded-full bg-gold align-middle" />
+              {chip.label}
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={ready ? { opacity: 1 } : {}}
+        transition={{ duration: 0.8, delay: 1.2 }}
+        className="absolute bottom-8 left-1/2 flex -translate-x-1/2 flex-col items-center gap-3"
+      >
+        <span className="technical">Scroll</span>
+        <span className="relative h-10 w-px overflow-hidden bg-ink/15">
+          <span className="animate-scroll-line absolute inset-x-0 top-0 h-full bg-ink" />
+        </span>
+      </motion.div>
+    </section>
+  );
+}
+
+
+==============================================================================
+FILE 35/51: src/components/home/sections/marquee.tsx
+LINES: 96
+==============================================================================
+"use client";
+
+import { useEffect, useRef, useState } from "react";
+import {
+  motion,
+  useAnimationFrame,
+  useMotionValue,
+  useScroll,
+  useSpring,
+  useTransform,
+  useVelocity
+} from "framer-motion";
+
+const BASE_VELOCITY = 1.2; // % of the track width per second — calm editorial drift
+
+/** Seamless modulo wrap (no dependency on framer's internal export). */
+function wrapValue(min: number, max: number, value: number) {
+  const range = max - min;
+  return (((value - min) % range) + range) % range + min;
+}
+
+function Row({ items }: { items: string[] }) {
+  return (
+    <span className="flex shrink-0 whitespace-nowrap">
+      {items.map((item, i) => (
+        <span key={`${item}-${i}`} className="mx-8 flex items-center gap-8">
+          <span
+            className={
+              i % 2 === 0
+                ? "text-[clamp(2rem,5vw,4.5rem)] font-light leading-none text-ink/[0.1]"
+                : "text-[clamp(2rem,5vw,4.5rem)] font-light leading-none text-transparent [-webkit-text-stroke:1px_rgba(17,17,17,0.18)]"
+            }
+          >
+            {item}
+          </span>
+          <span className="h-2 w-2 shrink-0 rounded-full bg-gold/60" />
+        </span>
+      ))}
+    </span>
+  );
+}
+
+/**
+ * Editorial marquee driven entirely on the compositor. A single motion value is
+ * advanced each frame and wrapped seamlessly across four duplicated rows — no
+ * CSS/inline transform conflict. It always drifts; scroll velocity smoothly
+ * modulates speed and direction, and the skew lives on a separate outer layer.
+ */
+export function Marquee({ items }: { items: string[] }) {
+  const baseX = useMotionValue(0);
+  const { scrollY } = useScroll();
+  const scrollVelocity = useVelocity(scrollY);
+  const smoothVelocity = useSpring(scrollVelocity, {
+    damping: 40,
+    stiffness: 220,
+    mass: 0.4
+  });
+  const velocityFactor = useTransform(smoothVelocity, [-1600, 0, 1600], [-4, 0, 4], {
+    clamp: false
+  });
+  const skew = useTransform(smoothVelocity, [-1600, 0, 1600], [-4, 0, 4], { clamp: true });
+
+  const x = useTransform(baseX, (v) => `${wrapValue(-50, 0, v)}%`);
+  const direction = useRef(1);
+
+  const [velocityEnabled, setVelocityEnabled] = useState(true);
+  useEffect(() => {
+    // Base drift always runs; only the scroll-reactive boost respects the setting.
+    setVelocityEnabled(!window.matchMedia("(prefers-reduced-motion: reduce)").matches);
+  }, []);
+
+  useAnimationFrame((_, delta) => {
+    if (!delta) return;
+    let moveBy = direction.current * BASE_VELOCITY * (delta / 1000);
+    if (velocityEnabled) {
+      const factor = velocityFactor.get();
+      if (factor < 0) direction.current = -1;
+      else if (factor > 0) direction.current = 1;
+      moveBy += moveBy * factor;
+    }
+    baseX.set(baseX.get() + moveBy);
+  });
+
+  return (
+    <section className="relative overflow-hidden border-y border-ink/10 bg-paper/40 py-12 backdrop-blur-sm">
+      <motion.div style={{ skewX: skew }} className="flex will-change-transform">
+        <motion.div style={{ x }} className="flex will-change-transform">
+          <Row items={items} />
+          <Row items={items} />
+          <Row items={items} />
+          <Row items={items} />
+        </motion.div>
+      </motion.div>
+    </section>
+  );
+}
+
+
+==============================================================================
+FILE 36/51: src/components/home/sections/metrics.tsx
+LINES: 47
+==============================================================================
+"use client";
+
+import { Reveal, RevealText } from "@/components/ui/reveal";
+import { TiltCard } from "@/components/ui/tilt-card";
+import { Counter } from "@/components/ui/counter";
+import type { HomeContent } from "@/components/home/content";
+
+export function Metrics({ metrics }: { metrics: HomeContent["metrics"] }) {
+  return (
+    <section id="science" className="relative overflow-hidden py-32 md:py-44">
+      <div className="hairline-x absolute inset-x-0 top-0 h-px" />
+      <div className="frame">
+        <div className="mb-20 text-center md:mb-28">
+          <Reveal>
+            <p className="technical mb-5">Scientific Rigor</p>
+          </Reveal>
+          <h2 className="text-[clamp(2.2rem,5vw,4rem)] font-light tracking-tightest">
+            <RevealText text="Numbers held to evidence." accentWords={[2]} />
+          </h2>
+        </div>
+
+        <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
+          {metrics.map((metric, i) => (
+            <Reveal key={metric.label} delay={0.1 * i} y={48}>
+              <TiltCard
+                className="group h-full rounded-2xl border border-ink/10 bg-paper/70 p-10 shadow-glass backdrop-blur-md md:p-12"
+                max={9}
+              >
+                <div className="flex items-baseline text-6xl font-light tracking-tightest text-ink md:text-7xl">
+                  <Counter value={metric.value} decimals={metric.decimals ?? 0} />
+                  {metric.suffix ? (
+                    <span className="ml-1 text-3xl text-gold">{metric.suffix}</span>
+                  ) : null}
+                </div>
+                <div className="my-6 h-px w-10 bg-gold/60" />
+                <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-ink-faint">
+                  {metric.label}
+                </p>
+                <p className="mt-3 text-sm leading-relaxed text-ink-mute">{metric.note}</p>
+              </TiltCard>
+            </Reveal>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+
+==============================================================================
+FILE 37/51: src/components/home/sections/mission.tsx
+LINES: 32
+==============================================================================
+"use client";
+
+import { Reveal } from "@/components/ui/reveal";
+
+export function Mission({ statement }: { statement: string }) {
+  return (
+    <section className="relative py-36 md:py-52">
+      <div className="frame max-w-4xl text-center">
+        <Reveal>
+          <svg
+            className="mx-auto mb-10 opacity-40"
+            width="30"
+            height="30"
+            viewBox="0 0 24 24"
+            fill="currentColor"
+            aria-hidden
+          >
+            <path d="M7 7h5v5c0 3-2 5-5 5v-2c1.5 0 3-1 3-3H7V7zm9 0h5v5c0 3-2 5-5 5v-2c1.5 0 3-1 3-3h-3V7z" />
+          </svg>
+        </Reveal>
+        <Reveal delay={0.05}>
+          <p className="text-balance text-[clamp(1.6rem,3.4vw,2.75rem)] font-light leading-[1.2] tracking-tight text-ink">
+            {statement}
+          </p>
+        </Reveal>
+        <Reveal delay={0.15}>
+          <p className="technical mt-10">Cashmir Biotech · Kashmir, India</p>
+        </Reveal>
+      </div>
+    </section>
+  );
+}
+
+
+==============================================================================
+FILE 38/51: src/components/home/sections/patents.tsx
+LINES: 63
+==============================================================================
+"use client";
+
+import Link from "next/link";
+import { Reveal, RevealText } from "@/components/ui/reveal";
+import type { PatentCard } from "@/components/home/content";
+
+export function Patents({ patents }: { patents: PatentCard[] }) {
+  return (
+    <section id="patents" className="relative py-32 md:py-44">
+      <div className="hairline-x absolute inset-x-0 top-0 h-px" />
+      <div className="frame grid grid-cols-1 gap-16 lg:grid-cols-12">
+        <div className="lg:col-span-4">
+          <div className="lg:sticky lg:top-28">
+            <Reveal>
+              <p className="technical mb-5">Registry</p>
+            </Reveal>
+            <h2 className="text-[clamp(2rem,3.4vw,3rem)] font-light leading-[1.08] tracking-tightest">
+              <RevealText text="Protected by patent, proven by research." accentWords={[2, 5]} />
+            </h2>
+            <Reveal delay={0.1}>
+              <Link
+                href="/patents"
+                data-cursor="Open"
+                className="group mt-8 inline-flex items-center gap-2 font-mono text-[11px] uppercase tracking-[0.16em] text-ink-mute transition-colors hover:text-ink"
+              >
+                Explore the registry
+                <span className="transition-transform duration-300 group-hover:translate-x-1">→</span>
+              </Link>
+            </Reveal>
+          </div>
+        </div>
+
+        <div className="lg:col-span-8">
+          <div className="divide-y divide-ink/10 border-y border-ink/10">
+            {patents.map((patent) => (
+              <Reveal key={patent.id}>
+                <article className="group grid grid-cols-1 gap-4 py-8 transition-colors md:grid-cols-[auto_1fr_auto] md:items-start md:gap-8">
+                  <div className="font-mono text-[11px] uppercase tracking-[0.16em] text-gold">
+                    {patent.patentCode}
+                  </div>
+                  <div>
+                    <h3 className="text-xl font-light tracking-tight text-ink">{patent.title}</h3>
+                    <p className="mt-2 max-w-xl text-sm leading-relaxed text-ink-mute">
+                      {patent.summary}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-3 md:flex-col md:items-end md:gap-1">
+                    <span className="rounded-sm border border-sky/40 bg-sky/10 px-2.5 py-1 font-mono text-[9px] uppercase tracking-[0.16em] text-ink-soft">
+                      {patent.status}
+                    </span>
+                    <span className="font-mono text-[10px] uppercase tracking-[0.16em] text-ink-faint">
+                      {patent.jurisdiction} · {patent.year}
+                    </span>
+                  </div>
+                </article>
+              </Reveal>
+            ))}
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+
+==============================================================================
+FILE 39/51: src/components/home/sections/pipeline.tsx
+LINES: 131
+==============================================================================
+"use client";
+
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { motion, useScroll, useSpring, useTransform } from "framer-motion";
+import type { HomeContent } from "@/components/home/content";
+
+/**
+ * Horizontal storytelling driven by a sticky viewport and scroll progress.
+ * A tall outer section provides the scroll runway; the inner viewport sticks
+ * while the track translates from 0 to -overflow. Reading scroll position
+ * directly (rather than pinning) keeps it in lockstep with Lenis or native
+ * scroll, on any device.
+ */
+export function Pipeline({ stages }: { stages: HomeContent["pipeline"] }) {
+  const sectionRef = useRef<HTMLElement>(null);
+  const trackRef = useRef<HTMLDivElement>(null);
+
+  const [isDesktop, setIsDesktop] = useState(false);
+  const [overflow, setOverflow] = useState(0);
+  const [viewportH, setViewportH] = useState(0);
+
+  const measure = () => {
+    const desktop = window.matchMedia("(min-width: 768px)").matches;
+    setIsDesktop(desktop);
+    setViewportH(window.innerHeight);
+    const track = trackRef.current;
+    if (track) {
+      setOverflow(desktop ? Math.max(0, track.scrollWidth - window.innerWidth) : 0);
+    }
+  };
+
+  useLayoutEffect(() => {
+    measure();
+    window.addEventListener("resize", measure);
+    if (document.fonts?.ready) document.fonts.ready.then(measure).catch(() => {});
+    return () => window.removeEventListener("resize", measure);
+  }, []);
+
+  // Re-measure once after paint so late layout (fonts, images) is captured.
+  useEffect(() => {
+    const id = requestAnimationFrame(measure);
+    return () => cancelAnimationFrame(id);
+  }, []);
+
+  const { scrollYProgress } = useScroll({
+    target: sectionRef,
+    offset: ["start start", "end end"]
+  });
+  const rawX = useTransform(scrollYProgress, [0, 1], [0, -overflow]);
+  const x = useSpring(rawX, { stiffness: 140, damping: 28, mass: 0.4 });
+
+  const runway = isDesktop && overflow > 0 ? { height: viewportH + overflow } : undefined;
+
+  return (
+    <section id="pipeline" ref={sectionRef} style={runway} className="relative bg-paper">
+      <div
+        className={
+          isDesktop
+            ? "sticky top-0 flex h-svh flex-col overflow-hidden"
+            : "flex flex-col"
+        }
+      >
+        <div className="frame shrink-0 pt-28 pb-6 md:pt-32 md:pb-8">
+          <p className="technical mb-4">The Pipeline</p>
+          <h2 className="max-w-md text-[clamp(1.8rem,3.2vw,2.75rem)] font-light leading-[1.1] tracking-tightest">
+            From alpine source to clinical-ready nutrition.
+          </h2>
+        </div>
+
+        <div
+          className={
+            isDesktop
+              ? "flex min-h-0 flex-1 items-center overflow-hidden"
+              : "flex items-stretch overflow-x-auto pb-10 [scrollbar-width:none]"
+          }
+        >
+          <motion.div
+            ref={trackRef}
+            style={isDesktop ? { x } : undefined}
+            className="flex items-stretch gap-6 px-6 will-change-transform md:gap-10 md:px-[8vw]"
+          >
+            {stages.map((stage, i) => {
+              const dark = i % 2 === 1;
+              return (
+                <article
+                  key={stage.index}
+                  data-tilt
+                  className={`group relative flex h-[clamp(340px,52vh,560px)] w-[80vw] flex-shrink-0 flex-col justify-end overflow-hidden rounded-3xl border p-8 sm:w-[62vw] md:w-[42vw] md:p-11 lg:w-[34vw] ${
+                    dark
+                      ? "border-ink/80 bg-ink text-paper"
+                      : "border-ink/10 bg-gradient-to-b from-paper to-pearl text-ink"
+                  }`}
+                >
+                  <div className="absolute inset-0 flex items-center justify-center opacity-70">
+                    <div
+                      className={`animate-spin-slow h-48 w-48 rounded-full border ${
+                        dark ? "border-paper/10" : "border-ink/5"
+                      }`}
+                    />
+                    <div
+                      className={`animate-spin-slow-rev absolute h-32 w-32 rounded-full border ${
+                        dark ? "border-sky/30" : "border-sky/40"
+                      }`}
+                    />
+                  </div>
+                  <span
+                    className={`relative font-mono text-[11px] uppercase tracking-[0.26em] ${
+                      dark ? "text-gold-soft" : "text-gold"
+                    }`}
+                  >
+                    Stage {stage.index}
+                  </span>
+                  <h3 className="relative mt-4 text-3xl font-light tracking-tight md:text-4xl">
+                    {stage.title}
+                  </h3>
+                  <p
+                    className={`relative mt-4 max-w-sm text-sm leading-relaxed ${
+                      dark ? "text-paper/70" : "text-ink-mute"
+                    }`}
+                  >
+                    {stage.body}
+                  </p>
+                </article>
+              );
+            })}
+          </motion.div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+
+==============================================================================
+FILE 40/51: src/components/home/sections/platform.tsx
+LINES: 81
+==============================================================================
+"use client";
+
+import { Reveal, RevealText } from "@/components/ui/reveal";
+import { TiltCard } from "@/components/ui/tilt-card";
+
+const CAPABILITIES = [
+  { index: "01", label: "Predictive Phytochemistry", note: "Model actives before extraction" },
+  { index: "02", label: "Automated Isolation", note: "Cold-chain, low-oxygen synthesis" },
+  { index: "03", label: "In-Assay Validation", note: "LC-MS on every batch" }
+];
+
+export function Platform() {
+  return (
+    <section id="platform" className="relative py-32 md:py-44">
+      <div className="frame grid grid-cols-1 items-start gap-16 lg:grid-cols-12">
+        <div className="lg:col-span-5">
+          <Reveal>
+            <p className="technical mb-6">The Method</p>
+          </Reveal>
+          <h2 className="text-[clamp(2rem,3.6vw,3.25rem)] font-light leading-[1.08] tracking-tightest">
+            <RevealText
+              text="A closed-loop discipline for molecular nutrition."
+              accentWords={[5]}
+            />
+          </h2>
+          <Reveal delay={0.1}>
+            <p className="mt-8 max-w-md leading-relaxed text-ink-mute">
+              Cashmir Biotech pairs computational phytochemistry with high-integrity
+              isolation, turning field research into registered formulations in seasons —
+              not decades. Every experiment feeds the next.
+            </p>
+          </Reveal>
+
+          <div className="mt-10 space-y-3">
+            {CAPABILITIES.map((cap, i) => (
+              <Reveal key={cap.index} delay={0.08 * i}>
+                <div className="group flex items-center gap-5 rounded-lg border border-ink/10 bg-paper/40 p-5 transition-colors duration-300 hover:border-gold/50">
+                  <span className="flex h-10 w-10 items-center justify-center rounded-full bg-pearl font-mono text-[11px] text-ink transition-colors duration-300 group-hover:bg-gold/15">
+                    {cap.index}
+                  </span>
+                  <span className="flex-1 text-sm tracking-wide text-ink-soft">{cap.label}</span>
+                  <span className="hidden font-mono text-[10px] uppercase tracking-[0.16em] text-ink-faint sm:block">
+                    {cap.note}
+                  </span>
+                </div>
+              </Reveal>
+            ))}
+          </div>
+        </div>
+
+        <div className="lg:col-span-7">
+          <div className="lg:sticky lg:top-28">
+            <Reveal y={48}>
+              <TiltCard
+                className="group relative aspect-[4/3] overflow-hidden rounded-3xl border border-ink/10 bg-gradient-to-br from-paper to-pearl shadow-ambient"
+                max={8}
+              >
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <div className="animate-spin-slow h-64 w-64 rounded-full border border-ink/10" />
+                  <div className="animate-spin-slow-rev absolute h-44 w-44 rounded-full border border-sky/40" />
+                  <div className="absolute h-24 w-24 rounded-full bg-[radial-gradient(circle_at_32%_30%,rgba(255,255,255,0.95),rgba(169,201,222,0.4)_60%,transparent)]" />
+                </div>
+                <div className="absolute bottom-8 left-8 [transform:translateZ(40px)]">
+                  <p className="font-mono text-[10px] uppercase tracking-[0.22em] text-ink-faint">
+                    Platform Architecture
+                  </p>
+                  <p className="mt-1 text-xl font-light tracking-tight text-ink">
+                    Source → Isolate → Verify → Formulate
+                  </p>
+                </div>
+                <span className="absolute right-6 top-6 font-mono text-[10px] uppercase tracking-[0.2em] text-gold">
+                  Live
+                </span>
+              </TiltCard>
+            </Reveal>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+
+==============================================================================
+FILE 41/51: src/components/home/sections/products.tsx
+LINES: 69
+==============================================================================
+"use client";
+
+import Link from "next/link";
+import { Reveal, RevealText } from "@/components/ui/reveal";
+import { TiltCard } from "@/components/ui/tilt-card";
+import type { ProductCard } from "@/components/home/content";
+
+const inr = new Intl.NumberFormat("en-IN", {
+  style: "currency",
+  currency: "INR",
+  maximumFractionDigits: 0
+});
+
+export function Products({ products }: { products: ProductCard[] }) {
+  return (
+    <section id="formulations" className="relative py-32 md:py-44">
+      <div className="frame">
+        <div className="mb-16 flex flex-col justify-between gap-6 md:flex-row md:items-end">
+          <div>
+            <Reveal>
+              <p className="technical mb-5">Flagship Formulations</p>
+            </Reveal>
+            <h2 className="max-w-xl text-[clamp(2rem,4vw,3.5rem)] font-light leading-[1.05] tracking-tightest">
+              <RevealText text="Nutrition, engineered molecule-first." accentWords={[2]} />
+            </h2>
+          </div>
+          <Reveal delay={0.1}>
+            <Link
+              href="/products"
+              data-cursor="Open"
+              className="group inline-flex items-center gap-2 font-mono text-[11px] uppercase tracking-[0.16em] text-ink-mute transition-colors hover:text-ink"
+            >
+              Full catalog
+              <span className="transition-transform duration-300 group-hover:translate-x-1">→</span>
+            </Link>
+          </Reveal>
+        </div>
+
+        <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
+          {products.map((product, i) => (
+            <Reveal key={product.id} delay={0.08 * i} y={44}>
+              <TiltCard
+                className="group flex h-full flex-col overflow-hidden rounded-2xl border border-ink/10 bg-paper/70 p-8 shadow-glass backdrop-blur-md"
+                max={8}
+              >
+                <div className="relative mb-8 flex aspect-square items-center justify-center overflow-hidden rounded-xl bg-gradient-to-br from-pearl to-mist">
+                  <div className="animate-breathe h-28 w-28 rounded-full bg-[radial-gradient(circle_at_34%_30%,rgba(255,255,255,0.95),rgba(209,184,140,0.35)_60%,transparent)]" />
+                  <span className="absolute left-4 top-4 rounded-sm border border-ink/10 bg-paper/70 px-2.5 py-1 font-mono text-[9px] uppercase tracking-[0.18em] text-ink-mute">
+                    {product.category}
+                  </span>
+                </div>
+                <h3 className="text-xl font-light tracking-tight text-ink">{product.name}</h3>
+                <p className="mt-2 flex-1 text-sm leading-relaxed text-ink-mute">
+                  {product.shortBenefit}
+                </p>
+                <div className="mt-6 flex items-center justify-between border-t border-ink/10 pt-5">
+                  <span className="font-mono text-[10px] uppercase tracking-[0.16em] text-ink-faint">
+                    {product.sizeLabel}
+                  </span>
+                  <span className="text-lg font-light text-ink">{inr.format(product.mrpInr)}</span>
+                </div>
+              </TiltCard>
+            </Reveal>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+
+==============================================================================
+FILE 42/51: src/components/ui/counter.tsx
+LINES: 58
+==============================================================================
+"use client";
+
+import { useEffect, useRef, useState } from "react";
+import { useInView } from "framer-motion";
+import { cn } from "@/lib/utils";
+
+type CounterProps = {
+  value: number;
+  decimals?: number;
+  duration?: number;
+  className?: string;
+  prefix?: string;
+  suffix?: string;
+};
+
+/** Eased count-up that fires once the number scrolls into view. */
+export function Counter({
+  value,
+  decimals = 0,
+  duration = 2000,
+  className,
+  prefix,
+  suffix
+}: CounterProps) {
+  const ref = useRef<HTMLSpanElement>(null);
+  const inView = useInView(ref, { once: true, margin: "0px 0px -20% 0px" });
+  const [display, setDisplay] = useState(0);
+
+  useEffect(() => {
+    if (!inView) return;
+    const prefersReduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (prefersReduced) {
+      setDisplay(value);
+      return;
+    }
+
+    let raf = 0;
+    let start: number | null = null;
+    const step = (ts: number) => {
+      if (start === null) start = ts;
+      const progress = Math.min((ts - start) / duration, 1);
+      const eased = 1 - Math.pow(1 - progress, 3);
+      setDisplay(value * eased);
+      if (progress < 1) raf = requestAnimationFrame(step);
+      else setDisplay(value);
+    };
+    raf = requestAnimationFrame(step);
+    return () => cancelAnimationFrame(raf);
+  }, [inView, value, duration]);
+
+  return (
+    <span ref={ref} className={cn("tabular-nums", className)}>
+      {prefix}
+      {display.toFixed(decimals)}
+      {suffix}
+    </span>
+  );
+}
+
+
+==============================================================================
+FILE 43/51: src/components/ui/luxe-button.tsx
+LINES: 77
+==============================================================================
+"use client";
+
+import { type ReactNode } from "react";
+import Link from "next/link";
+import { Magnetic } from "@/components/ui/magnetic";
+import { cn } from "@/lib/utils";
+
+type Variant = "primary" | "ghost" | "light";
+
+type LuxeButtonProps = {
+  children: ReactNode;
+  href?: string;
+  onClick?: () => void;
+  variant?: Variant;
+  className?: string;
+  type?: "button" | "submit";
+  ariaLabel?: string;
+};
+
+const base =
+  "group relative inline-flex items-center justify-center gap-2.5 overflow-hidden rounded-full px-7 py-3.5 text-[13px] font-medium tracking-[0.02em] transition-colors duration-500";
+
+const variants: Record<Variant, string> = {
+  primary: "bg-ink text-paper",
+  ghost: "border border-ink/15 text-ink hover:border-ink/40",
+  light: "bg-paper text-ink"
+};
+
+/**
+ * The signature call-to-action: magnetic pull, a champagne-gold fill that
+ * sweeps in from the left, and a subtle depth press.
+ */
+export function LuxeButton({
+  children,
+  href,
+  onClick,
+  variant = "primary",
+  className,
+  type = "button",
+  ariaLabel
+}: LuxeButtonProps) {
+  const showFill = variant !== "ghost";
+
+  const inner = (
+    <>
+      {showFill ? (
+        <span className="absolute inset-0 origin-left scale-x-0 rounded-full bg-gold transition-transform duration-500 ease-expo group-hover:scale-x-100" />
+      ) : (
+        <span className="absolute inset-0 origin-left scale-x-0 rounded-full bg-ink transition-transform duration-500 ease-expo group-hover:scale-x-100" />
+      )}
+      <span
+        className={cn(
+          "relative z-10 flex items-center gap-2 transition-colors duration-500",
+          variant === "ghost" && "group-hover:text-paper"
+        )}
+      >
+        {children}
+      </span>
+    </>
+  );
+
+  const classes = cn(base, variants[variant], className);
+
+  return (
+    <Magnetic strength={0.4}>
+      {href ? (
+        <Link href={href} className={classes} aria-label={ariaLabel}>
+          {inner}
+        </Link>
+      ) : (
+        <button type={type} onClick={onClick} className={classes} aria-label={ariaLabel}>
+          {inner}
+        </button>
+      )}
+    </Magnetic>
+  );
+}
+
+
+==============================================================================
+FILE 44/51: src/components/ui/magnetic.tsx
+LINES: 52
+==============================================================================
+"use client";
+
+import { type ReactNode, useRef } from "react";
+import { motion, useMotionValue, useSpring } from "framer-motion";
+import { SPRING_SOFT } from "@/lib/motion/ease";
+import { cn } from "@/lib/utils";
+
+type MagneticProps = {
+  children: ReactNode;
+  className?: string;
+  /** How strongly the element is pulled toward the cursor (0–1). */
+  strength?: number;
+};
+
+/**
+ * Pulls its child toward the cursor with a soft spring, releasing elastically
+ * on exit. Pointer-fine only; touch devices simply render statically.
+ */
+export function Magnetic({ children, className, strength = 0.35 }: MagneticProps) {
+  const ref = useRef<HTMLDivElement>(null);
+  const x = useMotionValue(0);
+  const y = useMotionValue(0);
+  const sx = useSpring(x, SPRING_SOFT);
+  const sy = useSpring(y, SPRING_SOFT);
+
+  const handleMove = (event: React.MouseEvent<HTMLDivElement>) => {
+    const el = ref.current;
+    if (!el) return;
+    const rect = el.getBoundingClientRect();
+    const relX = event.clientX - rect.left - rect.width / 2;
+    const relY = event.clientY - rect.top - rect.height / 2;
+    x.set(relX * strength);
+    y.set(relY * strength);
+  };
+
+  const reset = () => {
+    x.set(0);
+    y.set(0);
+  };
+
+  return (
+    <motion.div
+      ref={ref}
+      className={cn("inline-flex", className)}
+      style={{ x: sx, y: sy }}
+      onMouseMove={handleMove}
+      onMouseLeave={reset}
+    >
+      {children}
+    </motion.div>
+  );
+}
+
+
+==============================================================================
+FILE 45/51: src/components/ui/reveal.tsx
+LINES: 114
+==============================================================================
+"use client";
+
+import { type ReactNode } from "react";
+import { motion, type Variants } from "framer-motion";
+import { EASE_OUT_EXPO } from "@/lib/motion/ease";
+import { cn } from "@/lib/utils";
+
+type RevealProps = {
+  children: ReactNode;
+  className?: string;
+  delay?: number;
+  y?: number;
+  once?: boolean;
+};
+
+/** Generic blur + rise reveal for any block entering the viewport. */
+export function Reveal({ children, className, delay = 0, y = 34, once = true }: RevealProps) {
+  return (
+    <motion.div
+      className={className}
+      initial={{ opacity: 0, y, filter: "blur(8px)" }}
+      whileInView={{ opacity: 1, y: 0, filter: "blur(0px)" }}
+      viewport={{ once, margin: "0px 0px -12% 0px" }}
+      transition={{ duration: 1.1, ease: EASE_OUT_EXPO, delay }}
+    >
+      {children}
+    </motion.div>
+  );
+}
+
+const wordContainer: Variants = {
+  hidden: {},
+  visible: (stagger: number) => ({
+    transition: { staggerChildren: stagger }
+  })
+};
+
+const wordChild: Variants = {
+  hidden: { y: "115%", opacity: 0 },
+  visible: {
+    y: "0%",
+    opacity: 1,
+    transition: { duration: 1, ease: EASE_OUT_EXPO }
+  }
+};
+
+type RevealTextProps = {
+  text: string;
+  className?: string;
+  /** Word indexes to render in the champagne-gold signature treatment. */
+  accentWords?: number[];
+  delay?: number;
+  stagger?: number;
+  /**
+   * When provided, animation is driven by this flag instead of scroll — used to
+   * hold the hero until the loader has lifted.
+   */
+  play?: boolean;
+};
+
+/**
+ * Line/word mask reveal. Each word rises out of an overflow-hidden mask with a
+ * staggered delay — the editorial signature of the hero and section titles.
+ */
+export function RevealText({
+  text,
+  className,
+  accentWords = [],
+  delay = 0,
+  stagger = 0.055,
+  play
+}: RevealTextProps) {
+  const words = text.split(" ");
+  const accent = new Set(accentWords);
+
+  const controlProps =
+    play === undefined
+      ? {
+          whileInView: "visible" as const,
+          viewport: { once: true, margin: "0px 0px -10% 0px" }
+        }
+      : { animate: play ? "visible" : "hidden" };
+
+  return (
+    <motion.span
+      className={cn("inline", className)}
+      variants={wordContainer}
+      custom={stagger}
+      initial="hidden"
+      transition={{ delayChildren: delay }}
+      aria-label={text}
+      {...controlProps}
+    >
+      {words.map((word, i) => (
+        <span
+          key={`${word}-${i}`}
+          className="inline-block overflow-hidden align-top"
+          aria-hidden
+        >
+          <motion.span
+            variants={wordChild}
+            className={cn(
+              "inline-block will-change-transform",
+              accent.has(i) && "text-gold"
+            )}
+          >
+            {word}
+            {i < words.length - 1 ? "\u00A0" : ""}
+          </motion.span>
+        </span>
+      ))}
+    </motion.span>
+  );
+}
+
+
+==============================================================================
+FILE 46/51: src/components/ui/tech-chip.tsx
+LINES: 25
+==============================================================================
+import { type ReactNode } from "react";
+import { cn } from "@/lib/utils";
+
+/** Small laboratory-instrument tag rendered in the mono technical style. */
+export function TechChip({
+  children,
+  className,
+  dot = true
+}: {
+  children: ReactNode;
+  className?: string;
+  dot?: boolean;
+}) {
+  return (
+    <span
+      className={cn(
+        "inline-flex items-center gap-2 rounded-sm border border-ink/10 bg-sky/10 px-3 py-1.5 font-mono text-[10px] uppercase tracking-[0.2em] text-ink-mute",
+        className
+      )}
+    >
+      {dot ? <span className="h-1.5 w-1.5 rounded-full bg-sky-crystal" /> : null}
+      {children}
+    </span>
+  );
+}
+
+
+==============================================================================
+FILE 47/51: src/components/ui/tilt-card.tsx
+LINES: 66
+==============================================================================
+"use client";
+
+import { type ReactNode, useRef } from "react";
+import { motion, useMotionValue, useSpring, useTransform } from "framer-motion";
+import { cn } from "@/lib/utils";
+
+type TiltCardProps = {
+  children: ReactNode;
+  className?: string;
+  /** Max rotation in degrees. */
+  max?: number;
+  glare?: boolean;
+};
+
+/**
+ * 3D pointer tilt with a mouse-following specular glare. Uses springs so the
+ * card settles rather than snaps, and resets cleanly on exit.
+ */
+export function TiltCard({ children, className, max = 10, glare = true }: TiltCardProps) {
+  const ref = useRef<HTMLDivElement>(null);
+  const px = useMotionValue(0.5);
+  const py = useMotionValue(0.5);
+
+  const rx = useSpring(useTransform(py, [0, 1], [max, -max]), {
+    stiffness: 180,
+    damping: 18
+  });
+  const ry = useSpring(useTransform(px, [0, 1], [-max, max]), {
+    stiffness: 180,
+    damping: 18
+  });
+  const glareX = useTransform(px, [0, 1], ["0%", "100%"]);
+  const glareY = useTransform(py, [0, 1], ["0%", "100%"]);
+
+  const handleMove = (event: React.MouseEvent<HTMLDivElement>) => {
+    const el = ref.current;
+    if (!el) return;
+    const rect = el.getBoundingClientRect();
+    px.set((event.clientX - rect.left) / rect.width);
+    py.set((event.clientY - rect.top) / rect.height);
+  };
+
+  const reset = () => {
+    px.set(0.5);
+    py.set(0.5);
+  };
+
+  return (
+    <motion.div
+      ref={ref}
+      onMouseMove={handleMove}
+      onMouseLeave={reset}
+      style={{ rotateX: rx, rotateY: ry, transformPerspective: 1000 }}
+      className={cn("relative [transform-style:preserve-3d]", className)}
+    >
+      {children}
+      {glare ? (
+        <motion.span
+          aria-hidden
+          className="pointer-events-none absolute inset-0 rounded-[inherit] opacity-0 transition-opacity duration-300 [background:radial-gradient(circle_at_var(--gx)_var(--gy),rgba(255,255,255,0.55),transparent_58%)] group-hover:opacity-100"
+          style={{ ["--gx" as string]: glareX, ["--gy" as string]: glareY }}
+        />
+      ) : null}
+    </motion.div>
+  );
+}
+
+
+==============================================================================
+FILE 48/51: src/lib/motion/ease.ts
+LINES: 26
+==============================================================================
+import type { SpringOptions, Transition } from "framer-motion";
+
+/** Signature easings shared across the experience. */
+export const EASE_OUT_EXPO = [0.16, 1, 0.3, 1] as const;
+export const EASE_OUT_QUART = [0.23, 1, 0.32, 1] as const;
+export const EASE_IN_OUT = [0.7, 0, 0.3, 1] as const;
+
+/** A calm, physically-believable spring used for magnetic + tactile motion. */
+export const SPRING_SOFT: SpringOptions = {
+  stiffness: 150,
+  damping: 20,
+  mass: 0.6
+};
+
+export const SPRING_SNAPPY: SpringOptions = {
+  stiffness: 320,
+  damping: 30,
+  mass: 0.5
+};
+
+/** Reveal transition for editorial content entering the viewport. */
+export const revealTransition = (delay = 0): Transition => ({
+  duration: 1.1,
+  ease: EASE_OUT_EXPO,
+  delay
+});
+
+
+==============================================================================
+FILE 49/51: src/lib/utils.ts
+LINES: 6
+==============================================================================
+import { clsx, type ClassValue } from "clsx"
+import { twMerge } from "tailwind-merge"
+
+export function cn(...inputs: ClassValue[]) {
+  return twMerge(clsx(inputs))
+}
+
+
+==============================================================================
+FILE 50/51: tailwind.config.ts
+LINES: 119
+==============================================================================
+import type { Config } from "tailwindcss";
+
+const config = {
+  darkMode: ["class"],
+  content: ["./src/**/*.{ts,tsx}"],
+  prefix: "",
+  theme: {
+    container: {
+      center: true,
+      padding: { DEFAULT: "1.5rem", md: "2.5rem", lg: "5rem" },
+      screens: { "2xl": "1440px" }
+    },
+    extend: {
+      colors: {
+        paper: "rgb(var(--paper) / <alpha-value>)",
+        ivory: "rgb(var(--ivory) / <alpha-value>)",
+        pearl: "rgb(var(--pearl) / <alpha-value>)",
+        mist: "rgb(var(--mist) / <alpha-value>)",
+        hairline: "rgb(var(--hairline) / <alpha-value>)",
+        ink: {
+          DEFAULT: "rgb(var(--ink) / <alpha-value>)",
+          soft: "rgb(var(--ink-soft) / <alpha-value>)",
+          mute: "rgb(var(--ink-mute) / <alpha-value>)",
+          faint: "rgb(var(--ink-faint) / <alpha-value>)"
+        },
+        gold: {
+          DEFAULT: "rgb(var(--gold) / <alpha-value>)",
+          soft: "rgb(var(--gold-soft) / <alpha-value>)"
+        },
+        sky: {
+          DEFAULT: "rgb(var(--sky) / <alpha-value>)",
+          crystal: "rgb(var(--crystal) / <alpha-value>)"
+        },
+        background: "rgb(var(--ivory) / <alpha-value>)",
+        foreground: "rgb(var(--ink) / <alpha-value>)"
+      },
+      fontFamily: {
+        sans: ["var(--font-sans)", "system-ui", "sans-serif"],
+        display: ["var(--font-sans)", "system-ui", "sans-serif"],
+        mono: ["var(--font-mono)", "ui-monospace", "SFMono-Regular", "monospace"]
+      },
+      letterSpacing: {
+        tightest: "-0.045em",
+        technical: "0.24em"
+      },
+      transitionTimingFunction: {
+        expo: "cubic-bezier(0.16, 1, 0.3, 1)"
+      },
+      transitionDuration: {
+        "400": "400ms"
+      },
+      borderRadius: {
+        sm: "0.125rem",
+        DEFAULT: "0.25rem",
+        md: "0.375rem",
+        lg: "0.5rem",
+        xl: "0.75rem",
+        "2xl": "1rem",
+        "3xl": "1.5rem"
+      },
+      maxWidth: {
+        frame: "1440px"
+      },
+      boxShadow: {
+        ambient: "0 30px 80px -40px rgb(111 168 206 / 0.28)",
+        premium: "0 24px 60px -28px rgb(17 17 17 / 0.16)",
+        glass: "0 20px 50px -24px rgb(17 17 17 / 0.12), inset 0 1px 0 rgb(255 255 255 / 0.7)",
+        gold: "0 0 0 1px rgb(184 148 88 / 0.35), 0 18px 40px -22px rgb(184 148 88 / 0.5)"
+      },
+      keyframes: {
+        "fade-up": {
+          from: { opacity: "0", transform: "translateY(24px)" },
+          to: { opacity: "1", transform: "translateY(0)" }
+        },
+        float: {
+          "0%, 100%": { transform: "translateY(0)" },
+          "50%": { transform: "translateY(-14px)" }
+        },
+        "float-slow": {
+          "0%, 100%": { transform: "translateY(0)" },
+          "50%": { transform: "translateY(12px)" }
+        },
+        breathe: {
+          "0%, 100%": { transform: "scale(1)" },
+          "50%": { transform: "scale(1.04)" }
+        },
+        "spin-slow": {
+          to: { transform: "rotate(360deg)" }
+        },
+        marquee: {
+          from: { transform: "translateX(0)" },
+          to: { transform: "translateX(-50%)" }
+        },
+        sheen: {
+          "0%": { transform: "translateX(-150%) skewX(-16deg)" },
+          "100%": { transform: "translateX(220%) skewX(-16deg)" }
+        },
+        "scroll-line": {
+          "0%": { transform: "translateY(-100%)" },
+          "100%": { transform: "translateY(120%)" }
+        }
+      },
+      animation: {
+        "fade-up": "fade-up 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards",
+        float: "float 7s ease-in-out infinite",
+        "float-slow": "float-slow 11s ease-in-out infinite",
+        breathe: "breathe 6s ease-in-out infinite",
+        "spin-slow": "spin-slow 32s linear infinite",
+        "spin-slow-rev": "spin-slow 46s linear infinite reverse",
+        marquee: "marquee 42s linear infinite",
+        sheen: "sheen 2.6s ease-in-out infinite",
+        "scroll-line": "scroll-line 2.4s ease-in-out infinite"
+      }
+    }
+  },
+  plugins: [require("tailwindcss-animate")]
+} satisfies Config;
+
+export default config;
+
+
+==============================================================================
+FILE 51/51: tsconfig.json
+LINES: 42
+==============================================================================
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": [
+      "dom",
+      "dom.iterable",
+      "esnext"
+    ],
+    "allowJs": false,
+    "skipLibCheck": true,
+    "strict": true,
+    "noEmit": true,
+    "esModuleInterop": true,
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "jsx": "preserve",
+    "incremental": true,
+    "plugins": [
+      {
+        "name": "next"
+      }
+    ],
+    "paths": {
+      "@/*": [
+        "./src/*"
+      ]
+    }
+  },
+  "include": [
+    "next-env.d.ts",
+    "**/*.ts",
+    "**/*.tsx",
+    ".next/types/**/*.ts"
+  ],
+  "exclude": [
+    "node_modules",
+    ".cursor",
+    ".agents"
+  ]
+}
+
+

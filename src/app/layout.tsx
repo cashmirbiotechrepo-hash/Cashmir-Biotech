@@ -1,17 +1,19 @@
 import type { Metadata, Viewport } from "next";
-import { Bodoni_Moda, Jost } from "next/font/google";
+import { Inter, Space_Mono } from "next/font/google";
 import "./globals.css";
-import { ThemeProvider } from "@/components/providers/theme-provider";
 
-const bodoniModa = Bodoni_Moda({
+const inter = Inter({
   subsets: ["latin"],
-  variable: "--font-headline",
-  weight: ["400", "500", "600", "700"]
-});
-const jost = Jost({
-  subsets: ["latin"],
-  variable: "--font-body",
+  variable: "--font-sans",
+  display: "swap",
   weight: ["300", "400", "500", "600", "700"]
+});
+
+const spaceMono = Space_Mono({
+  subsets: ["latin"],
+  variable: "--font-mono",
+  display: "swap",
+  weight: ["400", "700"]
 });
 
 const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "https://cashmirbiotech.com";
@@ -19,13 +21,22 @@ const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "https://cashmirbiotech.com"
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
   title: {
-    default: "Cashmir Biotech",
-    template: "%s"
+    default: "Cashmir Biotech — Precision Biology from the Himalaya",
+    template: "%s · Cashmir Biotech"
   },
-  description: "Precision biotech innovation and patented supplements.",
+  description:
+    "Clinical-precision biotech formulations engineered from Himalayan biodiversity. Molecular research, patented actives, and evidence-led therapeutics.",
+  keywords: [
+    "biotech",
+    "Himalayan biodiversity",
+    "molecular research",
+    "precision medicine",
+    "Cashmir Biotech"
+  ],
   openGraph: {
-    title: "Cashmir Biotech",
-    description: "Precision biotech innovation and patented supplements.",
+    title: "Cashmir Biotech — Precision Biology from the Himalaya",
+    description:
+      "Clinical-precision biotech formulations engineered from Himalayan biodiversity.",
     url: siteUrl,
     siteName: "Cashmir Biotech",
     type: "website"
@@ -33,18 +44,15 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: "#0d0d0d",
-  colorScheme: "dark"
+  themeColor: "#fbfbf9",
+  colorScheme: "light"
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <body className={`${bodoniModa.variable} ${jost.variable} font-[family-name:var(--font-body)] antialiased`}>
-        {/* The public UI is designed dark-only; system light mode produced unreadable pages. */}
-        <ThemeProvider attribute="class" defaultTheme="dark" enableSystem={false}>
-          {children}
-        </ThemeProvider>
+      <body className={`${inter.variable} ${spaceMono.variable} font-sans antialiased`}>
+        {children}
       </body>
     </html>
   );
