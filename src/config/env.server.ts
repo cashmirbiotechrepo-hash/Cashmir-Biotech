@@ -35,15 +35,18 @@ const serverEnvSchema = z
     BLOB_READ_WRITE_TOKEN: z.string().min(1).optional()
   })
   .superRefine((val, ctx) => {
-    // During `next build`, NODE_ENV is production — require core secrets always,
-    // money/redis only when actually deploying to a live environment.
+    // During `next build`, NODE_ENV is production — don't demand live money/redis providers
+    // while Amplify/Vercel are still compiling (AWS_BRANCH=main is set at build time too).
     if (process.env.NODE_ENV !== "production") return;
 
+    const isCompileBuild =
+      process.env.NEXT_PHASE === "phase-production-build" ||
+      process.env.npm_lifecycle_event === "build";
+
+    if (isCompileBuild) return;
+
     const liveDeploy =
-      process.env.VERCEL_ENV === "production" ||
-      process.env.RUNTIME_ENV_STRICT === "true" ||
-      process.env.AWS_BRANCH === "main" ||
-      process.env.AWS_BRANCH === "master";
+      process.env.VERCEL_ENV === "production" || process.env.RUNTIME_ENV_STRICT === "true";
 
     const require = (key: keyof typeof val, message: string) => {
       if (!val[key]) {

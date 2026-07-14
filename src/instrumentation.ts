@@ -8,12 +8,9 @@ export async function register() {
     const { assertProductionDatabasePooling, databaseUrlLooksPooled } = await import("@/lib/db-pool");
     assertProductionDatabasePooling();
 
-    if (
-      process.env.VERCEL_ENV === "production" ||
-      process.env.RUNTIME_ENV_STRICT === "true" ||
-      process.env.AWS_BRANCH === "main" ||
-      process.env.AWS_BRANCH === "master"
-    ) {
+    // Soft-start on Amplify: only hard-require money/SMTP when explicitly strict
+    // (or Vercel production). Avoid AWS_BRANCH=main triggering at first boot.
+    if (process.env.VERCEL_ENV === "production" || process.env.RUNTIME_ENV_STRICT === "true") {
       const missing: string[] = [];
       for (const key of [
         "UPSTASH_REDIS_REST_URL",
