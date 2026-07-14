@@ -4,7 +4,7 @@ import { HomeExperience } from "@/components/home/home-experience";
 import { logger } from "@/lib/logger";
 
 // Statically rendered and revalidated hourly; CMS edits appear within the window.
-export const revalidate = 3600;
+export const revalidate = 60;
 
 export default async function HomePage() {
   let data = null;

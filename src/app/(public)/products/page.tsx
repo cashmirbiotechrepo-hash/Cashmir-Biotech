@@ -19,7 +19,7 @@ import {
 } from "@/components/shop/shop-product-card";
 import { ShopCatalog } from "@/components/shop/shop-catalog";
 
-export const revalidate = 3600;
+export const revalidate = 60;
 
 export const metadata: Metadata = {
   title: "Shop",

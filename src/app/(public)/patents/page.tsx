@@ -7,7 +7,7 @@ import { Reveal, RevealText } from "@/components/ui/reveal";
 import { TechChip } from "@/components/ui/tech-chip";
 import { PatentsRegistry } from "@/components/patents/patents-registry";
 
-export const revalidate = 3600;
+export const revalidate = 60;
 
 export const metadata: Metadata = {
   title: "Patent Registry",
