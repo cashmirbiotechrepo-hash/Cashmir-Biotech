@@ -13,6 +13,21 @@ const KNOWN_INSECURE = new Set([
   "ci-test-pow-secret-do-not-use-in-prod-32chars"
 ]);
 
+const optionalHttpUrl = z.preprocess((val) => {
+  if (val == null) return undefined;
+  let s = String(val).trim();
+  if (!s) return undefined;
+  // Amplify paste mistakes: wrapping quotes / trailing junk
+  s = s.replace(/^["']+|["']+$/g, "").trim();
+  try {
+    const u = new URL(s);
+    if (u.protocol !== "http:" && u.protocol !== "https:") return undefined;
+    return u.toString();
+  } catch {
+    return undefined;
+  }
+}, z.string().url().optional());
+
 const serverEnvSchema = z
   .object({
     DATABASE_URL: z.string().min(1),
@@ -29,10 +44,17 @@ const serverEnvSchema = z
     /** Required in production for cron auth: Authorization: Bearer <CRON_SECRET> */
     CRON_SECRET: z.string().min(16).optional(),
     /** Public site origin — required in production for invite/email links */
-    NEXT_PUBLIC_SITE_URL: z.string().url().optional(),
+    NEXT_PUBLIC_SITE_URL: optionalHttpUrl,
     POW_SECRET: z.string().min(16).optional(),
-    UPSTASH_REDIS_REST_URL: z.string().url().optional(),
-    UPSTASH_REDIS_REST_TOKEN: z.string().min(8).optional(),
+    UPSTASH_REDIS_REST_URL: optionalHttpUrl,
+    UPSTASH_REDIS_REST_TOKEN: z.preprocess(
+      (val) => {
+        if (val == null) return undefined;
+        const s = String(val).trim().replace(/^["']+|["']+$/g, "");
+        return s.length ? s : undefined;
+      },
+      z.string().min(8).optional()
+    ),
     RAZORPAY_KEY_ID: z.string().min(1).optional(),
     RAZORPAY_KEY_SECRET: z.string().min(1).optional(),
     RAZORPAY_WEBHOOK_SECRET: z.string().min(1).optional(),
@@ -114,6 +136,10 @@ function normalizeProcessEnv() {
   const p = { ...process.env } as Record<string, string | undefined>;
   if (p.ADMIN_EMAIL === "") p.ADMIN_EMAIL = undefined;
   if (p.ADMIN_PASSWORD_HASH === "") p.ADMIN_PASSWORD_HASH = undefined;
+  // Blank Amplify vars become undefined before Zod .url() checks.
+  for (const key of ["UPSTASH_REDIS_REST_URL", "UPSTASH_REDIS_REST_TOKEN", "NEXT_PUBLIC_SITE_URL"] as const) {
+    if (p[key] != null && String(p[key]).trim() === "") p[key] = undefined;
+  }
   return p;
 }
 

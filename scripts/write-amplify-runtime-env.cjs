@@ -40,7 +40,23 @@ const KEYS = [
 const out = {};
 for (const key of KEYS) {
   const val = process.env[key];
-  if (val != null && String(val).length > 0) out[key] = String(val);
+  if (val != null && String(val).length > 0) out[key] = String(val).trim().replace(/^["']+|["']+$/g, "");
+}
+
+// Drop malformed Upstash REST URL so Zod/build does not crash (common Amplify paste typo).
+if (out.UPSTASH_REDIS_REST_URL) {
+  try {
+    const u = new URL(out.UPSTASH_REDIS_REST_URL);
+    if (u.protocol !== "https:" && u.protocol !== "http:") {
+      console.warn("[write-amplify-runtime-env] Ignoring invalid UPSTASH_REDIS_REST_URL (bad protocol)");
+      delete out.UPSTASH_REDIS_REST_URL;
+      delete out.UPSTASH_REDIS_REST_TOKEN;
+    }
+  } catch {
+    console.warn("[write-amplify-runtime-env] Ignoring invalid UPSTASH_REDIS_REST_URL (not a URL)");
+    delete out.UPSTASH_REDIS_REST_URL;
+    delete out.UPSTASH_REDIS_REST_TOKEN;
+  }
 }
 
 // Prefer DB_* assembly so Amplify & truncation never ships a broken URL.
