@@ -50,16 +50,19 @@ async function markChallengeUsed(challenge: string): Promise<boolean> {
     return wasSet === "OK";
   }
 
-  if (process.env.NODE_ENV === "production") {
-    // In production without Redis, reject all PoW to fail-closed
+  const strictProd =
+    process.env.NODE_ENV === "production" &&
+    (process.env.RUNTIME_ENV_STRICT === "true" || process.env.VERCEL_ENV === "production");
+
+  if (strictProd) {
+    // Fail closed only when Upstash is mandatory.
     return false;
   }
 
-  // Dev fallback: in-memory single-process dedup
+  // Dev + Amplify soft-start: in-memory single-process dedup
   if (devUsedChallenges.has(challenge)) return false;
   devUsedChallenges.set(challenge, Date.now());
 
-  // Periodic cleanup to prevent memory leak
   if (devUsedChallenges.size > 1000) {
     const cutoff = Date.now() - POW_CONFIG.validityWindowMs * 2;
     for (const [key, ts] of devUsedChallenges) {
@@ -87,7 +90,11 @@ export type PoWPayload = {
   difficulty?: number;
 };
 
-export function generatePoWChallenge(customDifficulty?: number): Challenge {
+export async function generatePoWChallenge(customDifficulty?: number): Promise<Challenge> {
+  // Ensure baked Amplify env (POW_SECRET) is loaded before signing.
+  const { applyBakedAmplifyEnv } = await import("@/lib/apply-baked-env");
+  applyBakedAmplifyEnv();
+
   const challenge = randomBytes(32).toString("hex");
   const timestamp = Date.now();
   let difficulty = customDifficulty ?? POW_CONFIG.difficulty;
@@ -100,6 +107,9 @@ export function generatePoWChallenge(customDifficulty?: number): Challenge {
 }
 
 export async function verifyPoW(payload: PoWPayload): Promise<boolean> {
+  const { applyBakedAmplifyEnv } = await import("@/lib/apply-baked-env");
+  applyBakedAmplifyEnv();
+
   const { challenge, nonce, timestamp, signature, difficulty } = payload;
 
   // Dev-only bypass: only allowed in non-production AND when explicitly disabled

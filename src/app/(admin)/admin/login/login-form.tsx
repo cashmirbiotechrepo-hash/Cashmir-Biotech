@@ -86,7 +86,13 @@ export function LoginForm({
         return;
       }
       if (result?.error) setError(result.error);
-    } catch {
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      if (/Failed to find Server Action|server action/i.test(msg)) {
+        setError("This page is out of date after a deploy. Refreshing…");
+        window.location.reload();
+        return;
+      }
       setError("Could not complete sign-in. Please try again.");
     } finally {
       setPending(false);

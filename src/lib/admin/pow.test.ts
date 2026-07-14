@@ -9,8 +9,8 @@ describe("PoW Challenge & Verification", () => {
     // NODE_ENV is read-only under TS; vitest already runs in test.
   });
 
-  it("should generate a valid challenge with required properties", () => {
-    const challenge = generatePoWChallenge(3);
+  it("should generate a valid challenge with required properties", async () => {
+    const challenge = await generatePoWChallenge(3);
     expect(challenge.challenge).toHaveLength(64);
     expect(challenge.difficulty).toBe(3);
     expect(typeof challenge.timestamp).toBe("number");
@@ -18,7 +18,7 @@ describe("PoW Challenge & Verification", () => {
   });
 
   it("should verify a solved challenge and reject reuse", async () => {
-    const challengeObj = generatePoWChallenge(3);
+    const challengeObj = await generatePoWChallenge(3);
 
     // Solve PoW for difficulty 3
     let nonce = 0;
@@ -47,7 +47,7 @@ describe("PoW Challenge & Verification", () => {
   });
 
   it("should reject an invalid nonce or tampered signature", async () => {
-    const challengeObj = generatePoWChallenge(3);
+    const challengeObj = await generatePoWChallenge(3);
 
     const badNonce = await verifyPoW({
       challenge: challengeObj.challenge,
