@@ -1,0 +1,23 @@
+EventBridge crons (console alternative to deploy-crons.ps1)
+===========================================================
+
+After Amplify URL works and CRON_SECRET is set in Amplify env.
+
+Option A — CLI (preferred)
+  powershell -File .\scripts\aws\deploy-crons.ps1 `
+    -SiteBaseUrl "https://YOUR.amplifyapp.com" `
+    -CronSecret "YOUR_CRON_SECRET"
+
+Option B — Console
+1. EventBridge → API destinations → Connections → Create
+   - Auth: API Key
+   - API key name: Authorization
+   - Value: Bearer YOUR_CRON_SECRET
+2. Create API destinations:
+   - GET https://YOUR.amplifyapp.com/api/cron/release-stale-orders
+   - GET https://YOUR.amplifyapp.com/api/cron/cleanup-sessions
+3. EventBridge Scheduler → Create schedule
+   - Every 20 minutes → invoke release-stale destination
+   - cron(30 21 * * ? *) UTC → cleanup-sessions (03:00 IST)
+
+vercel.json crons do NOT run on Amplify — these schedules replace them.

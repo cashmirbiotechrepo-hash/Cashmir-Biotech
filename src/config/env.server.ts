@@ -40,7 +40,10 @@ const serverEnvSchema = z
     if (process.env.NODE_ENV !== "production") return;
 
     const liveDeploy =
-      process.env.VERCEL_ENV === "production" || process.env.RUNTIME_ENV_STRICT === "true";
+      process.env.VERCEL_ENV === "production" ||
+      process.env.RUNTIME_ENV_STRICT === "true" ||
+      process.env.AWS_BRANCH === "main" ||
+      process.env.AWS_BRANCH === "master";
 
     const require = (key: keyof typeof val, message: string) => {
       if (!val[key]) {

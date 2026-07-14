@@ -1,0 +1,81 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: Cashmir Biotech RDS PostgreSQL for Amplify (ap-south-1). Public access for first deploy.
+
+Parameters:
+  DbInstanceId:
+    Type: String
+    Default: cashmir-biotech-db
+  DbName:
+    Type: String
+    Default: cashmir
+  MasterUsername:
+    Type: String
+    Default: cashmir
+  MasterUserPassword:
+    Type: String
+    NoEcho: true
+    MinLength: 16
+  InstanceClass:
+    Type: String
+    Default: db.t4g.micro
+    AllowedValues: [db.t4g.micro, db.t3.micro, db.t4g.small]
+  SubnetIds:
+    Type: List<AWS::EC2::Subnet::Id>
+    Description: At least two subnet IDs from the default VPC
+
+Resources:
+  DbSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Cashmir Biotech PostgreSQL (TEMP public for Amplify)
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 5432
+          ToPort: 5432
+          CidrIp: 0.0.0.0/0
+          Description: TEMP open Postgres — tighten after go-live
+
+  DbSubnetGroup:
+    Type: AWS::RDS::DBSubnetGroup
+    Properties:
+      DBSubnetGroupDescription: Cashmir Biotech Amplify DB subnets
+      SubnetIds: !Ref SubnetIds
+
+  Database:
+    Type: AWS::RDS::DBInstance
+    DeletionPolicy: Snapshot
+    UpdateReplacePolicy: Snapshot
+    Properties:
+      DBInstanceIdentifier: !Ref DbInstanceId
+      DBName: !Ref DbName
+      Engine: postgres
+      EngineVersion: "16"
+      DBInstanceClass: !Ref InstanceClass
+      AllocatedStorage: 20
+      StorageType: gp3
+      MasterUsername: !Ref MasterUsername
+      MasterUserPassword: !Ref MasterUserPassword
+      PubliclyAccessible: true
+      VPCSecurityGroups:
+        - !GetAtt DbSecurityGroup.GroupId
+      DBSubnetGroupName: !Ref DbSubnetGroup
+      BackupRetentionPeriod: 7
+      PreferredBackupWindow: "18:30-19:00"
+      PreferredMaintenanceWindow: "sun:19:00-sun:20:00"
+      DeletionProtection: false
+      EnableCloudwatchLogsExports:
+        - postgresql
+
+Outputs:
+  EndpointAddress:
+    Description: RDS hostname
+    Value: !GetAtt Database.Endpoint.Address
+  EndpointPort:
+    Value: !GetAtt Database.Endpoint.Port
+  DatabaseName:
+    Value: !Ref DbName
+  MasterUsername:
+    Value: !Ref MasterUsername
+  JdbcStyleHint:
+    Description: Build DATABASE_URL from this pattern
+    Value: !Sub "postgresql://${MasterUsername}:PASSWORD@${Database.Endpoint.Address}:${Database.Endpoint.Port}/${DbName}?schema=public&connection_limit=5&pool_timeout=10"

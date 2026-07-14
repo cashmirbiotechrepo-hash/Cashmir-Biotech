@@ -1,0 +1,23 @@
+Create Amplify app from Console (GitHub OAuth)
+==============================================
+
+1. https://ap-south-1.console.aws.amazon.com/amplify/home?region=ap-south-1
+2. Create new app → Host web app → GitHub
+3. Authorize cashmirbiotechrepo-hash
+4. Repo: Cashmir-Biotech / Branch: main
+5. Amplify should detect Next.js + amplify.yml at repo root
+6. Environment variables — paste from:
+     deploy\aws\out\amplify-env.FINAL.txt
+   plus:
+     DATABASE_URL / DIRECT_URL (from RDS)
+     UPSTASH_* / RAZORPAY_* / SMTP_*
+   Set RUNTIME_ENV_STRICT=true
+7. Save and deploy
+8. When green: copy URL → set NEXT_PUBLIC_SITE_URL → Redeploy
+
+Troubleshooting red builds
+--------------------------
+- Open Amplify → Deployments → failed job → Build logs
+- Common: missing ENCRYPTION_KEY (must be exactly 32 chars)
+- Common: prisma generate — amplify.yml already runs it in preBuild
+- Paste the red error text back to your engineer

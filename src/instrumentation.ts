@@ -8,7 +8,12 @@ export async function register() {
     const { assertProductionDatabasePooling, databaseUrlLooksPooled } = await import("@/lib/db-pool");
     assertProductionDatabasePooling();
 
-    if (process.env.VERCEL_ENV === "production" || process.env.RUNTIME_ENV_STRICT === "true") {
+    if (
+      process.env.VERCEL_ENV === "production" ||
+      process.env.RUNTIME_ENV_STRICT === "true" ||
+      process.env.AWS_BRANCH === "main" ||
+      process.env.AWS_BRANCH === "master"
+    ) {
       const missing: string[] = [];
       for (const key of [
         "UPSTASH_REDIS_REST_URL",
@@ -35,6 +40,8 @@ export async function register() {
       {
         nodeEnv: process.env.NODE_ENV,
         vercelEnv: process.env.VERCEL_ENV,
+        awsBranch: process.env.AWS_BRANCH,
+        runtimeStrict: process.env.RUNTIME_ENV_STRICT === "true",
         upstash: Boolean(process.env.UPSTASH_REDIS_REST_URL),
         sentryConfigured: Boolean(process.env.SENTRY_DSN || process.env.NEXT_PUBLIC_SENTRY_DSN),
         dbPooled: databaseUrlLooksPooled(process.env.DATABASE_URL || "")

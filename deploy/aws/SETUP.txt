@@ -1,0 +1,58 @@
+Cashmir Biotech — AWS beginner deploy (Mumbai)
+==============================================
+
+Stack: Amplify Hosting (Next.js) + RDS PostgreSQL + Upstash + Razorpay
+Region: ap-south-1 (Asia Pacific / Mumbai)
+
+Prerequisites
+-------------
+1. AWS account Cashmir Biotech (you already have this)
+2. IAM access key for CLI:
+   Console → IAM → Users → Create user → Attach "AdministratorAccess"
+   (or PowerUser) → Security credentials → Create access key → CLI
+3. Open a NEW PowerShell and run:
+     aws configure
+     AWS Access Key ID:     <paste>
+     AWS Secret Access Key: <paste>
+     Default region name:   ap-south-1
+     Default output format: json
+
+Ordered commands (from project root)
+------------------------------------
+# A. Generate secrets
+powershell -File .\scripts\aws\generate-secrets.ps1
+
+# B. Create RDS (choose a long password, save it)
+powershell -File .\scripts\aws\create-rds.ps1 -MasterPassword "REPLACE_WITH_LONG_PASSWORD"
+
+# C. Migrate + seed
+powershell -File .\scripts\aws\migrate-rds.ps1
+
+# D. Merge env paste file
+powershell -File .\scripts\aws\prepare-amplify-env.ps1
+
+# E. Amplify GitHub connect (browser)
+powershell -File .\scripts\aws\connect-amplify.ps1
+# Follow printed console steps. Paste deploy\aws\out\amplify-env.FINAL.txt
+# into Amplify Environment variables. Leave NEXT_PUBLIC_SITE_URL empty until
+# first deploy URL is known, then set it and redeploy.
+
+# F. After Amplify URL works — crons
+powershell -File .\scripts\aws\deploy-crons.ps1 `
+  -SiteBaseUrl "https://main.XXXX.amplifyapp.com" `
+  -CronSecret "<same CRON_SECRET as Amplify>"
+
+# G. Custom domain (later)
+# See deploy\aws\domain-setup.txt
+
+Important Amplify env flags
+---------------------------
+RUNTIME_ENV_STRICT=true
+DATABASE_URL=...&connection_limit=5&pool_timeout=10
+(amplify.yml in repo root runs npm ci + prisma generate + next build)
+
+Do not commit
+-------------
+deploy/aws/out/*
+.env
+any password files

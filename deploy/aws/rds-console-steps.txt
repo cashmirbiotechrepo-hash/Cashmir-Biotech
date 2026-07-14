@@ -1,0 +1,40 @@
+Create RDS from the AWS Console (if you skip CLI)
+=================================================
+
+Region: Asia Pacific (Mumbai) ap-south-1
+
+1. Search bar → RDS → Create database
+2. Standard create
+3. Engine: PostgreSQL 16
+4. Templates: Free tier (if shown) OR Dev/Test
+5. DB instance identifier: cashmir-biotech-db
+6. Credentials:
+   - Master username: cashmir
+   - Auto-generate password OR set your own (SAVE IT)
+7. Instance: db.t4g.micro or db.t3.micro
+8. Storage: 20 GB gp3
+9. Connectivity:
+   - Virtual private cloud: default
+   - Public access: Yes
+   - VPC security group: create new "cashmir-db-sg"
+10. Additional: Initial database name: cashmir
+11. Create database → wait until Status = Available
+12. Click the DB → Connectivity & security → copy Endpoint
+13. Open security group → Inbound rules → Edit → Add:
+    Type PostgreSQL, Port 5432, Source 0.0.0.0/0 (TEMP for Amplify)
+14. Build URL (encode special chars in password):
+
+postgresql://cashmir:YOUR_PASSWORD@YOUR_ENDPOINT:5432/cashmir?schema=public&connection_limit=5&pool_timeout=10
+
+15. From project root PowerShell (after setting DATABASE_URL):
+
+$env:DATABASE_URL = "postgresql://..."
+$env:DIRECT_URL = $env:DATABASE_URL
+npx prisma migrate deploy
+npx tsx prisma/seed.ts
+npm run db:reset-admin
+
+Or save the URL into deploy\aws\out\rds-connection.txt as:
+DATABASE_URL=...
+DIRECT_URL=...
+then run: powershell -File .\scripts\aws\migrate-rds.ps1

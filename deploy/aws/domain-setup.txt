@@ -1,0 +1,21 @@
+Cashmir Biotech — Amplify custom domain (do after Amplify URL works)
+====================================================================
+
+1. AWS Console (Mumbai) → Amplify → your app → Domain management
+2. Add domain → enter cashmirbiotech.com (or your domain)
+3. Amplify shows DNS records (CNAME / ALIAS). Add them at:
+   - Route 53 (if domain is in Route 53), OR
+   - Your registrar DNS panel (GoDaddy, Namecheap, Cloudflare, etc.)
+4. Wait until Amplify domain status is Available
+5. Amplify → Environment variables → update:
+     NEXT_PUBLIC_SITE_URL=https://www.yourdomain.com
+   (or apex https://yourdomain.com — match the cert Amplify issues)
+6. Redeploy the app (Hosting → Redeploy this version)
+7. Razorpay Dashboard → Webhooks → set URL to:
+     https://www.yourdomain.com/api/webhooks/razorpay
+8. Optional: redirect apex ↔ www in Amplify domain settings
+
+Verify:
+  - https://yourdomain.com loads homepage
+  - /admin/login works
+  - Checkout creates Razorpay order against live/test keys you configured

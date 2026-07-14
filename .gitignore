@@ -37,6 +37,9 @@ playwright/.cache/
 # vercel
 .vercel
 
+# AWS deploy secrets / generated connection strings
+deploy/aws/out/
+
 # admin uploads (user-generated, served from /public/uploads)
 /public/uploads
 /public/invoices

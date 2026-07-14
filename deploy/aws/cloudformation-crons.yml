@@ -1,0 +1,101 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: EventBridge Scheduler → Cashmir Biotech Amplify cron routes (Bearer CRON_SECRET)
+
+Parameters:
+  SiteBaseUrl:
+    Type: String
+    Description: Amplify app origin without trailing slash (e.g. https://main.d123.amplifyapp.com)
+  CronSecret:
+    Type: String
+    NoEcho: true
+    MinLength: 16
+
+Resources:
+  # API Destination auth connection (API key → Authorization Bearer)
+  CronConnection:
+    Type: AWS::Events::Connection
+    Properties:
+      Name: cashmir-biotech-cron
+      AuthorizationType: API_KEY
+      Description: Bearer token for Cashmir Biotech cron routes
+      AuthParameters:
+        ApiKeyAuthParameters:
+          ApiKeyName: Authorization
+          ApiKeyValue: !Sub "Bearer ${CronSecret}"
+
+  ReleaseStaleApiDestination:
+    Type: AWS::Events::ApiDestination
+    Properties:
+      Name: cashmir-release-stale-orders
+      ConnectionArn: !GetAtt CronConnection.Arn
+      InvocationEndpoint: !Sub "${SiteBaseUrl}/api/cron/release-stale-orders"
+      HttpMethod: GET
+      InvocationRateLimitPerSecond: 1
+
+  CleanupSessionsApiDestination:
+    Type: AWS::Events::ApiDestination
+    Properties:
+      Name: cashmir-cleanup-sessions
+      ConnectionArn: !GetAtt CronConnection.Arn
+      InvocationEndpoint: !Sub "${SiteBaseUrl}/api/cron/cleanup-sessions"
+      HttpMethod: GET
+      InvocationRateLimitPerSecond: 1
+
+  SchedulerApiRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: scheduler.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: InvokeApiDestinations
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - events:InvokeApiDestination
+                Resource:
+                  - !GetAtt ReleaseStaleApiDestination.Arn
+                  - !GetAtt CleanupSessionsApiDestination.Arn
+
+  ReleaseStaleSchedule:
+    Type: AWS::Scheduler::Schedule
+    Properties:
+      Name: cashmir-release-stale-orders
+      Description: Every 20 minutes — release abandoned checkout stock
+      FlexibleTimeWindow:
+        Mode: "OFF"
+      ScheduleExpression: rate(20 minutes)
+      State: ENABLED
+      Target:
+        Arn: !GetAtt ReleaseStaleApiDestination.Arn
+        RoleArn: !GetAtt SchedulerApiRole.Arn
+        RetryPolicy:
+          MaximumRetryAttempts: 2
+
+  CleanupSessionsSchedule:
+    Type: AWS::Scheduler::Schedule
+    Properties:
+      Name: cashmir-cleanup-sessions
+      Description: Daily 03:00 IST (21:30 UTC previous day) — session cleanup
+      FlexibleTimeWindow:
+        Mode: "OFF"
+      ScheduleExpression: cron(30 21 * * ? *)
+      ScheduleExpressionTimezone: UTC
+      State: ENABLED
+      Target:
+        Arn: !GetAtt CleanupSessionsApiDestination.Arn
+        RoleArn: !GetAtt SchedulerApiRole.Arn
+        RetryPolicy:
+          MaximumRetryAttempts: 2
+
+Outputs:
+  ReleaseStaleDestination:
+    Value: !GetAtt ReleaseStaleApiDestination.Arn
+  CleanupSessionsDestination:
+    Value: !GetAtt CleanupSessionsApiDestination.Arn
