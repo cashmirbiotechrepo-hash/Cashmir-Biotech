@@ -3,13 +3,11 @@ import { Ratelimit } from "@upstash/ratelimit";
 import { Redis } from "@upstash/redis/cloudflare";
 
 /* ---------------------------------------------------------------------------
- * CRIT-04 FIX: Rate limiting is now MANDATORY in production.
- *
- * - If Upstash Redis is configured → use Upstash sliding window (distributed).
- * - If NOT configured in development → fall back to in-memory sliding window.
- * - If NOT configured in production → throw immediately at startup.
- *
- * Code Refactoring #1: All 5 duplicate factory functions collapsed into one.
+ * Rate limiting: Upstash sliding window when configured.
+ * Without Upstash:
+ *   - development → in-memory fallback
+ *   - Amplify soft-start (RUNTIME_ENV_STRICT≠true) → in-memory fallback
+ *   - RUNTIME_ENV_STRICT=true or Vercel production → throw (must configure Upstash)
  * --------------------------------------------------------------------------- */
 
 type RateLimitConfig = {
@@ -107,16 +105,20 @@ function createRateLimiter(config: RateLimitConfig): Ratelimit {
       prefix: `cashmir:${config.prefix}`,
       analytics: true
     });
-  } else if (process.env.NODE_ENV === "production") {
+  } else if (
+    process.env.NODE_ENV === "production" &&
+    (process.env.RUNTIME_ENV_STRICT === "true" || process.env.VERCEL_ENV === "production")
+  ) {
+    // Hard-require Upstash only when explicitly strict (or classic Vercel prod).
     throw new Error(
       `UPSTASH_REDIS_REST_URL/TOKEN are required in production for rate limiting (${config.prefix}). ` +
-      `Set these environment variables before deploying.`
+        `Set these environment variables, or set RUNTIME_ENV_STRICT=false for Amplify bootstrap.`
     );
   } else {
-    // Development in-memory fallback
+    // Dev + Amplify soft-start (RUNTIME_ENV_STRICT≠true): per-isolate in-memory limiter.
     console.warn(
       `[rate-limit] Upstash Redis not configured — using in-memory fallback for "${config.prefix}". ` +
-      `This is NOT safe for production.`
+        `Add UPSTASH_REDIS_REST_URL/TOKEN for distributed rate limits.`
     );
     limiter = new InMemoryRatelimit(
       `cashmir:${config.prefix}`,
