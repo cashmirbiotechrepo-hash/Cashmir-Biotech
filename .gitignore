@@ -37,3 +37,11 @@ playwright/.cache/
 # admin uploads (user-generated, served from /public/uploads)
 /public/uploads
 /public/invoices
+
+# Local working docs / source dumps — stay on disk, never on GitHub
+/Data/
+/Patents/
+/*.md
+!/README.md
+/*.txt
+/dataset_*.json
