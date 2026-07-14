@@ -1,5 +1,8 @@
 import "server-only";
 import { z } from "zod";
+import { ensureDatabaseUrl } from "@/lib/database-url";
+
+ensureDatabaseUrl();
 
 const KNOWN_INSECURE = new Set([
   "dev-encryption-key-32-chars-lo!!",

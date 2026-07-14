@@ -2,8 +2,7 @@ import "server-only";
 
 /**
  * Amplify Hosting truncates environment values at unescaped `&`.
- * Prefer a full DATABASE_URL when it is intact; otherwise assemble from
- * DB_HOST / DB_USER / DB_PASSWORD / DB_NAME (no ampersands in those values).
+ * Prefer discrete DB_* parts when present; otherwise use DATABASE_URL as-is.
  */
 export function resolveDatabaseUrl(): string {
   const existing = (process.env.DATABASE_URL ?? "").trim();
@@ -19,7 +18,6 @@ export function resolveDatabaseUrl(): string {
       ? `postgresql://${encodeURIComponent(user)}:${encodeURIComponent(password)}@${host}:${port}/${name}?sslmode=${encodeURIComponent(sslmode)}`
       : "";
 
-  // Prefer assembled URL when discrete Amplify parts are present — avoids truncated & URLs.
   if (assembled) {
     process.env.DATABASE_URL = assembled;
     if (!process.env.DIRECT_URL) process.env.DIRECT_URL = assembled;
@@ -29,11 +27,13 @@ export function resolveDatabaseUrl(): string {
   return existing;
 }
 
-/** Call once before PrismaClient is constructed. */
+/** Call once before PrismaClient / env validation. */
 export function ensureDatabaseUrl(): string {
   const url = resolveDatabaseUrl();
   if (!url) {
-    console.warn("[db] DATABASE_URL missing and DB_HOST/DB_USER/DB_PASSWORD/DB_NAME not set");
+    console.warn(
+      "[db] No DATABASE_URL and no DB_HOST/DB_USER/DB_PASSWORD/DB_NAME — set Amplify env vars then redeploy."
+    );
   }
   return url;
 }

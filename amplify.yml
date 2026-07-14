@@ -7,7 +7,34 @@ frontend:
         - npx prisma generate
     build:
       commands:
-        # Amplify injects env vars; ensure Prisma client is ready then build Next.js
+        # Amplify SSR often does not inject console env vars into compute reliably.
+        # Assemble DATABASE_URL from DB_* (no `&` truncation), then bake secrets into
+        # .env.production so Next.js SSR can read them at runtime.
+        - |
+          if [ -n "$DB_HOST" ] && [ -n "$DB_USER" ] && [ -n "$DB_PASSWORD" ] && [ -n "$DB_NAME" ]; then
+            export DATABASE_URL="postgresql://${DB_USER}:${DB_PASSWORD}@${DB_HOST}:${DB_PORT:-5432}/${DB_NAME}?sslmode=${DB_SSLMODE:-require}"
+            export DIRECT_URL="$DATABASE_URL"
+            echo "Assembled DATABASE_URL from DB_* parts"
+          fi
+        - |
+          {
+            for key in DATABASE_URL DIRECT_URL JWT_SECRET PASSWORD_PEPPER ENCRYPTION_KEY CRON_SECRET POW_SECRET ALLOW_UNPOOLED_DATABASE_URL RUNTIME_ENV_STRICT NEXT_PUBLIC_SITE_URL NEXT_PUBLIC_RAZORPAY_KEY_ID RAZORPAY_KEY_ID RAZORPAY_KEY_SECRET RAZORPAY_WEBHOOK_SECRET SMTP_HOST SMTP_PORT SMTP_USER SMTP_PASS SMTP_FROM UPSTASH_REDIS_REST_URL UPSTASH_REDIS_REST_TOKEN DB_HOST DB_PORT DB_USER DB_PASSWORD DB_NAME DB_SSLMODE; do
+              eval "val=\${$key}"
+              if [ -n "$val" ]; then
+                printf '%s=%s\n' "$key" "$val"
+              fi
+            done
+          } > .env.production
+        - |
+          if [ -z "$DATABASE_URL" ]; then
+            echo "ERROR: DATABASE_URL is empty at build time. Set DATABASE_URL or DB_HOST/DB_USER/DB_PASSWORD/DB_NAME in Amplify env."
+            exit 1
+          fi
+        - |
+          if [ -z "$JWT_SECRET" ]; then
+            echo "ERROR: JWT_SECRET is empty at build time. Set JWT_SECRET in Amplify env (min 32 chars)."
+            exit 1
+          fi
         - npm run build
   artifacts:
     baseDirectory: .next
