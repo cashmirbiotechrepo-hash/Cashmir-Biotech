@@ -5,7 +5,6 @@ import "server-only";
  * Prefer discrete DB_* parts when present; otherwise use DATABASE_URL as-is.
  */
 export function resolveDatabaseUrl(): string {
-  const existing = (process.env.DATABASE_URL ?? "").trim();
   const host = (process.env.DB_HOST ?? "").trim();
   const user = (process.env.DB_USER ?? "").trim();
   const password = process.env.DB_PASSWORD ?? "";
@@ -23,6 +22,15 @@ export function resolveDatabaseUrl(): string {
     if (!process.env.DIRECT_URL) process.env.DIRECT_URL = assembled;
     return assembled;
   }
+
+  // Amplify truncates at `&` — many URLs are stored with `%26` instead.
+  // Prisma/libpq need real `&` separators at runtime.
+  const existing = (process.env.DATABASE_URL ?? "").trim().replace(/%26/gi, "&");
+  if (existing && existing !== process.env.DATABASE_URL) {
+    process.env.DATABASE_URL = existing;
+  }
+  const direct = (process.env.DIRECT_URL ?? "").trim().replace(/%26/gi, "&");
+  if (direct) process.env.DIRECT_URL = direct;
 
   return existing;
 }
