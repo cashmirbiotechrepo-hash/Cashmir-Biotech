@@ -8,7 +8,8 @@ import { Reveal, RevealText } from "@/components/ui/reveal";
 import { TechChip } from "@/components/ui/tech-chip";
 import type { TeamMember } from "@prisma/client";
 
-export const revalidate = 60;
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
 
 export const metadata: Metadata = {
   title: "Scientific Board",

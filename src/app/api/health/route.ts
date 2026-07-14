@@ -40,6 +40,21 @@ export async function GET(request: Request) {
     );
   }
 
+  let patents = -1;
+  let products = -1;
+  let dbHost = "";
+  try {
+    const raw = process.env.DATABASE_URL ?? "";
+    dbHost = raw.includes("@") ? raw.split("@")[1]?.split("/")[0]?.split("?")[0] ?? "" : "";
+    if (dbOk) {
+      const [pCount, prodCount] = await Promise.all([db.patent.count(), db.product.count({ where: { active: true } })]);
+      patents = pCount;
+      products = prodCount;
+    }
+  } catch {
+    /* keep counts as -1 */
+  }
+
   return NextResponse.json(
     {
       status,
@@ -49,7 +64,11 @@ export async function GET(request: Request) {
       checks: {
         database: {
           status: dbOk ? "ok" : "error",
-          latencyMs: dbLatencyMs
+          latencyMs: dbLatencyMs,
+          host: dbHost || null,
+          hasDatabaseUrl: Boolean(process.env.DATABASE_URL),
+          patents,
+          products
         }
       },
       durationMs: Date.now() - start
