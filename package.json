@@ -35,7 +35,7 @@
     "@react-three/fiber": "^8.18.0",
     "@sentry/nextjs": "^10.65.0",
     "@upstash/ratelimit": "^2.0.8",
-    "@upstash/redis": "^1.37.0",
+    "@upstash/redis": "^1.38.0",
     "@vercel/blob": "^2.6.1",
     "bcryptjs": "^2.4.3",
     "class-variance-authority": "^0.7.1",
