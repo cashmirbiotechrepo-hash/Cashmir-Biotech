@@ -5,23 +5,35 @@ import { motion } from "framer-motion";
 import { EASE_OUT_EXPO, EASE_IN_OUT } from "@/lib/motion/ease";
 
 const WORD = "CASHMIR";
-const MIN_MS = 900; // never flash by; give the wordmark time to assemble
-const MAX_MS = 3600; // never punish a slow WebGL chunk indefinitely
+const MIN_MS = 900;
+const MAX_MS = 2800;
+/** Fade-out duration — must match the exit motion below. */
+const EXIT_MS = 500;
 
 /**
- * Cinematic opening: the wordmark assembles out of blur, a champagne light
- * sweeps across it, a progress line completes, then the sheet lifts. It clears
- * on the earliest of (window load + min time) or a hard max, and can be skipped
- * with a click or the Escape key.
+ * Cinematic opening: wordmark assembles, progress line, sheet lifts.
+ * Clears on load+min, hard max, click, or Escape — never waits on Framer
+ * animation callbacks alone (those can miss under reduced-motion / stalled rAF).
  */
 export function Loader({ onComplete }: { onComplete: () => void }) {
   const [done, setDone] = useState(false);
   const completed = useRef(false);
+  const exitTimer = useRef(0);
 
   const finish = useCallback(() => {
     if (completed.current) return;
     completed.current = true;
     setDone(true);
+    // Fail-safe: lift the shell even if onAnimationComplete never fires.
+    exitTimer.current = window.setTimeout(() => {
+      onComplete();
+    }, EXIT_MS);
+  }, [onComplete]);
+
+  useEffect(() => {
+    return () => {
+      if (exitTimer.current) window.clearTimeout(exitTimer.current);
+    };
   }, []);
 
   useEffect(() => {
@@ -45,7 +57,10 @@ export function Loader({ onComplete }: { onComplete: () => void }) {
     else window.addEventListener("load", settle, { once: true });
 
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") finish();
+      if (e.key === "Escape" || e.key === "Enter" || e.key === " ") {
+        e.preventDefault();
+        finish();
+      }
     };
     window.addEventListener("keydown", onKey);
 
@@ -61,14 +76,12 @@ export function Loader({ onComplete }: { onComplete: () => void }) {
     <motion.div
       role="status"
       aria-label="Loading Cashmir Biotech"
+      aria-busy={!done}
       onClick={finish}
       className="fixed inset-0 z-[100] flex cursor-pointer flex-col items-center justify-center bg-paper"
       initial={{ opacity: 1 }}
-      animate={done ? { opacity: 0, filter: "blur(6px)" } : { opacity: 1 }}
-      transition={{ duration: 0.9, ease: EASE_IN_OUT }}
-      onAnimationComplete={() => {
-        if (done) onComplete();
-      }}
+      animate={done ? { opacity: 0 } : { opacity: 1 }}
+      transition={{ duration: EXIT_MS / 1000, ease: EASE_IN_OUT }}
       style={{ pointerEvents: done ? "none" : "auto" }}
     >
       <div className="relative mb-10 overflow-hidden px-2">
@@ -98,12 +111,12 @@ export function Loader({ onComplete }: { onComplete: () => void }) {
           className="absolute inset-y-0 left-0 bg-ink"
           initial={{ width: "0%" }}
           animate={{ width: done ? "100%" : "88%" }}
-          transition={{ duration: done ? 0.4 : 2.2, ease: [0.65, 0, 0.35, 1] }}
+          transition={{ duration: done ? 0.35 : 2.0, ease: [0.65, 0, 0.35, 1] }}
         />
       </div>
 
       <p className="technical mt-5">Calibrating the molecular interface</p>
-      <p className="technical mt-3 !text-ink-faint">Click to skip</p>
+      <p className="technical mt-3 !text-ink-faint">Click anywhere to continue</p>
     </motion.div>
   );
 }

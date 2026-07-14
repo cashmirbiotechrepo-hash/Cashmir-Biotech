@@ -1,9 +1,10 @@
 import type { Metadata } from "next";
 import { requireCustomerSession } from "@/lib/customer/auth";
 import { getCustomerSecurityProfile } from "@/lib/customer/portal";
+import { revokePortalSession } from "../actions";
 
 export const metadata: Metadata = {
-  title: "Security · Research Portal",
+  title: "Security · Customer Portal",
   robots: { index: false, follow: false }
 };
 
@@ -35,10 +36,7 @@ export default async function PortalSecurityPage() {
         </div>
         <div>
           <dt className="font-mono text-[10px] uppercase tracking-[0.14em] text-ink-faint">Sign-in</dt>
-          <dd className="mt-1 text-sm text-ink-mute">
-            Passwordless — email one-time code.{" "}
-            {profile.passwordHash ? "A password is also on file for future use." : "No password required."}
-          </dd>
+          <dd className="mt-1 text-sm text-ink-mute">Passwordless — email one-time code only.</dd>
         </div>
       </dl>
 
@@ -46,13 +44,28 @@ export default async function PortalSecurityPage() {
         <h2 className="mb-4 text-lg font-light text-ink">Devices</h2>
         <ul className="space-y-3">
           {profile.sessions.map((s) => (
-            <li key={s.id} className="rounded-xl border border-ink/10 px-4 py-3 text-sm">
-              <p className="text-ink truncate">{s.userAgent || "Unknown device"}</p>
-              <p className="mt-1 font-mono text-[10px] text-ink-faint">
-                {s.ipAddress || "IP —"} · Last used{" "}
-                {s.lastUsedAt.toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" })}
-                {s.id === session.sessionId ? " · This session" : ""}
-              </p>
+            <li
+              key={s.id}
+              className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-ink/10 px-4 py-3 text-sm"
+            >
+              <div>
+                <p className="truncate text-ink">{s.userAgent || "Unknown device"}</p>
+                <p className="mt-1 font-mono text-[10px] text-ink-faint">
+                  {s.ipAddress || "IP —"} · Last used{" "}
+                  {s.lastUsedAt.toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" })}
+                  {s.id === session.sessionId ? " · This session" : ""}
+                </p>
+              </div>
+              {s.id !== session.sessionId ? (
+                <form action={revokePortalSession.bind(null, s.id)}>
+                  <button
+                    type="submit"
+                    className="font-mono text-[10px] uppercase tracking-[0.14em] text-red-600/80 hover:text-red-700"
+                  >
+                    Revoke
+                  </button>
+                </form>
+              ) : null}
             </li>
           ))}
         </ul>

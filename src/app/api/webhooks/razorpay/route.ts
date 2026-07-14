@@ -62,8 +62,26 @@ export async function POST(request: Request) {
 
   if (order) {
     if (eventType === "payment.captured" || eventType === "order.paid") {
-      await markOrderPaid({ orderId: order.id, razorpayPaymentId: paymentEntity?.id, source: "webhook" });
+      try {
+        const paid = await markOrderPaid({
+          orderId: order.id,
+          razorpayPaymentId: paymentEntity?.id,
+          source: "webhook"
+        });
+        if (!paid.ok) {
+          logger.error(
+            { orderId: order.id, eventType, event: "webhook_fulfillment_failed" },
+            "webhook capture acknowledged but fulfillment failed"
+          );
+          // 500 so Razorpay retries; idempotent claim prevents double side-effects.
+          return NextResponse.json({ ok: false, retry: true }, { status: 500 });
+        }
+      } catch (err) {
+        logger.error({ err, orderId: order.id, event: "webhook_fulfillment_error" }, "markOrderPaid threw");
+        return NextResponse.json({ ok: false, retry: true }, { status: 500 });
+      }
     } else if (eventType === "payment.failed") {
+      // Keep stock reserved for late capture; stale-order cron releases holds.
       await markOrderFailed({ orderId: order.id, source: "webhook" });
     }
   } else {

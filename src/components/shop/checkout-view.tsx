@@ -188,10 +188,33 @@ function validateAll(form: FormState): Errors {
   return next;
 }
 
-export function CheckoutView() {
+export type SavedCheckoutAddress = {
+  id: string;
+  label: string;
+  fullName: string;
+  phone: string;
+  line1: string;
+  line2: string;
+  city: string;
+  state: string;
+  postalCode: string;
+  country: string;
+  isDefault: boolean;
+};
+
+export function CheckoutView({
+  savedAddresses = [],
+  prefillEmail = ""
+}: {
+  savedAddresses?: SavedCheckoutAddress[];
+  prefillEmail?: string;
+}) {
   const { items, ready, subtotalInr, clear } = useCart();
   const router = useRouter();
-  const [form, setForm] = useState<FormState>(EMPTY);
+  const [form, setForm] = useState<FormState>(() => ({
+    ...EMPTY,
+    email: prefillEmail
+  }));
   const [touched, setTouched] = useState<Partial<Record<FieldKey, boolean>>>({});
   const [attempted, setAttempted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -325,7 +348,8 @@ export function CheckoutView() {
       // Test mode: server completed the order without Razorpay.
       if (data.skipPayment && data.orderNumber) {
         clear();
-        router.push(`/order/${data.orderNumber}`);
+        const t = data.confirmationToken ? `?t=${encodeURIComponent(data.confirmationToken)}` : "";
+        router.push(`/order/${data.orderNumber}${t}`);
         return;
       }
 
@@ -359,7 +383,10 @@ export function CheckoutView() {
             const verifyData = await verifyRes.json();
             if (verifyRes.ok && verifyData.ok) {
               clear();
-              router.push(`/order/${verifyData.orderNumber}`);
+              const t = verifyData.confirmationToken
+                ? `?t=${encodeURIComponent(verifyData.confirmationToken)}`
+                : "";
+              router.push(`/order/${verifyData.orderNumber}${t}`);
             } else {
               setError(
                 "Payment could not be verified. If money was deducted, contact us with your order number."
@@ -437,6 +464,51 @@ export function CheckoutView() {
           </Section>
 
           <Section title="Ship to" index="02" complete={addressDone}>
+            {savedAddresses.length > 0 ? (
+              <div className="mb-4 space-y-2">
+                <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-ink-faint">
+                  Saved portal addresses
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {savedAddresses.map((a) => (
+                    <button
+                      key={a.id}
+                      type="button"
+                      onClick={() => {
+                        setForm((f) => ({
+                          ...f,
+                          fullName: a.fullName || f.fullName,
+                          phone: a.phone || f.phone,
+                          line1: a.line1,
+                          line2: a.line2,
+                          city: a.city,
+                          state: a.state,
+                          postalCode: a.postalCode,
+                          country: a.country || "India"
+                        }));
+                        setTouched((t) => ({
+                          ...t,
+                          fullName: true,
+                          phone: true,
+                          line1: true,
+                          city: true,
+                          state: true,
+                          postalCode: true,
+                          country: true
+                        }));
+                      }}
+                      className="rounded-full border border-ink/15 px-3 py-1.5 text-left text-[12px] text-ink transition-colors hover:border-gold/50 hover:bg-pearl/60"
+                    >
+                      <span className="font-medium">{a.label}</span>
+                      {a.isDefault ? <span className="ml-1 text-gold">· default</span> : null}
+                      <span className="mt-0.5 block text-[11px] text-ink-mute">
+                        {a.city}, {a.state}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ) : null}
             <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2 sm:gap-4">
               <Field
                 id="field-fullName"

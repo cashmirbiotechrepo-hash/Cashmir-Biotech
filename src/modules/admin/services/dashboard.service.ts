@@ -1,7 +1,7 @@
 import "server-only";
 import { db } from "@/lib/db";
 
-export type DashboardStats = {
+export type AdminDashboardStats = {
   products: number;
   activeProducts: number;
   lowStock: number;
@@ -13,11 +13,10 @@ export type DashboardStats = {
   teamMembers: number;
   openDeals: number;
   pipelineValueInr: number;
-  /** Coupons exist in admin but are not wired to storefront checkout yet. */
   couponsPendingStorefront: number;
 };
 
-export async function getDashboardStats(): Promise<DashboardStats> {
+export async function getDashboardStats(): Promise<AdminDashboardStats> {
   const [
     products,
     activeProducts,
@@ -28,12 +27,13 @@ export async function getDashboardStats(): Promise<DashboardStats> {
     subscribers,
     teamMembers,
     pipeline,
-    couponsPendingStorefront
+    couponsPendingStorefront,
+    lowStockRaw
   ] = await Promise.all([
     db.product.count(),
     db.product.count({ where: { active: true } }),
     db.order.count(),
-    db.order.count({ where: { status: { in: ["pending", "paid", "processing"] } } }),
+    db.order.count({ where: { status: "pending" } }),
     db.order.aggregate({
       where: { status: { in: ["paid", "processing", "shipped", "delivered"] } },
       _sum: { totalCents: true }
@@ -42,20 +42,20 @@ export async function getDashboardStats(): Promise<DashboardStats> {
     db.subscriber.count(),
     db.teamMember.count(),
     db.deal.aggregate({
-      where: { stage: { in: ["lead", "qualified", "proposal"] } },
-      _sum: { valueCents: true },
-      _count: true
+      where: { stage: { notIn: ["won", "lost"] } },
+      _count: { _all: true },
+      _sum: { valueCents: true }
     }),
-    db.coupon.count({ where: { active: true } })
+    db.coupon.count({ where: { active: true } }),
+    // MED-01: DB-level low stock count via raw query
+    db.$queryRaw<{ count: bigint }[]>`
+      SELECT COUNT(*)::bigint as count
+      FROM "Inventory"
+      WHERE ("quantityOnHand" - "quantityReserved") <= "lowStockThreshold"
+    `
   ]);
 
-  // Match Inventory screen: available = onHand − reserved
-  const inventoryRows = await db.inventory.findMany({
-    select: { quantityOnHand: true, quantityReserved: true, lowStockThreshold: true }
-  });
-  const lowStockCount = inventoryRows.filter(
-    (r) => r.quantityOnHand - r.quantityReserved <= r.lowStockThreshold
-  ).length;
+  const lowStockCount = Number(lowStockRaw[0]?.count ?? 0);
 
   return {
     products,
@@ -67,8 +67,8 @@ export async function getDashboardStats(): Promise<DashboardStats> {
     patents,
     subscribers,
     teamMembers,
-    openDeals: pipeline._count,
-    pipelineValueInr: Math.round((pipeline._sum.valueCents ?? 0) / 100),
+    openDeals: pipeline._count._all ?? 0,
+    pipelineValueInr: Math.round((pipeline._sum?.valueCents ?? 0) / 100),
     couponsPendingStorefront
   };
 }
@@ -81,29 +81,64 @@ export async function listRecentOrders(limit = 8) {
   });
 }
 
-export async function listLowStockProducts(limit = 6) {
-  const rows = await db.inventory.findMany({
-    include: { product: { select: { id: true, name: true, slug: true, imageUrl: true, sku: true } } },
-    orderBy: { updatedAt: "desc" },
-    take: 100
-  });
+export type LowStockProductRow = {
+  id: string;
+  name: string;
+  slug: string;
+  imageUrl: string;
+  sku: string;
+  stockQty: number;
+  lowStockThreshold: number;
+  quantityOnHand: number;
+  quantityReserved: number;
+};
 
-  return rows
-    .map((r) => {
-      const available = r.quantityOnHand - r.quantityReserved;
-      return {
-        id: r.productId,
-        name: r.product.name,
-        slug: r.product.slug,
-        imageUrl: r.product.imageUrl,
-        sku: r.sku || r.product.sku,
-        stockQty: available,
-        lowStockThreshold: r.lowStockThreshold,
-        quantityOnHand: r.quantityOnHand,
-        quantityReserved: r.quantityReserved
-      };
-    })
-    .filter((p) => p.stockQty <= p.lowStockThreshold)
-    .sort((a, b) => a.stockQty - b.stockQty)
-    .slice(0, limit);
+/**
+ * MED-01: DB-level low stock query with SQL sorting and limit to avoid loading all rows into JS memory.
+ */
+export async function listLowStockProducts(limit = 6): Promise<LowStockProductRow[]> {
+  const rows = await db.$queryRaw<
+    {
+      productId: string;
+      name: string;
+      slug: string;
+      imageUrl: string;
+      sku: string | null;
+      productSku: string | null;
+      quantityOnHand: number;
+      quantityReserved: number;
+      lowStockThreshold: number;
+    }[]
+  >`
+    SELECT 
+      i."productId",
+      p.name,
+      p.slug,
+      p."imageUrl",
+      i.sku,
+      p.sku as "productSku",
+      i."quantityOnHand",
+      i."quantityReserved",
+      i."lowStockThreshold"
+    FROM "Inventory" i
+    JOIN "Product" p ON p.id = i."productId"
+    WHERE (i."quantityOnHand" - i."quantityReserved") <= i."lowStockThreshold"
+    ORDER BY (i."quantityOnHand" - i."quantityReserved") ASC
+    LIMIT ${limit}
+  `;
+
+  return rows.map((r) => {
+    const available = r.quantityOnHand - r.quantityReserved;
+    return {
+      id: r.productId,
+      name: r.name,
+      slug: r.slug,
+      imageUrl: r.imageUrl,
+      sku: r.sku || r.productSku || "",
+      stockQty: available,
+      lowStockThreshold: r.lowStockThreshold,
+      quantityOnHand: r.quantityOnHand,
+      quantityReserved: r.quantityReserved
+    };
+  });
 }

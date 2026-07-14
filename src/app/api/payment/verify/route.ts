@@ -2,8 +2,8 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { db } from "@/lib/db";
 import { logger } from "@/lib/logger";
-import { markOrderFailed, markOrderPaid } from "@/modules/shop/services/order.service";
-import { verifyPaymentSignature } from "@/lib/payments/razorpay";
+import { markOrderPaid } from "@/modules/shop/services/order.service";
+import { assertCapturedPayment, verifyPaymentSignature } from "@/lib/payments/razorpay";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -36,7 +36,6 @@ export async function POST(request: Request) {
 
   const valid = verifyPaymentSignature({ razorpayOrderId, razorpayPaymentId, signature: razorpaySignature });
 
-  // Audit trail: log every verify attempt, deduped by payment id.
   await db.paymentEvent
     .create({
       data: {
@@ -52,13 +51,65 @@ export async function POST(request: Request) {
   if (!valid) {
     logger.warn(
       { event: "payment_signature_invalid", orderId: order.id, razorpayOrderId },
-      "razorpay signature verification failed"
+      "razorpay signature verification failed — order left unchanged"
     );
-    await markOrderFailed({ orderId: order.id, source: "verify" }).catch(() => undefined);
     return NextResponse.json({ ok: false, error: "Payment could not be verified." }, { status: 400 });
   }
 
-  await markOrderPaid({ orderId: order.id, razorpayPaymentId, source: "verify" });
+  const captured = await assertCapturedPayment({
+    paymentId: razorpayPaymentId,
+    razorpayOrderId,
+    amountCents: order.totalCents
+  });
+  if (!captured.ok) {
+    logger.warn(
+      { event: "payment_assert_failed", orderId: order.id, error: captured.error },
+      "Razorpay payment assertion failed"
+    );
+    return NextResponse.json({ ok: false, error: captured.error }, { status: 400 });
+  }
 
-  return NextResponse.json({ ok: true, orderNumber: order.orderNumber });
+  let paid: { ok: boolean; confirmationToken?: string };
+  try {
+    paid = await markOrderPaid({ orderId: order.id, razorpayPaymentId, source: "verify" });
+  } catch (err) {
+    logger.error({ err, orderId: order.id, event: "payment_verify_fulfillment_error" }, "markOrderPaid threw");
+    return NextResponse.json(
+      { ok: false, error: "Payment captured but fulfillment failed. Support has been notified.", needsSupport: true },
+      { status: 500 }
+    );
+  }
+
+  if (!paid.ok) {
+    logger.error(
+      { orderId: order.id, razorpayPaymentId, event: "payment_verify_fulfillment_failed" },
+      "signature valid but fulfillment failed"
+    );
+    await db.paymentEvent
+      .create({
+        data: {
+          eventType: "verify.fulfillment_failed",
+          providerEventId: `verify-fulfill:${razorpayPaymentId}:${Date.now()}`,
+          orderId: order.id,
+          signatureValid: true,
+          payload: { razorpayOrderId, razorpayPaymentId }
+        }
+      })
+      .catch(() => undefined);
+    return NextResponse.json(
+      {
+        ok: false,
+        error: "Payment was received but we could not complete your order. Please contact support.",
+        needsSupport: true,
+        orderNumber: order.orderNumber
+      },
+      { status: 500 }
+    );
+  }
+
+  return NextResponse.json({
+    ok: true,
+    orderNumber: order.orderNumber,
+    confirmationToken: paid.confirmationToken ?? order.confirmationToken
+  });
 }

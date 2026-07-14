@@ -2,7 +2,6 @@
 
 import type { Order, OrderItem } from "@prisma/client";
 import Link from "next/link";
-import { useState } from "react";
 import { updateOrderStatusAction } from "@/app/(admin)/admin/(console)/actions";
 import { FormStatus, SaveButton, useAdminForm } from "@/components/admin/admin-form";
 import { Badge } from "@/components/ui/badge";
@@ -15,22 +14,17 @@ import {
   TableHeader,
   TableRow
 } from "@/components/ui/table";
+import {
+  allowedNextStatuses,
+  humanStatus,
+  primaryWorkflowAction,
+  type OrderStatusValue
+} from "@/lib/admin/order-workflow";
 
 type OrderWithItems = Order & {
   items: OrderItem[];
   invoices?: { id: string; invoiceNumber: string }[];
 };
-
-const STATUSES = [
-  "pending",
-  "paid",
-  "processing",
-  "shipped",
-  "delivered",
-  "cancelled",
-  "payment_failed",
-  "refunded"
-] as const;
 
 function formatInr(cents: number) {
   return new Intl.NumberFormat("en-IN", {
@@ -40,15 +34,48 @@ function formatInr(cents: number) {
   }).format(cents / 100);
 }
 
+function NextStepForm({ orderId, to, label }: { orderId: string; to: OrderStatusValue; label: string }) {
+  const { pending, state, onSubmit } = useAdminForm(updateOrderStatusAction, { refresh: true });
+  return (
+    <form onSubmit={onSubmit} className="flex flex-col gap-1">
+      <input type="hidden" name="id" value={orderId} />
+      <input type="hidden" name="status" value={to} />
+      <SaveButton pending={pending} label={label} />
+      <FormStatus state={state} />
+    </form>
+  );
+}
+
+function CancelForm({ orderId }: { orderId: string }) {
+  const { pending, state, onSubmit } = useAdminForm(updateOrderStatusAction, { refresh: true });
+  return (
+    <form onSubmit={onSubmit}>
+      <input type="hidden" name="id" value={orderId} />
+      <input type="hidden" name="status" value="cancelled" />
+      <button
+        type="submit"
+        disabled={pending}
+        className="text-[11px] text-muted-foreground hover:text-destructive"
+      >
+        {pending ? "…" : "Cancel"}
+      </button>
+      <FormStatus state={state} />
+    </form>
+  );
+}
+
 function OrderRow({ order }: { order: OrderWithItems }) {
-  const { pending, state, onSubmit } = useAdminForm(updateOrderStatusAction);
-  const [status, setStatus] = useState(order.status);
   const invoice = order.invoices?.[0];
+  const primary = primaryWorkflowAction(order.status);
+  const canCancel = allowedNextStatuses(order.status).includes("cancelled");
 
   return (
     <TableRow>
       <TableCell>
-        <Link href={`/admin/orders/${order.id}`} className="font-mono text-xs text-primary hover:underline">
+        <Link
+          href={`/admin/orders/${order.id}`}
+          className="font-mono text-xs text-primary hover:underline"
+        >
           {order.orderNumber}
         </Link>
         {order.trackingNumber ? (
@@ -72,25 +99,17 @@ function OrderRow({ order }: { order: OrderWithItems }) {
       </TableCell>
       <TableCell className="text-right tabular-nums">{formatInr(order.totalCents)}</TableCell>
       <TableCell>
-        <form onSubmit={onSubmit} className="flex min-w-[11rem] flex-col gap-1.5">
-          <input type="hidden" name="id" value={order.id} />
-          <select
-            name="status"
-            value={status}
-            onChange={(e) => setStatus(e.target.value as typeof status)}
-            className="h-8 rounded-lg border border-input bg-background px-2 text-sm"
-          >
-            {STATUSES.map((s) => (
-              <option key={s} value={s}>
-                {s}
-              </option>
-            ))}
-          </select>
-          <div className="flex items-center gap-2">
-            <SaveButton pending={pending} label="Update" />
-            <FormStatus state={state} />
-          </div>
-        </form>
+        <div className="space-y-1.5">
+          <Badge variant="secondary" className="capitalize">
+            {humanStatus(order.status)}
+          </Badge>
+          {primary ? (
+            <NextStepForm orderId={order.id} to={primary.to} label={primary.label} />
+          ) : (
+            <p className="text-[11px] text-muted-foreground">No next step</p>
+          )}
+          {canCancel ? <CancelForm orderId={order.id} /> : null}
+        </div>
       </TableCell>
       <TableCell>
         <div className="flex flex-col gap-1">
@@ -115,17 +134,26 @@ function OrderRow({ order }: { order: OrderWithItems }) {
         )}
       </TableCell>
       <TableCell>
-        <div className="flex flex-col gap-1 text-xs">
-          <Link href={`/admin/orders/${order.id}`} className="text-primary hover:underline">
-            Open
+        <div className="flex min-w-[8.5rem] flex-col gap-1 text-xs">
+          <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Actions</p>
+          <Link href={`/admin/orders/${order.id}`} className="font-medium text-primary hover:underline">
+            View order →
           </Link>
           <Link
             href={`/admin/orders/${order.id}/print/packing-slip`}
             className="text-muted-foreground hover:underline"
             target="_blank"
           >
-            Pack
+            Print packing slip
           </Link>
+          {invoice ? (
+            <Link
+              href={`/admin/finance/invoices/${invoice.id}`}
+              className="text-muted-foreground hover:underline"
+            >
+              Print invoice
+            </Link>
+          ) : null}
         </div>
       </TableCell>
     </TableRow>
@@ -143,10 +171,10 @@ export function OrdersTable({ orders }: { orders: OrderWithItems[] }) {
               <TableHead>Customer</TableHead>
               <TableHead>Date</TableHead>
               <TableHead className="text-right">Total</TableHead>
-              <TableHead>Status</TableHead>
+              <TableHead>Workflow</TableHead>
               <TableHead>Items</TableHead>
               <TableHead>Invoice</TableHead>
-              <TableHead />
+              <TableHead>Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>

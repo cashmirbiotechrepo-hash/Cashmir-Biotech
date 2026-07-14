@@ -11,7 +11,11 @@ export type PublicHomeData = {
 export async function getPublicHomeContent(): Promise<PublicHomeData> {
   const [settings, products, patents] = await Promise.all([
     db.siteSettings.findUnique({ where: { id: 1 } }),
-    db.product.findMany({ where: { active: true }, orderBy: [{ featured: "desc" }, { createdAt: "desc" }], take: 3 }),
+    db.product.findMany({
+      where: { active: true },
+      orderBy: [{ featured: "desc" }, { createdAt: "desc" }],
+      take: 6
+    }),
     db.patent.findMany({ orderBy: { publishedAt: "desc" }, take: 3 })
   ]);
   return { settings, products, patents };

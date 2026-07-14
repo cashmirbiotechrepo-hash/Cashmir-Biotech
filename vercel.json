@@ -3,6 +3,10 @@
     {
       "path": "/api/cron/release-stale-orders",
       "schedule": "*/20 * * * *"
+    },
+    {
+      "path": "/api/cron/cleanup-sessions",
+      "schedule": "0 3 * * *"
     }
   ]
 }

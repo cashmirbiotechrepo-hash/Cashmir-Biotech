@@ -143,13 +143,13 @@ export function SiteNav() {
             })}
           </ul>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-3 md:gap-3.5">
             <Link
               href="/portal/login"
-              data-cursor="Portal"
-              className="hidden font-mono text-[11px] uppercase tracking-[0.16em] text-ink-mute transition-colors hover:text-ink lg:inline"
+              data-cursor="Sign in"
+              className="hidden font-mono text-[11px] uppercase tracking-[0.16em] text-ink-mute transition-colors hover:text-ink lg:inline-flex lg:items-center lg:px-1"
             >
-              Portal
+              Sign in
             </Link>
             <Link
               href="/cart"
@@ -248,9 +248,9 @@ export function SiteNav() {
               </Link>
               <Link
                 href="/portal/login"
-                className="flex items-center justify-center rounded-full border border-ink/20 py-4 text-sm text-ink"
+                className="flex items-center justify-center rounded-full border border-ink/20 py-4 font-mono text-[12px] uppercase tracking-[0.16em] text-ink"
               >
-                Research Portal
+                Sign in
               </Link>
               <Link
                 href={CONTACT_HREF}

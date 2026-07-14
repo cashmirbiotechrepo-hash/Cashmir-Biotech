@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 import { CheckoutView } from "@/components/shop/checkout-view";
+import { getCurrentCustomer } from "@/lib/customer/auth";
+import { getCustomerAddresses } from "@/lib/customer/portal";
 
 export const metadata: Metadata = {
   title: "Secure checkout",
@@ -7,10 +9,28 @@ export const metadata: Metadata = {
     "Complete your Cashmir Biotech research order — patent-backed formulations, GST invoice, Razorpay-secured payment."
 };
 
-export default function CheckoutPage() {
+export default async function CheckoutPage() {
+  const customer = await getCurrentCustomer();
+  const addresses = customer ? await getCustomerAddresses(customer.id) : [];
+
   return (
     <div className="pb-10">
-      <CheckoutView />
+      <CheckoutView
+        prefillEmail={customer?.email ?? ""}
+        savedAddresses={addresses.map((a) => ({
+          id: a.id,
+          label: a.label,
+          fullName: a.fullName,
+          phone: a.phone,
+          line1: a.line1,
+          line2: a.line2,
+          city: a.city,
+          state: a.state,
+          postalCode: a.postalCode,
+          country: a.country,
+          isDefault: a.isDefault
+        }))}
+      />
     </div>
   );
 }

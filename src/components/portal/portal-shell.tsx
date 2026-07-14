@@ -8,6 +8,8 @@ const NAV = [
   { href: "/portal", label: "Overview", exact: true },
   { href: "/portal/orders", label: "Orders" },
   { href: "/portal/documents", label: "Documents" },
+  { href: "/portal/organization", label: "Organisation" },
+  { href: "/portal/circle", label: "Research Circle" },
   { href: "/portal/addresses", label: "Addresses" },
   { href: "/portal/security", label: "Security" },
   { href: "/portal/support", label: "Support" }
@@ -16,8 +18,9 @@ const NAV = [
 const MOBILE = [
   { href: "/portal", label: "Home", exact: true },
   { href: "/portal/orders", label: "Orders" },
-  { href: "/portal/documents", label: "Documents" },
-  { href: "/portal/support", label: "Support" }
+  { href: "/portal/organization", label: "Org" },
+  { href: "/portal/circle", label: "Circle" },
+  { href: "/portal/support", label: "Help" }
 ] as const;
 
 function active(pathname: string, href: string, exact?: boolean) {
@@ -50,7 +53,7 @@ export function PortalShell({
         <aside className="hidden w-52 shrink-0 flex-col border-r border-ink/10 pr-6 md:flex lg:w-56">
           <Link href="/" className="mb-10 block">
             <p className="font-mono text-[10px] uppercase tracking-[0.22em] text-gold">Cashmir Biotech</p>
-            <p className="mt-1 text-lg font-light tracking-tight">Research Portal</p>
+            <p className="mt-1 text-lg font-light tracking-tight">Customer Portal</p>
           </Link>
           <nav className="flex flex-1 flex-col gap-1">
             {NAV.map((item) => (
@@ -84,7 +87,7 @@ export function PortalShell({
         <div className="flex min-w-0 flex-1 flex-col pb-24 md:pb-0">
           <header className="flex items-center justify-between border-b border-ink/10 px-5 py-5 md:hidden">
             <div>
-              <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-gold">Research Portal</p>
+              <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-gold">Customer Portal</p>
               <p className="text-sm text-ink-mute">Hello {firstName}</p>
             </div>
             <button
@@ -100,13 +103,13 @@ export function PortalShell({
       </div>
 
       <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-ink/10 bg-paper/95 backdrop-blur md:hidden">
-        <ul className="mx-auto flex max-w-lg justify-around px-2 py-2">
+        <ul className="mx-auto flex max-w-lg justify-around gap-1 overflow-x-auto px-1 py-2">
           {MOBILE.map((item) => (
-            <li key={item.href}>
+            <li key={item.href} className="shrink-0">
               <Link
                 href={item.href}
                 className={cn(
-                  "block px-3 py-2 font-mono text-[10px] uppercase tracking-[0.12em]",
+                  "block px-2.5 py-2 font-mono text-[9px] uppercase tracking-[0.1em]",
                   active(pathname, item.href, "exact" in item && item.exact) ? "text-ink" : "text-ink-faint"
                 )}
               >

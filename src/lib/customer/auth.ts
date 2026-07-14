@@ -1,27 +1,30 @@
 import "server-only";
-import { createHash, randomInt, randomUUID } from "crypto";
+import { createHash, randomInt, randomUUID, timingSafeEqual } from "crypto";
 import { SignJWT, jwtVerify } from "jose";
 import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
 import {
   CUSTOMER_JWT_AUDIENCE,
+  CUSTOMER_REFRESH_COOKIE,
   CUSTOMER_SESSION_COOKIE,
   JWT_ISSUER
 } from "@/config/auth.constants";
 import { env } from "@/config/env.server";
 import { db } from "@/lib/db";
 import { decryptToken, encryptToken } from "@/lib/admin/encryption";
-import { sendAdminMail } from "@/lib/admin/mail";
 import { logger } from "@/lib/logger";
 
 const SESSION_DAYS = 30;
-const ACCESS_TOKEN_EXPIRY = "30d";
+/** Short access TTL so revoke is effective quickly even without Redis denylist. */
+const ACCESS_TOKEN_EXPIRY = "15m";
+
+const REFRESH_COOKIE_MAX_AGE = 30 * 24 * 60 * 60; // 30 days in seconds
 const OTP_EXPIRY_MS = 10 * 60 * 1000;
 const OTP_COOLDOWN_MS = 60 * 1000;
 const MAX_OTP_ATTEMPTS = 5;
 
 function jwtSecret() {
-  return new TextEncoder().encode(env.JWT_SECRET);
+  return new TextEncoder().encode(env.CUSTOMER_JWT_SECRET ?? env.JWT_SECRET);
 }
 
 function hashOtp(code: string) {
@@ -89,7 +92,26 @@ export async function requestPortalOtp(emailRaw: string): Promise<{ ok: true } |
     return { ok: false, error: "Enter a valid email address." };
   }
 
-  // Avoid enumeration: only create/send when we have a reason (customer or guest orders).
+  const smtpReady = Boolean(process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS);
+  const isLive = process.env.NODE_ENV === "production" || process.env.VERCEL_ENV === "production";
+  if (isLive && !smtpReady) {
+    logger.error({ event: "portal_otp_smtp_missing" }, "SMTP not configured — portal OTP unavailable");
+    return { ok: false, error: "Login email could not be sent. Please try again later or contact support." };
+  }
+  if (process.env.VERCEL_ENV === "preview" && !smtpReady) {
+    logger.error({ event: "portal_otp_smtp_missing_preview" }, "SMTP missing on preview");
+    return { ok: false, error: "Login email could not be sent. Please try again later." };
+  }
+
+  // Uniform cooldown for every email (known or unknown) — closes OTP enumeration (H5).
+  const recentAny = await db.customerOtp.findFirst({
+    where: { email, purpose: "login" },
+    orderBy: { createdAt: "desc" }
+  });
+  if (recentAny && recentAny.createdAt.getTime() > Date.now() - OTP_COOLDOWN_MS) {
+    return { ok: true };
+  }
+
   let customer = await db.customer.findUnique({ where: { email } });
   const guestOrder = await db.order.findFirst({
     where: { customerEmail: { equals: email, mode: "insensitive" } },
@@ -97,8 +119,17 @@ export async function requestPortalOtp(emailRaw: string): Promise<{ ok: true } |
     select: { customerName: true, customerPhone: true }
   });
 
+  // Always create a cooldown marker OTP row for unknown emails (never sent).
   if (!customer && !guestOrder) {
-    // Generic success — no email sent
+    await db.customerOtp.create({
+      data: {
+        email,
+        codeHash: hashOtp(String(randomInt(100000, 1000000))),
+        purpose: "login",
+        expiresAt: new Date(Date.now() + OTP_EXPIRY_MS),
+        usedAt: new Date()
+      }
+    });
     return { ok: true };
   }
 
@@ -112,14 +143,6 @@ export async function requestPortalOtp(emailRaw: string): Promise<{ ok: true } |
     });
   }
 
-  const recent = await db.customerOtp.findFirst({
-    where: { email, purpose: "login", usedAt: null },
-    orderBy: { createdAt: "desc" }
-  });
-  if (recent && recent.createdAt.getTime() > Date.now() - OTP_COOLDOWN_MS) {
-    return { ok: false, error: "Please wait a minute before requesting another code." };
-  }
-
   const code = String(randomInt(100000, 1000000));
   await db.customerOtp.create({
     data: {
@@ -131,18 +154,16 @@ export async function requestPortalOtp(emailRaw: string): Promise<{ ok: true } |
     }
   });
 
-  const smtpReady = process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS;
   if (smtpReady) {
-    const sent = await sendAdminMail({
+    const { sendOtpMail } = await import("@/lib/admin/mail");
+    await sendOtpMail({
       to: email,
-      subject: "Cashmir Biotech — Research Portal access code",
-      text: `Your Research Portal code is ${code}. It expires in 10 minutes.\n\nIf you did not request this, ignore this email.`
+      kind: "portal_login",
+      code
     });
-    if (!sent) return { ok: false, error: "Could not send the code. Try again shortly." };
-  } else if (process.env.NODE_ENV !== "production") {
-    logger.info({ event: "portal_otp_dev", email, code }, `[DEV] Portal OTP for ${email}`);
   } else {
-    return { ok: false, error: "Email delivery is not configured yet." };
+    // Local development only.
+    logger.info({ event: "portal_otp_dev", email, code }, `[DEV] Portal OTP for ${email}`);
   }
 
   return { ok: true };
@@ -172,7 +193,13 @@ export async function verifyPortalOtp(
     return { ok: false, error: "Too many attempts. Request a new code." };
   }
 
-  if (otp.codeHash !== hashOtp(code)) {
+  const valid = (() => {
+    const a = Buffer.from(hashOtp(code));
+    const b = Buffer.from(otp.codeHash);
+    if (a.length !== b.length) return false;
+    return timingSafeEqual(a, b);
+  })();
+  if (!valid) {
     await db.customerOtp.update({ where: { id: otp.id }, data: { attempts: { increment: 1 } } });
     return { ok: false, error: "Invalid or expired code." };
   }
@@ -197,7 +224,8 @@ export async function verifyPortalOtp(
     sessionId: session.id,
     emailVerified: true
   });
-  await setCustomerSessionCookie(access);
+  const refresh = await mintCustomerRefreshToken(session.id);
+  await setCustomerSessionCookies(access, refresh);
 
   logger.info(
     { event: "portal_login", customerId: customer.id, linkedCount, firstVerify },
@@ -248,7 +276,17 @@ async function mintCustomerAccessToken(payload: CustomerSessionPayload) {
     .sign(jwtSecret());
 }
 
-export async function setCustomerSessionCookie(accessToken: string) {
+async function mintCustomerRefreshToken(sessionId: string): Promise<string> {
+  return new SignJWT({ sessionId, type: "customer_refresh" })
+    .setProtectedHeader({ alg: "HS256" })
+    .setIssuedAt()
+    .setIssuer(JWT_ISSUER)
+    .setAudience(CUSTOMER_JWT_AUDIENCE)
+    .setExpirationTime("30d")
+    .sign(jwtSecret());
+}
+
+export async function setCustomerSessionCookies(accessToken: string, refreshToken?: string) {
   const encrypted = await encryptToken(accessToken);
   const jar = await cookies();
   jar.set(CUSTOMER_SESSION_COOKIE, encrypted, {
@@ -256,13 +294,56 @@ export async function setCustomerSessionCookie(accessToken: string) {
     secure: process.env.NODE_ENV === "production",
     sameSite: "lax",
     path: "/",
-    maxAge: SESSION_DAYS * 24 * 60 * 60
+    maxAge: 15 * 60 // 15 minutes — matches access token expiry
   });
+  if (refreshToken) {
+    const encryptedRefresh = await encryptToken(refreshToken);
+    jar.set(CUSTOMER_REFRESH_COOKIE, encryptedRefresh, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "strict",
+      path: "/api/portal/auth/refresh",
+      maxAge: REFRESH_COOKIE_MAX_AGE
+    });
+  }
 }
 
-export async function clearCustomerSessionCookie() {
+export async function clearCustomerSessionCookies() {
   const jar = await cookies();
   jar.delete(CUSTOMER_SESSION_COOKIE);
+  jar.delete({ name: CUSTOMER_REFRESH_COOKIE, path: "/api/portal/auth/refresh" });
+}
+
+/** Rotates customer refresh token — returns new access + refresh tokens or null. */
+export async function rotateCustomerRefresh(encryptedRefreshCookie: string): Promise<{ accessToken: string; refreshToken: string } | null> {
+  let jwt: string;
+  try { jwt = await decryptToken(encryptedRefreshCookie); } catch { return null; }
+
+  try {
+    const { payload } = await jwtVerify(jwt, jwtSecret(), {
+      issuer: JWT_ISSUER,
+      audience: CUSTOMER_JWT_AUDIENCE
+    });
+    if (payload.type !== "customer_refresh" || typeof payload.sessionId !== "string") return null;
+
+    const session = await db.customerSession.findUnique({ where: { id: payload.sessionId } });
+    if (!session || session.isRevoked || session.expiresAt < new Date()) return null;
+
+    const customer = await db.customer.findUnique({ where: { id: session.customerId } });
+    if (!customer || !customer.active) return null;
+
+    const accessToken = await mintCustomerAccessToken({
+      id: customer.id,
+      email: customer.email,
+      name: customer.name,
+      sessionId: session.id,
+      emailVerified: Boolean(customer.emailVerifiedAt)
+    });
+    const refreshToken = await mintCustomerRefreshToken(session.id);
+    return { accessToken, refreshToken };
+  } catch {
+    return null;
+  }
 }
 
 export async function getCurrentCustomer(): Promise<CustomerSessionPayload | null> {
@@ -318,8 +399,10 @@ export async function logoutCustomer() {
       where: { id: customer.sessionId },
       data: { isRevoked: true }
     }).catch(() => undefined);
+    const { markSessionRevokedEdge } = await import("@/lib/session-revoke-edge");
+    await markSessionRevokedEdge(customer.sessionId).catch(() => undefined);
   }
-  await clearCustomerSessionCookie();
+  await clearCustomerSessionCookies();
 }
 
 export async function requestMeta() {

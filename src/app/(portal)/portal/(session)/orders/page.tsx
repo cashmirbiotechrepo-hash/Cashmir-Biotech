@@ -4,7 +4,7 @@ import { requireCustomerSession } from "@/lib/customer/auth";
 import { getCustomerOrders } from "@/lib/customer/portal";
 
 export const metadata: Metadata = {
-  title: "Orders · Research Portal",
+  title: "Orders · Customer Portal",
   robots: { index: false, follow: false }
 };
 

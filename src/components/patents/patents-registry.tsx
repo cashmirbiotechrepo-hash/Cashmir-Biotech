@@ -213,7 +213,7 @@ export function PatentsRegistry({ patents, years, jurisdictions }: Props) {
     });
   }, [patents, yearFilter, placeFilter]);
 
-  const [featured, ..._rest] = filtered;
+  const [featured] = filtered;
   const byYear = useMemo(() => {
     const map = new Map<number, RegistryPatent[]>();
     for (const p of filtered) {

@@ -4,7 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { LogOut, Menu, PanelLeft } from "lucide-react";
-import { ADMIN_NAV, MOBILE_NAV, navForRole } from "@/components/admin/admin-nav";
+import { MOBILE_NAV, navGroupsForRole } from "@/components/admin/admin-nav";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
@@ -19,31 +19,46 @@ type AdminShellProps = {
   children: React.ReactNode;
 };
 
-function NavLinks({ onNavigate, items }: { onNavigate?: () => void; items: typeof ADMIN_NAV }) {
+function NavLinks({
+  onNavigate,
+  groups
+}: {
+  onNavigate?: () => void;
+  groups: ReturnType<typeof navGroupsForRole>;
+}) {
   const pathname = usePathname();
 
   return (
-    <nav className="flex flex-col gap-1">
-      {items.map((item) => {
-        const active = pathname === item.href || pathname.startsWith(`${item.href}/`);
-        const Icon = item.icon;
-        return (
-          <Link
-            key={item.href}
-            href={item.href}
-            onClick={onNavigate}
-            className={cn(
-              "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition-colors",
-              active
-                ? "bg-sidebar-accent font-medium text-sidebar-accent-foreground"
-                : "text-muted-foreground hover:bg-sidebar-accent/70 hover:text-foreground"
-            )}
-          >
-            <Icon className="size-4 shrink-0" />
-            <span className="truncate">{item.label}</span>
-          </Link>
-        );
-      })}
+    <nav className="flex flex-col gap-5">
+      {groups.map((group) => (
+        <div key={group.id}>
+          <p className="mb-1.5 px-3 text-[10px] font-medium uppercase tracking-[0.16em] text-muted-foreground/80">
+            {group.label}
+          </p>
+          <div className="flex flex-col gap-0.5">
+            {group.items.map((item) => {
+              const active = pathname === item.href || pathname.startsWith(`${item.href}/`);
+              const Icon = item.icon;
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  onClick={onNavigate}
+                  className={cn(
+                    "flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors",
+                    active
+                      ? "bg-sidebar-accent font-medium text-sidebar-accent-foreground"
+                      : "text-muted-foreground hover:bg-sidebar-accent/70 hover:text-foreground"
+                  )}
+                >
+                  <Icon className="size-4 shrink-0" />
+                  <span className="truncate">{item.label}</span>
+                </Link>
+              );
+            })}
+          </div>
+        </div>
+      ))}
     </nav>
   );
 }
@@ -52,7 +67,8 @@ export function AdminShell({ adminEmail, adminRole, children }: AdminShellProps)
   const pathname = usePathname();
   const isMobile = useIsMobile();
   const initials = adminEmail.slice(0, 2).toUpperCase();
-  const navItems = navForRole(adminRole);
+  const navGroups = navGroupsForRole(adminRole);
+  const wideContent = pathname.startsWith("/admin/orders/");
 
   return (
     <div className="min-h-svh bg-background text-foreground">
@@ -64,7 +80,7 @@ export function AdminShell({ adminEmail, adminRole, children }: AdminShellProps)
               <Image src="/logo.png" alt="Cashmir Biotech" width={120} height={40} className="h-9 w-auto" />
             </div>
             <div className="flex-1 overflow-y-auto px-3 py-4">
-              <NavLinks items={navItems} />
+              <NavLinks groups={navGroups} />
             </div>
             <div className="border-t border-sidebar-border p-4">
               <div className="mb-3 flex items-center gap-3 px-1">
@@ -110,7 +126,7 @@ export function AdminShell({ adminEmail, adminRole, children }: AdminShellProps)
                         </SheetTitle>
                       </SheetHeader>
                       <div className="px-3 py-4">
-                        <NavLinks items={navItems} />
+                        <NavLinks groups={navGroups} />
                       </div>
                       <Separator />
                       <div className="p-4">
@@ -153,7 +169,7 @@ export function AdminShell({ adminEmail, adminRole, children }: AdminShellProps)
           </header>
 
           <main className={cn("flex-1 px-4 py-6 md:px-8 md:py-8", isMobile ? "pb-24" : "")}>
-            <div className="mx-auto w-full max-w-6xl">{children}</div>
+            <div className={cn("mx-auto w-full", wideContent ? "max-w-7xl" : "max-w-6xl")}>{children}</div>
           </main>
 
           {/* Mobile bottom nav */}
@@ -163,7 +179,7 @@ export function AdminShell({ adminEmail, adminRole, children }: AdminShellProps)
               style={{ paddingBottom: "env(safe-area-inset-bottom, 0px)" }}
               aria-label="Main navigation"
             >
-              <div className="mx-auto grid max-w-lg grid-cols-4">
+              <div className="mx-auto grid max-w-lg grid-cols-5">
                 {MOBILE_NAV.map((item) => {
                   const active = pathname === item.href || pathname.startsWith(`${item.href}/`);
                   const Icon = item.icon;
@@ -172,7 +188,7 @@ export function AdminShell({ adminEmail, adminRole, children }: AdminShellProps)
                       key={item.href}
                       href={item.href}
                       className={cn(
-                        "flex min-w-0 flex-col items-center gap-0.5 px-2 py-2.5 text-[10px] font-medium",
+                        "flex min-w-0 flex-col items-center gap-0.5 px-1 py-2.5 text-[10px] font-medium",
                         active ? "text-primary" : "text-muted-foreground"
                       )}
                     >

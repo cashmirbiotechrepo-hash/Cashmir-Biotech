@@ -34,8 +34,8 @@ const COLUMNS: FooterColumn[] = [
       { label: "About us", href: "/about" },
       { label: "Contact", href: "/contact" },
       { label: "Board members", href: "/team" },
-      { label: "Research Portal", href: "/portal/login" },
-      { label: "Admin console", href: "/admin/login" }
+      { label: "Customer Portal", href: "/portal/login" },
+      { label: "Operations Console", href: "/admin/login" }
     ]
   }
 ];

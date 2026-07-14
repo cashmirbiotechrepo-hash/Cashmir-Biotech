@@ -1,6 +1,15 @@
 import "server-only";
 import { db } from "@/lib/db";
 
+/**
+ * MED-02: DTO stripping helper to ensure only plain, serializable JSON objects
+ * cross the Server Action -> Client Component boundary (prevents Decimal/Date serialization errors).
+ */
+function toDTO<T>(data: T): T {
+  if (data === null || data === undefined) return data;
+  return JSON.parse(JSON.stringify(data));
+}
+
 export async function getCrmSummary() {
   const [contacts, deals, pipeline] = await Promise.all([
     db.contact.count(),
@@ -20,44 +29,51 @@ export async function getCrmSummary() {
 }
 
 export async function listContacts() {
-  return db.contact.findMany({
+  const data = await db.contact.findMany({
     orderBy: { updatedAt: "desc" },
     include: { _count: { select: { deals: true } } }
   });
+  return toDTO(data);
 }
 
 export async function listDeals() {
-  return db.deal.findMany({
+  const data = await db.deal.findMany({
     orderBy: { updatedAt: "desc" },
     include: { contact: true }
   });
+  return toDTO(data);
 }
 
 export async function listCoupons() {
-  return db.coupon.findMany({ orderBy: { createdAt: "desc" } });
+  const data = await db.coupon.findMany({ orderBy: { createdAt: "desc" } });
+  return toDTO(data);
 }
 
 export async function listInvoices() {
-  return db.invoice.findMany({
+  const data = await db.invoice.findMany({
     orderBy: { issuedAt: "desc" },
     include: { order: true },
     take: 100
   });
+  return toDTO(data);
 }
 
 export async function listExpenses() {
-  return db.expense.findMany({ orderBy: { incurredAt: "desc" }, take: 200 });
+  const data = await db.expense.findMany({ orderBy: { incurredAt: "desc" }, take: 200 });
+  return toDTO(data);
 }
 
 export async function listCampaigns() {
-  return db.emailCampaign.findMany({ orderBy: { createdAt: "desc" } });
+  const data = await db.emailCampaign.findMany({ orderBy: { createdAt: "desc" } });
+  return toDTO(data);
 }
 
 export async function listPatentsFull() {
-  return db.patent.findMany({
+  const data = await db.patent.findMany({
     orderBy: { publishedAt: "desc" },
     include: { products: { select: { id: true, name: true } } }
   });
+  return toDTO(data);
 }
 
 export function parseInventors(raw: string | undefined): string[] {

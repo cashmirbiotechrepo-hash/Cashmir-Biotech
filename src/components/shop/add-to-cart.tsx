@@ -31,7 +31,7 @@ const control =
  * Single purchase block — no sticky/floating duplicate dock.
  * (Lenis transform breaks `position: fixed`, which caused mid-page overlap.)
  */
-export function AddToCart({ product, available, priceLabel: _priceLabel, className }: AddToCartProps) {
+export function AddToCart({ product, available, className }: AddToCartProps) {
   const { add, items } = useCart();
   const router = useRouter();
   const [qty, setQty] = useState(1);

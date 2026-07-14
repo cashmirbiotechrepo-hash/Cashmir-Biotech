@@ -2,9 +2,7 @@ import "server-only";
 import type { Order, OrderEvent, OrderItem, Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
 import { logger } from "@/lib/logger";
-import { sendAdminMail } from "@/lib/admin/mail";
 import { nextInvoiceNumber } from "@/modules/admin/services/phase2.service";
-import { SITE_CONTACT } from "@/lib/site-contact";
 
 export type OrderEventInput = {
   orderId: string;
@@ -33,7 +31,7 @@ export async function recordOrderEvent(input: OrderEventInput) {
   }
 }
 
-/** Biotech lot label for warehouse docs until SKU-level batch tracking is wired. */
+/** Biotech lot label fallback when OrderItem.lotCodes is empty (pre-provenance orders). */
 export function batchLabelForOrder(orderNumber: string, createdAt: Date) {
   const d = createdAt.toISOString().slice(0, 10).replace(/-/g, "");
   const suffix = orderNumber.slice(-4).toUpperCase();
@@ -43,13 +41,14 @@ export function batchLabelForOrder(orderNumber: string, createdAt: Date) {
 /**
  * Creates a GST invoice for a paid order if one does not already exist.
  * Idempotent — safe to call from markOrderPaid and admin actions.
+ * Uses unique orderId to prevent dual-invoice races.
  */
 export async function ensureInvoiceForOrder(orderId: string): Promise<{
   created: boolean;
   invoiceId?: string;
   invoiceNumber?: string;
 }> {
-  const existing = await db.invoice.findFirst({ where: { orderId } });
+  const existing = await db.invoice.findUnique({ where: { orderId } });
   if (existing) {
     return { created: false, invoiceId: existing.id, invoiceNumber: existing.invoiceNumber };
   }
@@ -66,41 +65,50 @@ export async function ensureInvoiceForOrder(orderId: string): Promise<{
   const half = Math.round(tax / 2);
   const addr = (order.shippingAddress ?? {}) as { state?: string };
 
-  const invoice = await db.invoice.create({
-    data: {
-      invoiceNumber: await nextInvoiceNumber(),
-      orderId: order.id,
-      subtotalCents: subtotal,
-      taxCents: tax,
-      totalCents: total,
-      gstDetails: {
-        gstin: process.env.COMPANY_GSTIN ?? "",
-        placeOfSupply: addr.state ?? "Jammu and Kashmir",
-        taxType: "intra",
-        cgstCents: half,
-        sgstCents: half,
-        igstCents: 0,
-        hsn: "21069099",
-        lineItems: order.items.map((item) => ({
-          description: item.productName,
-          qty: item.quantity,
-          rateCents: item.unitPriceCents,
-          amountCents: item.quantity * item.unitPriceCents,
-          hsn: "21069099"
-        }))
+  try {
+    const invoice = await db.invoice.create({
+      data: {
+        invoiceNumber: await nextInvoiceNumber(),
+        orderId: order.id,
+        subtotalCents: subtotal,
+        taxCents: tax,
+        totalCents: total,
+        gstDetails: {
+          gstin: process.env.COMPANY_GSTIN ?? "",
+          placeOfSupply: addr.state ?? "Jammu and Kashmir",
+          taxType: "intra",
+          cgstCents: half,
+          sgstCents: half,
+          igstCents: 0,
+          hsn: "21069099",
+          lineItems: order.items.map((item) => ({
+            description: item.productName,
+            qty: item.quantity,
+            rateCents: item.unitPriceCents,
+            amountCents: item.quantity * item.unitPriceCents,
+            hsn: "21069099"
+          }))
+        }
       }
+    });
+
+    await recordOrderEvent({
+      orderId: order.id,
+      type: "invoice_generated",
+      title: "GST invoice generated",
+      detail: invoice.invoiceNumber,
+      metadata: { invoiceId: invoice.id }
+    });
+
+    return { created: true, invoiceId: invoice.id, invoiceNumber: invoice.invoiceNumber };
+  } catch (err) {
+    // Unique constraint race — another writer won; return theirs.
+    const raced = await db.invoice.findUnique({ where: { orderId } });
+    if (raced) {
+      return { created: false, invoiceId: raced.id, invoiceNumber: raced.invoiceNumber };
     }
-  });
-
-  await recordOrderEvent({
-    orderId: order.id,
-    type: "invoice_generated",
-    title: "GST invoice generated",
-    detail: invoice.invoiceNumber,
-    metadata: { invoiceId: invoice.id }
-  });
-
-  return { created: true, invoiceId: invoice.id, invoiceNumber: invoice.invoiceNumber };
+    throw err;
+  }
 }
 
 export async function runPaidOrderAutomation(orderId: string, source: string) {
@@ -139,30 +147,54 @@ export async function runPaidOrderAutomation(orderId: string, source: string) {
 }
 
 export async function notifyCustomerShipped(orderId: string) {
-  const order = await db.order.findUnique({ where: { id: orderId } });
+  const order = await db.order.findUnique({
+    where: { id: orderId },
+    include: {
+      items: {
+        include: {
+          product: { select: { imageUrl: true, sizeLabel: true } }
+        }
+      },
+      invoices: { orderBy: { issuedAt: "desc" }, take: 1 }
+    }
+  });
   if (!order?.customerEmail) return false;
 
-  const tracking =
-    order.trackingNumber && order.carrier
-      ? `Carrier: ${order.carrier}\nTracking: ${order.trackingNumber}`
-      : order.trackingNumber
-        ? `Tracking: ${order.trackingNumber}`
-        : "Tracking details will follow shortly.";
+  const { buildOrderShippedMail } = await import("@/lib/email/transactional");
+  const { sendTransactionalMail } = await import("@/lib/admin/mail");
 
-  const ok = await sendAdminMail({
-    to: order.customerEmail,
-    subject: `Your Cashmir Biotech order ${order.orderNumber} has shipped`,
-    text: [
-      `Hi ${order.customerName ?? "there"},`,
-      "",
-      `Good news — order ${order.orderNumber} is on its way.`,
-      tracking,
-      "",
-      `Questions? Write to ${SITE_CONTACT.supportEmail}`,
-      "",
-      "— Cashmir Biotech"
-    ].join("\n")
+  const addr = (order.shippingAddress ?? null) as {
+    fullName?: string;
+    line1?: string;
+    line2?: string;
+    city?: string;
+    state?: string;
+    postalCode?: string;
+    phone?: string;
+  } | null;
+
+  const mail = buildOrderShippedMail({
+    customerName: order.customerName,
+    orderNumber: order.orderNumber,
+    confirmationToken: order.confirmationToken,
+    carrier: order.carrier || null,
+    trackingNumber: order.trackingNumber || null,
+    items: order.items.map((i) => ({
+      productName: i.productName,
+      quantity: i.quantity,
+      unitPriceCents: i.unitPriceCents,
+      imageUrl: i.product?.imageUrl,
+      sizeLabel: i.product?.sizeLabel
+    })),
+    shippingAddress: addr,
+    subtotalCents: order.subtotalCents,
+    shippingCents: order.shippingCents,
+    discountCents: order.discountCents ?? 0,
+    totalCents: order.totalCents,
+    invoicePdfUrl: order.invoices[0]?.pdfUrl || null
   });
+
+  const ok = await sendTransactionalMail({ to: order.customerEmail, mail });
 
   await recordOrderEvent({
     orderId,
@@ -222,7 +254,7 @@ export function buildOrderTimeline(
     });
   }
 
-  if (["paid", "processing", "shipped", "delivered"].includes(order.status) || order.stockDeducted) {
+  if ((ACTIVE_ORDER_STATUSES as readonly string[]).includes(order.status) || order.stockDeducted) {
     synthetic.push({
       id: "syn-paid",
       at: order.updatedAt,
@@ -266,15 +298,28 @@ export function buildOrderTimeline(
     });
   }
 
+  if (["cancelled", "payment_failed", "refunded"].includes(order.status)) {
+    synthetic.push({
+      id: `syn-${order.status}`,
+      at: order.updatedAt,
+      type: order.status,
+      title: order.status === "cancelled" ? "Order Cancelled" : order.status === "payment_failed" ? "Payment Failed" : "Order Refunded",
+      detail: order.status,
+      actorEmail: ""
+    });
+  }
+
   return synthetic.sort((a, b) => a.at.getTime() - b.at.getTime());
 }
+
+export const ACTIVE_ORDER_STATUSES = ["paid", "processing", "shipped", "delivered"] as const;
 
 export async function getCustomerOrderStats(email: string | null | undefined) {
   if (!email) return null;
   const orders = await db.order.findMany({
     where: {
       customerEmail: email,
-      status: { in: ["paid", "processing", "shipped", "delivered"] }
+      status: { in: [...ACTIVE_ORDER_STATUSES] }
     },
     select: { totalCents: true, createdAt: true, orderNumber: true, id: true },
     orderBy: { createdAt: "desc" }

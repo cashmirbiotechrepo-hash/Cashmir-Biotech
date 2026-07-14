@@ -51,6 +51,34 @@ export default async function ToolPage({ params }: { params: Promise<{ slug: str
         </h1>
         <Reveal delay={0.1}>
           <p className="mt-6 max-w-2xl text-[15px] leading-relaxed text-ink-mute">{tool.blurb}</p>
+          <p className="mt-3 max-w-2xl text-[14px] leading-relaxed text-ink-soft">
+            <span className="font-medium text-ink">When to use: </span>
+            {tool.whenToUse}
+          </p>
+          <dl className="mt-5 flex flex-wrap gap-x-6 gap-y-2 font-mono text-[10px] uppercase tracking-[0.12em] text-ink-faint">
+            <div>
+              <dt className="inline text-ink-faint">Level </dt>
+              <dd className="inline text-ink-mute">
+                {tool.difficulty === "beginner"
+                  ? "Beginner"
+                  : tool.difficulty === "intermediate"
+                    ? "Intermediate"
+                    : "Advanced"}
+              </dd>
+            </div>
+            <div>
+              <dt className="inline">Input </dt>
+              <dd className="inline text-ink-mute">{tool.input}</dd>
+            </div>
+            <div>
+              <dt className="inline">Output </dt>
+              <dd className="inline text-ink-mute">{tool.output}</dd>
+            </div>
+            <div>
+              <dt className="inline">Runtime </dt>
+              <dd className="inline text-ink-mute">{tool.runtime}</dd>
+            </div>
+          </dl>
         </Reveal>
         <div className="hairline-x mt-12 h-px w-full" />
       </header>

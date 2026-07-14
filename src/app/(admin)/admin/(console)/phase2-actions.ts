@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { getCurrentAdmin, requireAdminSession } from "@/lib/auth";
-import { DESTRUCTIVE_ROLES, hasAdminRole } from "@/lib/admin/rbac";
+import { DESTRUCTIVE_ROLES, hasAdminRole, OPERATIONS_ROLES } from "@/lib/admin/rbac";
 import { sendAdminMail } from "@/lib/admin/mail";
 import { db } from "@/lib/db";
 import { logger } from "@/lib/logger";
@@ -249,6 +249,9 @@ export async function saveDealAction(formData: FormData): Promise<ActionState> {
 
 export async function saveCouponAction(formData: FormData): Promise<ActionState> {
   const admin = await requireAdminSession();
+  if (!hasAdminRole(admin.role, OPERATIONS_ROLES)) {
+    return { error: "Insufficient permissions for coupon management." };
+  }
   const raw = fields(formData);
   const parsed = couponSchema.safeParse({
     ...raw,
@@ -311,6 +314,7 @@ export async function deleteCouponAction(formData: FormData): Promise<void> {
 
 export async function toggleCouponAction(formData: FormData): Promise<void> {
   const admin = await requireAdminSession();
+  if (!hasAdminRole(admin.role, OPERATIONS_ROLES)) return;
   const id = String(formData.get("id") ?? "");
   const active = String(formData.get("active") ?? "") === "true";
   if (!id) return;

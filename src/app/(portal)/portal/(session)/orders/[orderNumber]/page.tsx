@@ -5,7 +5,7 @@ import { requireCustomerSession } from "@/lib/customer/auth";
 import { getCustomerOrderDetail } from "@/lib/customer/portal";
 
 export const metadata: Metadata = {
-  title: "Order detail · Research Portal",
+  title: "Order detail · Customer Portal",
   robots: { index: false, follow: false }
 };
 
@@ -19,19 +19,27 @@ const STATUS_LABEL: Record<string, string> = {
   delivered: "Delivered",
   cancelled: "Cancelled",
   payment_failed: "Payment failed",
-  refunded: "Refunded"
+  refunded: "Refunded",
+  partially_refunded: "Partially refunded"
 };
 
-const PIPELINE = ["Placed", "Paid", "Invoice", "Packed", "Courier", "Out for delivery", "Delivered"] as const;
+const PIPELINE = ["Placed", "Paid", "Preparing", "Shipped", "Delivered"] as const;
 
-function pipelineIndex(status: string, hasInvoice: boolean): number {
-  if (status === "delivered") return 6;
-  if (status === "shipped") return 5;
-  if (status === "processing") return 3;
-  if (["paid", "processing", "shipped", "delivered"].includes(status)) {
-    return hasInvoice ? 2 : 1;
+/** Maps OrderStatus to the customer-facing pipeline step (0-indexed). */
+function pipelineIndex(status: string): number {
+  switch (status) {
+    case "delivered":
+      return 4;
+    case "shipped":
+      return 3;
+    case "processing":
+      return 2;
+    case "paid":
+    case "partially_refunded":
+      return 1;
+    default:
+      return 0;
   }
-  return 0;
 }
 
 export default async function PortalOrderDetailPage({
@@ -45,7 +53,7 @@ export default async function PortalOrderDetailPage({
   if (!detail) notFound();
 
   const { order, timeline } = detail;
-  const activeIdx = pipelineIndex(order.status, order.invoices.length > 0);
+  const activeIdx = pipelineIndex(order.status);
 
   return (
     <div className="space-y-12">
@@ -62,6 +70,16 @@ export default async function PortalOrderDetailPage({
         <p className="mt-2 font-mono text-[11px] uppercase tracking-[0.16em] text-ink-faint">
           {order.orderNumber} · {STATUS_LABEL[order.status] ?? order.status} · {inr.format(order.totalCents / 100)}
         </p>
+        {(order.refundedCents ?? 0) > 0 ? (
+          <p className="mt-3 rounded-xl border border-ink/10 bg-pearl/50 px-4 py-3 text-sm text-ink-mute" role="status">
+            Refunded so far: {inr.format(order.refundedCents / 100)}
+            {order.status === "partially_refunded"
+              ? ` · Remaining ${inr.format((order.totalCents - order.refundedCents) / 100)}`
+              : order.status === "refunded"
+                ? " · Full refund"
+                : null}
+          </p>
+        ) : null}
       </div>
 
       <section>

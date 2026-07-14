@@ -2,6 +2,7 @@ import type { PublicHomeData } from "@/modules/cms/services/content.service";
 
 export type ProductCard = {
   id: string;
+  slug: string;
   name: string;
   shortBenefit: string;
   description?: string;
@@ -9,6 +10,7 @@ export type ProductCard = {
   sizeLabel: string;
   mrpInr: number;
   imageUrl?: string;
+  featured?: boolean;
 };
 
 export type PatentCard = {
@@ -98,12 +100,14 @@ const DEFAULT_FAQS = [
 const FALLBACK_PRODUCTS: ProductCard[] = [
   {
     id: "magic-food-taxo",
+    slug: "magic-food-taxo-250g",
     name: "Magic Food TaxO",
     shortBenefit: "Nutritional herbal compound for daily vitality",
     category: "Functional Food",
     sizeLabel: "250 g",
     mrpInr: 350,
-    imageUrl: "/products/magic-food-taxo.png"
+    imageUrl: "/products/magic-food-taxo.png",
+    featured: true
   }
 ];
 
@@ -128,13 +132,15 @@ export function buildHomeContent(data: PublicHomeData | null): HomeContent {
     data?.products && data.products.length > 0
       ? data.products.map((p) => ({
           id: p.id,
+          slug: p.slug,
           name: p.name,
           shortBenefit: p.shortBenefit,
           description: p.description,
           category: p.category,
           sizeLabel: p.sizeLabel,
           mrpInr: p.mrpInr,
-          imageUrl: p.imageUrl
+          imageUrl: p.imageUrl,
+          featured: p.featured
         }))
       : FALLBACK_PRODUCTS;
 

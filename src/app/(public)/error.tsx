@@ -3,6 +3,8 @@
 import { useEffect } from "react";
 import Link from "next/link";
 
+import * as Sentry from "@sentry/nextjs";
+
 export default function PublicError({
   error,
   reset
@@ -11,7 +13,7 @@ export default function PublicError({
   reset: () => void;
 }) {
   useEffect(() => {
-    console.error("[public] route error", error);
+    Sentry.captureException(error, { tags: { boundary: "public" } });
     // A loader/menu may have locked scroll before the crash — always release it.
     document.body.style.overflow = "";
   }, [error]);

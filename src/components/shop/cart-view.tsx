@@ -9,7 +9,6 @@ import {
   ArrowRight,
   Beaker,
   Building2,
-  Check,
   Circle,
   FileCheck,
   FlaskConical,

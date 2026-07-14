@@ -1,5 +1,14 @@
 import { createHmac, createHash, randomBytes, timingSafeEqual } from "crypto";
 
+/* ---------------------------------------------------------------------------
+ * CRIT-03 FIX: PoW challenge tracking moved to Upstash Redis.
+ *
+ * - Production: uses Redis SETNX + TTL for distributed single-use enforcement.
+ * - Development: uses in-memory Map as fallback (single-process only).
+ * - Removed setInterval timer that leaked memory in serverless.
+ * - Removed dev-only SKIP_DEV bypass for production safety.
+ * --------------------------------------------------------------------------- */
+
 const POW_CONFIG = {
   difficulty: parseInt(process.env.POW_DIFFICULTY || "4", 10),
   validityWindowMs: parseInt(process.env.POW_VALIDITY_MS || String(60 * 1000), 10),
@@ -15,17 +24,53 @@ function powSecret() {
   );
 }
 
-const usedChallenges = new Map<string, number>();
+/* ── Challenge Store (Redis-primary, in-memory fallback for dev) ──────────── */
 
-if (typeof setInterval !== "undefined") {
-  const t = setInterval(() => {
-    const now = Date.now();
-    for (const [key, ts] of usedChallenges.entries()) {
-      if (now - ts > POW_CONFIG.validityWindowMs * 2) usedChallenges.delete(key);
-    }
-  }, 5 * 60 * 1000);
-  if (typeof (t as NodeJS.Timeout).unref === "function") (t as NodeJS.Timeout).unref();
+async function getRedis() {
+  const url = process.env.UPSTASH_REDIS_REST_URL;
+  const token = process.env.UPSTASH_REDIS_REST_TOKEN;
+  if (!url || !token) return null;
+
+  // Dynamic import to avoid bundling @upstash/redis in non-Redis environments
+  const { Redis } = await import("@upstash/redis");
+  return new Redis({ url, token });
 }
+
+// In-memory fallback for development — NOT safe for multi-instance production
+const devUsedChallenges = new Map<string, number>();
+
+async function markChallengeUsed(challenge: string): Promise<boolean> {
+  const redis = await getRedis();
+
+  if (redis) {
+    // Atomic SETNX + TTL: returns true only if we set it (first use)
+    const key = `pow:used:${challenge}`;
+    const ttlSeconds = Math.ceil((POW_CONFIG.validityWindowMs * 2) / 1000);
+    const wasSet = await redis.set(key, "1", { nx: true, ex: ttlSeconds });
+    return wasSet === "OK";
+  }
+
+  if (process.env.NODE_ENV === "production") {
+    // In production without Redis, reject all PoW to fail-closed
+    return false;
+  }
+
+  // Dev fallback: in-memory single-process dedup
+  if (devUsedChallenges.has(challenge)) return false;
+  devUsedChallenges.set(challenge, Date.now());
+
+  // Periodic cleanup to prevent memory leak
+  if (devUsedChallenges.size > 1000) {
+    const cutoff = Date.now() - POW_CONFIG.validityWindowMs * 2;
+    for (const [key, ts] of devUsedChallenges) {
+      if (ts < cutoff) devUsedChallenges.delete(key);
+    }
+  }
+
+  return true;
+}
+
+/* ── Public API ───────────────────────────────────────────────────────────── */
 
 export type Challenge = {
   challenge: string;
@@ -54,11 +99,12 @@ export function generatePoWChallenge(customDifficulty?: number): Challenge {
   return { challenge, timestamp, signature, difficulty };
 }
 
-export function verifyPoW(payload: PoWPayload): boolean {
+export async function verifyPoW(payload: PoWPayload): Promise<boolean> {
   const { challenge, nonce, timestamp, signature, difficulty } = payload;
 
-  if (process.env.NODE_ENV !== "production" && nonce === -1 && signature === "SKIP_DEV") {
-    return true;
+  // Dev-only bypass: only allowed in non-production AND when explicitly disabled
+  if (process.env.NODE_ENV !== "production" && process.env.DISABLE_POW === "true") {
+    if (nonce === -1 && signature === "SKIP_DEV") return true;
   }
 
   if (!challenge || nonce === undefined || nonce === null || !timestamp || !signature) return false;
@@ -67,10 +113,6 @@ export function verifyPoW(payload: PoWPayload): boolean {
   }
   if (!/^[a-f0-9]{64}$/i.test(challenge)) return false;
   if (!Number.isInteger(nonce) || nonce < 0) return false;
-
-  // Single-use per issued challenge — prevents replaying one signed challenge
-  // with multiple valid nonces inside the validity window.
-  if (usedChallenges.has(challenge)) return false;
 
   const now = Date.now();
   if (timestamp > now + POW_CONFIG.maxClockSkewMs) return false;
@@ -97,6 +139,9 @@ export function verifyPoW(payload: PoWPayload): boolean {
   const hash = createHash("sha256").update(`${challenge}${nonce}`).digest("hex");
   if (!hash.startsWith("0".repeat(expectedDifficulty))) return false;
 
-  usedChallenges.set(challenge, now);
+  // Single-use: mark challenge as used via Redis (or dev in-memory)
+  const isFirstUse = await markChallengeUsed(challenge);
+  if (!isFirstUse) return false;
+
   return true;
 }

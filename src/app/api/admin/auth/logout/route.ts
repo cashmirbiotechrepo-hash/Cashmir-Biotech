@@ -10,7 +10,3 @@ export async function POST() {
   await clearAdminSessionCookies();
   return NextResponse.json({ data: { ok: true } });
 }
-
-export async function GET() {
-  return POST();
-}

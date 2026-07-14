@@ -28,6 +28,7 @@ model Product {
   shortBenefit      String
   description       String
   mrpInr            Int
+  pricePaise        Int?          @default(0)
   sizeLabel         String
   category          String
   imageUrl          String
@@ -44,9 +45,105 @@ model Product {
   updatedAt         DateTime      @updatedAt
   orderItems        OrderItem[]
   inventory         Inventory?
+  certificates      CertificateOfAnalysis[]
   patent            Patent?       @relation(fields: [patentId], references: [id], onDelete: SetNull)
 
   @@index([patentId])
+  @@unique([sku])
+}
+
+/// Catalog taxonomy (string Product.category remains denormalized label for storefront filters).
+model Category {
+  id        String   @id @default(cuid())
+  slug      String   @unique
+  name      String
+  sortOrder Int      @default(0)
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([active, sortOrder])
+}
+
+/// B2B / institutional account (labs, universities).
+model Organization {
+  id           String   @id @default(cuid())
+  name         String
+  gstin        String   @default("")
+  billingEmail String   @default("")
+  active       Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  members      OrganizationMember[]
+  invites      OrganizationInvite[]
+  quotes       Quote[]
+
+  @@index([active])
+}
+
+model OrganizationMember {
+  id             String       @id @default(cuid())
+  organizationId String
+  customerId     String
+  customer       Customer     @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  role           String       @default("buyer")
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  createdAt      DateTime     @default(now())
+
+  @@unique([organizationId, customerId])
+  @@index([customerId])
+}
+
+/// Email invite to join an organisation (multi-seat).
+model OrganizationInvite {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  email          String
+  role           String       @default("buyer")
+  tokenHash      String       @unique
+  invitedBy      String       @default("")
+  expiresAt      DateTime
+  acceptedAt     DateTime?
+  createdAt      DateTime     @default(now())
+
+  @@index([organizationId, email])
+  @@index([email])
+}
+
+model Quote {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  title          String
+  status         String       @default("draft")
+  totalCents     Int          @default(0)
+  notes          String       @default("")
+  poNumber       String       @default("")
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  @@index([organizationId, status])
+}
+
+/// Lot-level Certificate of Analysis for institutional downloads.
+model CertificateOfAnalysis {
+  id        String         @id @default(cuid())
+  productId String
+  product   Product        @relation(fields: [productId], references: [id], onDelete: Cascade)
+  lotId     String?
+  lot       InventoryLot?  @relation(fields: [lotId], references: [id], onDelete: SetNull)
+  lotCode   String
+  title     String
+  fileUrl   String
+  issuedAt  DateTime       @default(now())
+  active    Boolean        @default(true)
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
+
+  @@index([productId, active])
+  @@index([lotCode])
+  @@index([lotId])
 }
 
 enum OrderStatus {
@@ -58,6 +155,7 @@ enum OrderStatus {
   cancelled
   payment_failed
   refunded
+  partially_refunded
 }
 
 model Order {
@@ -69,7 +167,9 @@ model Order {
   subtotalCents   Int         @default(0)
   taxCents        Int         @default(0)
   shippingCents   Int         @default(0)
+  discountCents   Int?        @default(0)
   totalCents      Int         @default(0)
+  couponCode      String?     @default("")
   shippingAddress Json?
   trackingNumber  String      @default("")
   carrier         String      @default("")
@@ -77,10 +177,15 @@ model Order {
   adminNotes      String      @default("")
   stockReserved   Boolean     @default(false)
   stockDeducted   Boolean     @default(false)
-  razorpayOrderId String      @default("")
+  /// Razorpay order id — unique when set; NULL until checkout creates a provider order.
+  razorpayOrderId String?     @unique
   razorpayPaymentId String    @default("")
   customerPhone   String      @default("")
+  /// Cumulative Razorpay refund amount in paise (supports partial refunds).
+  refundedCents   Int         @default(0)
   customerId      String?
+  /// Opaque secret required to view public confirmation / invoice pages.
+  confirmationToken String    @default("")
   createdAt       DateTime    @default(now())
   updatedAt       DateTime    @updatedAt
   items           OrderItem[]
@@ -90,9 +195,9 @@ model Order {
   customer        Customer?   @relation(fields: [customerId], references: [id], onDelete: SetNull)
 
   @@index([status, createdAt])
-  @@index([razorpayOrderId])
   @@index([customerId])
   @@index([customerEmail])
+  @@index([confirmationToken])
 }
 
 model OrderEvent {
@@ -116,10 +221,27 @@ model OrderItem {
   productName    String
   quantity       Int
   unitPriceCents Int
+  /// Comma-joined lot codes allocated at fulfillment (packing / provenance).
+  lotCodes       String  @default("")
   order          Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
   product        Product? @relation(fields: [productId], references: [id], onDelete: SetNull)
+  lotAllocations OrderItemLotAllocation[]
 
   @@index([orderId])
+}
+
+/// FEFO lot draw-down recorded per order line at payment confirmation.
+model OrderItemLotAllocation {
+  id          String       @id @default(cuid())
+  orderItemId String
+  orderItem   OrderItem    @relation(fields: [orderItemId], references: [id], onDelete: Cascade)
+  lotId       String
+  lot         InventoryLot @relation(fields: [lotId], references: [id], onDelete: Restrict)
+  quantity    Int
+  createdAt   DateTime     @default(now())
+
+  @@index([orderItemId])
+  @@index([lotId])
 }
 
 model PaymentEvent {
@@ -157,8 +279,30 @@ model Inventory {
   updatedAt         DateTime               @updatedAt
   product           Product                @relation(fields: [productId], references: [id], onDelete: Cascade)
   transactions      InventoryTransaction[]
+  lots              InventoryLot[]
 
   @@index([sku])
+}
+
+/// Physical lot/batch with expiry — source of truth for packing slip provenance.
+model InventoryLot {
+  id             String                   @id @default(cuid())
+  inventoryId    String
+  inventory      Inventory                @relation(fields: [inventoryId], references: [id], onDelete: Cascade)
+  lotCode        String
+  quantityOnHand Int                      @default(0)
+  manufacturedAt DateTime?
+  expiresAt      DateTime?
+  notes          String                   @default("")
+  active         Boolean                  @default(true)
+  createdAt      DateTime                 @default(now())
+  updatedAt      DateTime                 @updatedAt
+  allocations    OrderItemLotAllocation[]
+  certificates   CertificateOfAnalysis[]
+
+  @@unique([inventoryId, lotCode])
+  @@index([inventoryId, expiresAt])
+  @@index([lotCode])
 }
 
 model InventoryTransaction {
@@ -202,19 +346,26 @@ model MediaAsset {
   altText    String   @default("")
   uploadedBy String?
   createdAt  DateTime @default(now())
+  updatedAt  DateTime @default(now()) @updatedAt
+}
+
+enum BlogPostStatus {
+  draft
+  published
+  archived
 }
 
 model BlogPost {
-  id            String    @id @default(cuid())
-  slug          String    @unique
+  id            String         @id @default(cuid())
+  slug          String         @unique
   title         String
-  excerpt       String    @default("")
-  coverImageUrl String    @default("")
-  body          String    @default("")
-  status        String    @default("draft")
+  excerpt       String         @default("")
+  coverImageUrl String         @default("")
+  body          String         @default("")
+  status        BlogPostStatus @default(draft)
   publishedAt   DateTime?
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
 }
 
 model Patent {
@@ -313,7 +464,8 @@ model Coupon {
 model Invoice {
   id            String   @id @default(cuid())
   invoiceNumber String   @unique
-  orderId       String?
+  /// One invoice per order — uniqueness prevents race duplicates.
+  orderId       String?  @unique
   subtotalCents Int      @default(0)
   taxCents      Int      @default(0)
   totalCents    Int      @default(0)
@@ -321,10 +473,10 @@ model Invoice {
   pdfUrl        String   @default("")
   issuedAt      DateTime @default(now())
   createdAt     DateTime @default(now())
+  updatedAt     DateTime @default(now()) @updatedAt
   order         Order?   @relation(fields: [orderId], references: [id], onDelete: SetNull)
 
   @@index([issuedAt])
-  @@index([orderId])
 }
 
 model Expense {
@@ -337,6 +489,7 @@ model Expense {
   notes       String   @default("")
   incurredAt  DateTime @default(now())
   createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
   @@index([incurredAt])
   @@index([category])
@@ -439,7 +592,7 @@ model AdminRefreshToken {
 model Customer {
   id                  String             @id @default(cuid())
   email               String             @unique
-  passwordHash        String?
+  passwordHash        String?  /// Legacy residue — portal auth is OTP-only; do not use for login.
   name                String?
   phone               String?
   emailVerifiedAt     DateTime?
@@ -452,8 +605,61 @@ model Customer {
   sessions            CustomerSession[]
   otps                CustomerOtp[]
   addresses           CustomerAddress[]
+  supportTickets      SupportTicket[]
+  organizationMembers OrganizationMember[]
+  circleSubscriptions ResearchCircleSubscription[]
+}
 
-  @@index([email])
+/// Research Circle membership plan (annual / multi-month).
+model ResearchCirclePlan {
+  id             String                       @id @default(cuid())
+  slug           String                       @unique
+  name           String
+  description    String                       @default("")
+  priceCents     Int
+  intervalMonths Int                          @default(12)
+  benefits       String                       @default("")
+  active         Boolean                      @default(true)
+  createdAt      DateTime                     @default(now())
+  updatedAt      DateTime                     @updatedAt
+  subscriptions  ResearchCircleSubscription[]
+
+  @@index([active])
+}
+
+model ResearchCircleSubscription {
+  id                 String             @id @default(cuid())
+  customerId         String
+  customer           Customer           @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  planId             String
+  plan               ResearchCirclePlan @relation(fields: [planId], references: [id], onDelete: Restrict)
+  status             String             @default("active")
+  currentPeriodStart DateTime
+  currentPeriodEnd   DateTime
+  razorpayPaymentId  String?
+  cancelledAt        DateTime?
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
+
+  @@index([customerId, status])
+  @@index([planId])
+  @@index([currentPeriodEnd])
+}
+
+model SupportTicket {
+  id         String   @id @default(cuid())
+  customerId String
+  customer   Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  orderNumber String  @default("")
+  topic      String
+  subject    String
+  body       String
+  status     String   @default("open")
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([customerId, createdAt])
+  @@index([status, createdAt])
 }
 
 model CustomerSession {

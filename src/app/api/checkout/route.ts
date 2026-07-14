@@ -10,20 +10,21 @@ import {
 } from "@/modules/shop/services/order.service";
 import { createRazorpayOrder, razorpayConfigured, razorpayPublicKey } from "@/lib/payments/razorpay";
 
+import { featureEnabled } from "@/lib/feature-flags";
+
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 /** Dev/test only: complete orders without opening Razorpay. */
 function checkoutSkipPaymentEnabled() {
-  if (process.env.CHECKOUT_SKIP_PAYMENT !== "true") return false;
-  // Refuse in production unless an explicit second flag is set.
-  if (
-    process.env.NODE_ENV === "production" &&
-    process.env.ALLOW_CHECKOUT_SKIP_IN_PRODUCTION !== "true"
-  ) {
-    return false;
+  const enabled = featureEnabled("checkout_skip_payment");
+  if (enabled && process.env.NODE_ENV === "production") {
+    logger.error(
+      { event: "checkout_skip_payment_enabled_in_production" },
+      "CRITICAL: CHECKOUT_SKIP_PAYMENT is enabled in production — disable before real traffic"
+    );
   }
-  return true;
+  return enabled;
 }
 
 const checkoutSchema = z.object({
@@ -46,7 +47,8 @@ const checkoutSchema = z.object({
     state: z.string().trim().min(2).max(100),
     postalCode: z.string().trim().min(3).max(20),
     country: z.string().trim().min(2).max(100).optional().default("India")
-  })
+  }),
+  couponCode: z.string().trim().max(50).optional()
 });
 
 export async function POST(request: Request) {
@@ -71,7 +73,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: false, error: "Please check your cart and address details." }, { status: 422 });
   }
 
-  const priced = await priceCart(parsed.data.items);
+  const priced = await priceCart(parsed.data.items, parsed.data.couponCode);
   if (!priced.ok) {
     return NextResponse.json({ ok: false, error: priced.error }, { status: 409 });
   }
@@ -103,6 +105,7 @@ export async function POST(request: Request) {
       skipPayment: true,
       orderId: created.orderId,
       orderNumber: created.orderNumber,
+      confirmationToken: created.confirmationToken,
       amountCents: priced.cart.totalCents,
       currency: "INR",
       cart: priced.cart,
@@ -121,12 +124,16 @@ export async function POST(request: Request) {
       notes: { orderId: created.orderId, orderNumber: created.orderNumber }
     });
 
-    await db.order.update({ where: { id: created.orderId }, data: { razorpayOrderId: rzpOrder.id } });
+    await db.order.update({
+      where: { id: created.orderId },
+      data: { razorpayOrderId: rzpOrder.id }
+    });
 
     return NextResponse.json({
       ok: true,
       orderId: created.orderId,
       orderNumber: created.orderNumber,
+      confirmationToken: created.confirmationToken,
       razorpayOrderId: rzpOrder.id,
       amountCents: priced.cart.totalCents,
       currency: "INR",
@@ -140,7 +147,7 @@ export async function POST(request: Request) {
     });
   } catch (error) {
     logger.error({ err: error, event: "checkout_razorpay_failed", orderId: created.orderId }, "checkout failed");
-    await markOrderFailed({ orderId: created.orderId, source: "verify" }).catch(() => undefined);
+    await markOrderFailed({ orderId: created.orderId, source: "checkout" }).catch(() => undefined);
     return NextResponse.json({ ok: false, error: "Could not start payment. Please try again." }, { status: 502 });
   }
 }

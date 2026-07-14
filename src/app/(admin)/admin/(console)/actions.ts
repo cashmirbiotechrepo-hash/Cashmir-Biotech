@@ -1,9 +1,10 @@
 "use server";
 
+import { randomBytes } from "crypto";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { getCurrentAdmin, requireAdminSession } from "@/lib/auth";
-import { DESTRUCTIVE_ROLES, hasAdminRole } from "@/lib/admin/rbac";
+import { DESTRUCTIVE_ROLES, OPERATIONS_ROLES, hasAdminRole } from "@/lib/admin/rbac";
 import {
   initializeInventory,
   reconcileFromProductForm,
@@ -48,7 +49,7 @@ function slugify(value: string) {
 async function uniqueProductSlug(name: string) {
   const base = slugify(name);
   const existing = await db.product.findUnique({ where: { slug: base } });
-  return existing ? `${base}-${Math.random().toString(36).slice(2, 6)}` : base;
+  return existing ? `${base}-${randomBytes(3).toString("hex")}` : base;
 }
 
 /** Compresses a string into an uppercase alphanumeric code of a fixed length (padded with X). */
@@ -62,7 +63,7 @@ async function generateUniqueSku(name: string, category: string) {
   const cat = skuSegment(category || "GEN", 3);
   const nm = skuSegment(name || "PRD", 3);
   for (let attempt = 0; attempt < 8; attempt++) {
-    const rand = Math.random().toString(36).slice(2, 6).toUpperCase().padEnd(4, "0");
+    const rand = randomBytes(2).toString("hex").toUpperCase();
     const sku = `CB-${cat}-${nm}-${rand}`;
     const clash = await db.product.findFirst({ where: { sku }, select: { id: true } });
     if (!clash) return sku;
@@ -333,7 +334,17 @@ export async function deleteTeamMemberAction(formData: FormData): Promise<Action
 
 const orderStatusSchema = z.object({
   id: z.string().min(1),
-  status: z.enum(["pending", "paid", "processing", "shipped", "delivered", "cancelled", "payment_failed", "refunded"])
+  status: z.enum([
+    "pending",
+    "paid",
+    "processing",
+    "shipped",
+    "delivered",
+    "cancelled",
+    "payment_failed",
+    "refunded",
+    "partially_refunded"
+  ])
 });
 
 export async function moveTeamMemberAction(formData: FormData): Promise<void> {
@@ -370,6 +381,9 @@ export async function moveTeamMemberAction(formData: FormData): Promise<void> {
 
 export async function updateOrderStatusAction(formData: FormData): Promise<ActionState> {
   const admin = await requireAdminSession();
+  if (!hasAdminRole(admin.role, OPERATIONS_ROLES)) {
+    return { error: "You do not have permission to update orders." };
+  }
   const parsed = orderStatusSchema.safeParse(fields(formData));
   if (!parsed.success) {
     return { error: "Invalid order status." };
@@ -382,11 +396,24 @@ export async function updateOrderStatusAction(formData: FormData): Promise<Actio
     if (!order) return { error: "Order not found." };
 
     const newStatus = parsed.data.status;
+    const { canTransition } = await import("@/lib/admin/order-workflow");
+    if (!canTransition(order.status, newStatus)) {
+      return {
+        error: `Cannot move from ${order.status} to ${newStatus}. Use the allowed next step only.`
+      };
+    }
+
     const lines = order.items.map((i) => ({
       productId: i.productId,
       quantity: i.quantity,
       productName: i.productName
     }));
+
+    // Start packing → ensure GST invoice exists before warehouse work continues
+    if (newStatus === "processing" && order.status !== "processing") {
+      const { ensureInvoiceForOrder } = await import("@/modules/shop/services/order-ops.service");
+      await ensureInvoiceForOrder(order.id).catch(() => undefined);
+    }
 
     let stockDeducted = order.stockDeducted;
     let stockReserved = order.stockReserved;
@@ -436,7 +463,18 @@ export async function updateOrderStatusAction(formData: FormData): Promise<Actio
     await recordOrderEvent({
       orderId: order.id,
       type: "status_changed",
-      title: `Status → ${newStatus}`,
+      title:
+        newStatus === "processing"
+          ? "Packing started"
+          : newStatus === "shipped"
+            ? "Order dispatched"
+            : newStatus === "delivered"
+              ? "Order delivered"
+              : newStatus === "cancelled"
+                ? "Order cancelled"
+                : newStatus === "paid"
+                  ? "Marked paid"
+                  : `Status → ${newStatus}`,
       detail: order.status !== newStatus ? `Was ${order.status}` : "",
       actorEmail: String(admin.email),
       metadata: { from: order.status, to: newStatus }
@@ -466,6 +504,9 @@ const orderFulfillmentSchema = z.object({
 
 export async function updateOrderFulfillmentAction(formData: FormData): Promise<ActionState> {
   const admin = await requireAdminSession();
+  if (!hasAdminRole(admin.role, OPERATIONS_ROLES)) {
+    return { error: "You do not have permission to update fulfillment." };
+  }
   const parsed = orderFulfillmentSchema.safeParse(fields(formData));
   if (!parsed.success) {
     return { error: "Invalid fulfillment details." };

@@ -99,11 +99,7 @@ export class AdminAuthService {
         where: { id: user.id },
         data: { failedLoginAttempts: attempts }
       });
-      const remaining = MAX_FAILED_ATTEMPTS - attempts;
-      throw new AdminAuthError(
-        `Invalid email or password. ${remaining} attempt(s) remaining.`,
-        "INVALID_CREDENTIALS"
-      );
+      throw new AdminAuthError("Invalid email or password.", "INVALID_CREDENTIALS");
     }
 
     // Upgrade legacy bcrypt (no pepper) to peppered hash
@@ -196,6 +192,8 @@ export class AdminAuthService {
       where: { sessionId, revoked: false },
       data: { revoked: true }
     });
+    const { markSessionRevokedEdge } = await import("@/lib/session-revoke-edge");
+    await markSessionRevokedEdge(sessionId).catch(() => undefined);
     if (userEmail) {
       await writeAuditLog({
         userEmail,

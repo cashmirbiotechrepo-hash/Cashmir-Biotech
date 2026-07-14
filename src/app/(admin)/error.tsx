@@ -3,6 +3,8 @@
 import { useEffect } from "react";
 import Link from "next/link";
 
+import * as Sentry from "@sentry/nextjs";
+
 export default function AdminError({
   error,
   reset
@@ -11,7 +13,7 @@ export default function AdminError({
   reset: () => void;
 }) {
   useEffect(() => {
-    console.error("[admin] route error", error);
+    Sentry.captureException(error, { tags: { boundary: "admin" } });
     document.body.style.overflow = "";
   }, [error]);
 

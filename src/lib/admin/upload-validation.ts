@@ -1,6 +1,6 @@
 import "server-only";
 
-/** Sniff image magic bytes — do not trust client Content-Type alone. */
+/** Sniff file magic bytes — do not trust client Content-Type alone. */
 export function detectImageType(buffer: Buffer): "png" | "jpg" | "webp" | "gif" | "avif" | null {
   if (buffer.length < 12) return null;
 
@@ -53,4 +53,8 @@ export function detectImageType(buffer: Buffer): "png" | "jpg" | "webp" | "gif" 
   }
 
   return null;
+}
+
+export function detectPdf(buffer: Buffer): boolean {
+  return buffer.length >= 5 && buffer.subarray(0, 5).toString("ascii") === "%PDF-";
 }

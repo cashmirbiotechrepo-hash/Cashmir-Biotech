@@ -223,41 +223,8 @@ export default async function BlogPage() {
           </Reveal>
         ) : (
           <Reveal y={20}>
-            <div className="mt-4 grid gap-8 border-t border-ink/15 pt-8 md:grid-cols-[1.15fr_0.85fr]">
-              <div>
-                <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-ink-faint">
-                  Notebook 001 · In draft
-                </p>
-                <h2 className="mt-2 text-[clamp(1.5rem,3vw,2.25rem)] font-light leading-snug tracking-tight text-ink">
-                  How we isolate Syringaresinol
-                </h2>
-                <p className="mt-4 max-w-lg text-[14px] leading-relaxed text-ink-mute">
-                  A working note on phytochemical isolation from Himalayan flora — method, failed
-                  batches, and what the assay finally confirmed. Manuscript expected with the Q4
-                  pipeline.
-                </p>
-                <p className="mt-6 font-mono text-[10px] uppercase tracking-[0.14em] text-gold">
-                  8 min · Coming soon
-                </p>
-              </div>
-              <div className="flex flex-col justify-between border-l border-ink/8 pl-0 md:pl-8">
-                <div>
-                  <p className="font-mono text-[9px] uppercase tracking-[0.14em] text-ink-faint">Linked IP</p>
-                  <p className="mt-2 text-[14px] font-light text-ink">
-                    {commentary[0]?.patentCode ?? "IN-582752"}
-                  </p>
-                  <p className="mt-1 text-[12px] text-ink-mute line-clamp-2">
-                    {commentary[0]?.title ?? "Syringaresinol formulation"}
-                  </p>
-                </div>
-                <Link
-                  href="/patents"
-                  className="mt-6 inline-flex items-center gap-1 text-[13px] text-ink underline-offset-4 hover:underline"
-                >
-                  View in registry
-                  <ArrowUpRight className="h-3.5 w-3.5" />
-                </Link>
-              </div>
+            <div className="mt-4 border-t border-ink/15 pt-8">
+              <p className="text-[14px] font-light text-ink-mute">The first manuscript is currently being drafted.</p>
             </div>
           </Reveal>
         )}

@@ -1,26 +1,41 @@
 import { NextResponse } from "next/server";
+import { timingSafeEqual } from "crypto";
 import { releaseStalePendingOrders } from "@/modules/shop/services/order.service";
 import { logger } from "@/lib/logger";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+export const maxDuration = 60;
+
+function safeCompareSecrets(provided: string, expected: string): boolean {
+  const a = Buffer.from(provided);
+  const b = Buffer.from(expected);
+  if (a.length !== b.length) return false;
+  return timingSafeEqual(a, b);
+}
+
+function authorizeCron(request: Request): boolean {
+  const expected = process.env.CRON_SECRET;
+  if (!expected) return false;
+  const auth = request.headers.get("authorization");
+  const bearer = auth?.startsWith("Bearer ") ? auth.slice(7) : null;
+  if (process.env.NODE_ENV === "production") {
+    return Boolean(bearer && safeCompareSecrets(bearer, expected));
+  }
+  const urlSecret = new URL(request.url).searchParams.get("secret");
+  const provided = bearer ?? urlSecret;
+  return Boolean(provided && safeCompareSecrets(provided, expected));
+}
 
 /**
  * Sweep abandoned checkouts and free reserved stock.
- * Secure with CRON_SECRET (Authorization: Bearer <secret> or ?secret=).
- * Schedule via Vercel Cron / external scheduler every 15–30 minutes.
+ * Auth: Authorization: Bearer <CRON_SECRET>
  */
 export async function GET(request: Request) {
-  const expected = process.env.CRON_SECRET;
-  if (!expected) {
+  if (!process.env.CRON_SECRET) {
     return NextResponse.json({ ok: false, error: "CRON_SECRET is not configured." }, { status: 503 });
   }
-
-  const auth = request.headers.get("authorization");
-  const bearer = auth?.startsWith("Bearer ") ? auth.slice(7) : null;
-  const urlSecret = new URL(request.url).searchParams.get("secret");
-  const provided = bearer ?? urlSecret;
-  if (provided !== expected) {
+  if (!authorizeCron(request)) {
     return NextResponse.json({ ok: false, error: "Unauthorized." }, { status: 401 });
   }
 

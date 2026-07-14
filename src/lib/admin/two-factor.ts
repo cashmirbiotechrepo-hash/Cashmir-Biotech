@@ -3,7 +3,6 @@ import { createHash, randomInt } from "crypto";
 import { timingSafeEqual } from "crypto";
 import { db } from "@/lib/db";
 import { logger } from "@/lib/logger";
-import { sendAdminMail } from "@/lib/admin/mail";
 import { AdminPasswordService } from "@/lib/admin/password";
 
 const CODE_EXPIRY_MS = 10 * 60 * 1000;
@@ -47,10 +46,11 @@ export async function generateAdminTwoFactorCode(email: string): Promise<TwoFact
     process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS;
 
   if (smtpReady) {
-    const sent = await sendAdminMail({
+    const { sendOtpMail } = await import("@/lib/admin/mail");
+    const sent = await sendOtpMail({
       to: normalized,
-      subject: "Cashmir Biotech — Admin sign-in code",
-      text: `Your verification code is ${code}. It expires in 10 minutes.\n\nIf you did not request this, ignore this email.`
+      kind: "admin_2fa",
+      code
     });
     if (!sent) return { ok: false, reason: "email_failed" };
     return { ok: true, reason: "sent" };

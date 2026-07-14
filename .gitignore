@@ -18,6 +18,11 @@ MCP.json
 npm-debug.log*
 .DS_Store
 
+# Playwright
+test-results/
+playwright-report/
+playwright/.cache/
+
 # IDE
 .idea
 .vscode/*
@@ -31,3 +36,4 @@ npm-debug.log*
 
 # admin uploads (user-generated, served from /public/uploads)
 /public/uploads
+/public/invoices

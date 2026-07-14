@@ -3,6 +3,7 @@ import { PageHeader } from "@/components/ui/page-header";
 import { Reveal } from "@/components/ui/reveal";
 import { LuxeButton } from "@/components/ui/luxe-button";
 import { SITE_CONTACT } from "@/lib/site-contact";
+import { ContactForm } from "@/components/contact/contact-form";
 
 export const revalidate = 3600;
 
@@ -24,6 +25,10 @@ export default function ContactPage() {
       <section className="frame grid grid-cols-1 gap-12 lg:grid-cols-2">
         <div className="space-y-8">
           <Reveal>
+            <ContactForm />
+          </Reveal>
+
+          <Reveal delay={0.08}>
             <div className="rounded-2xl border border-ink/10 bg-paper/70 p-8 shadow-glass">
               <p className="technical mb-5">Email</p>
               <ul className="space-y-3">
@@ -47,7 +52,7 @@ export default function ContactPage() {
             </div>
           </Reveal>
 
-          <Reveal delay={0.08}>
+          <Reveal delay={0.12}>
             <div className="rounded-2xl border border-ink/10 bg-paper/70 p-8 shadow-glass">
               <p className="technical mb-5">Phone</p>
               <a
@@ -60,7 +65,7 @@ export default function ContactPage() {
             </div>
           </Reveal>
 
-          <Reveal delay={0.12}>
+          <Reveal delay={0.16}>
             <LuxeButton href={SITE_CONTACT.mapsUrl}>Open in Google Maps</LuxeButton>
           </Reveal>
         </div>

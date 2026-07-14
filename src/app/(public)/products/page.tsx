@@ -15,10 +15,9 @@ import { SITE_CONTACT } from "@/lib/site-contact";
 import { ShopCountUp } from "@/components/shop/shop-count-up";
 import { ShopFaq } from "@/components/shop/shop-faq";
 import {
-  ShopComingSoonCard,
-  ShopEducationCard,
-  ShopProductCard
+  ShopComingSoonCard
 } from "@/components/shop/shop-product-card";
+import { ShopCatalog } from "@/components/shop/shop-catalog";
 
 export const revalidate = 3600;
 
@@ -88,10 +87,6 @@ const SHOP_FAQS = [
     a: "The public patents registry lists codes and jurisdictions. Linked formulas also show them on the product page."
   }
 ] as const;
-
-function categorySlug(name: string) {
-  return name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
-}
 
 function formatPostDate(d: Date | null) {
   if (!d) return "";
@@ -247,88 +242,11 @@ export default async function ProductsPage() {
             </div>
           </Reveal>
         ) : (
-          <>
-            {featured ? (
-              <Reveal y={24}>
-                <div className="mb-3 flex items-baseline justify-between gap-4">
-                  <p className="technical !text-ink-soft">Flagship formulation</p>
-                  {featured.patent?.patentCode ? (
-                    <p className="font-mono text-[10px] text-ink-soft">{featured.patent.patentCode}</p>
-                  ) : null}
-                </div>
-                <ShopProductCard product={featured} featured />
-              </Reveal>
-            ) : null}
-
-            <div id="formulas" className="mx-auto mt-9 max-w-4xl scroll-mt-28 md:mt-11">
-              <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
-                <div>
-                  <p className="technical mb-0.5 !text-ink-soft">All formulas</p>
-                  <h2 className="text-lg font-light tracking-tight text-ink">The catalog</h2>
-                </div>
-                {categories.length > 0 ? (
-                  <nav aria-label="Product categories" className="flex flex-wrap gap-x-3 gap-y-1">
-                    <a
-                      href="#formulas"
-                      className="font-mono text-[10px] uppercase tracking-[0.14em] text-ink underline-offset-4 hover:underline"
-                    >
-                      All
-                    </a>
-                    {categories.map((cat) => (
-                      <a
-                        key={cat}
-                        href={`#cat-${categorySlug(cat)}`}
-                        className="font-mono text-[10px] uppercase tracking-[0.14em] text-ink-mute underline-offset-4 hover:text-ink hover:underline"
-                      >
-                        {cat}
-                      </a>
-                    ))}
-                  </nav>
-                ) : null}
-              </div>
-
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                {catalog.map((product, i) => (
-                  <Reveal key={product.id} delay={0.04 * (i % 2)} y={24}>
-                    <div id={categories.length > 1 ? `cat-${categorySlug(product.category)}` : undefined}>
-                      <ShopProductCard product={product} />
-                    </div>
-                  </Reveal>
-                ))}
-
-                {/* Fill empty grid slots so thin catalogs don’t abandon half the screen */}
-                {catalog.length === 0 ? (
-                  <>
-                    <Reveal y={24}>
-                      <ShopEducationCard
-                        label="Research kits"
-                        title="Assay-ready fractions"
-                        blurb="Partner kits for labs — next release from the SKUAST-K pipeline."
-                        href="#pipeline"
-                      />
-                    </Reveal>
-                    <Reveal delay={0.05} y={24}>
-                      <ShopEducationCard
-                        label="Evidence"
-                        title="Patent registry"
-                        blurb="Codes, jurisdictions, and summaries for every linked formulation."
-                        href="#registry"
-                      />
-                    </Reveal>
-                  </>
-                ) : catalog.length === 1 ? (
-                  <Reveal delay={0.05} y={24}>
-                    <ShopEducationCard
-                      label="Coming soon"
-                      title="Next formulation"
-                      blurb="Additional molecules are in discovery. Explore the pipeline for readiness."
-                      href="#pipeline"
-                    />
-                  </Reveal>
-                ) : null}
-              </div>
-            </div>
-          </>
+          <ShopCatalog
+            featured={featured}
+            catalog={catalog}
+            categories={categories}
+          />
         )}
       </section>
 

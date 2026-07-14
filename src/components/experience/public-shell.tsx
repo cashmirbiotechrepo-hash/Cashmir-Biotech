@@ -36,18 +36,27 @@ export function PublicShell({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (!isHome) {
       setReady(true);
+      setShowLoader(false);
       return;
     }
-    if (sessionStorage.getItem(INTRO_KEY)) {
-      setShowLoader(false);
-      setReady(true);
+    try {
+      if (sessionStorage.getItem(INTRO_KEY)) {
+        setShowLoader(false);
+        setReady(true);
+      }
+    } catch {
+      // Private mode / blocked storage — still allow the loader; it self-times out.
     }
     // Only evaluated on first mount; client nav to home should not replay it.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const handleLoaderComplete = useCallback(() => {
-    sessionStorage.setItem(INTRO_KEY, "1");
+    try {
+      sessionStorage.setItem(INTRO_KEY, "1");
+    } catch {
+      /* ignore */
+    }
     setShowLoader(false);
     setReady(true);
   }, []);

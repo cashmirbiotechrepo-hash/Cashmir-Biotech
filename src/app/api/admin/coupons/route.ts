@@ -1,16 +1,16 @@
-import { adminErr, adminOk, requireAdminApi } from "@/lib/admin/api";
+import { adminErr, adminOk, requireAdminRole } from "@/lib/admin/api";
 import { db } from "@/lib/db";
 import { couponSchema } from "@/modules/admin/validations/phase2";
 
 export async function GET() {
-  const { error } = await requireAdminApi();
+  const { error } = await requireAdminRole(["owner", "admin"]);
   if (error) return error;
   const coupons = await db.coupon.findMany({ orderBy: { createdAt: "desc" } });
   return adminOk(coupons);
 }
 
 export async function POST(req: Request) {
-  const { error } = await requireAdminApi();
+  const { error } = await requireAdminRole(["owner", "admin"]);
   if (error) return error;
   let body: unknown;
   try {

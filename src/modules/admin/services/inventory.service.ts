@@ -2,7 +2,6 @@ import "server-only";
 import type { Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
 import { logger } from "@/lib/logger";
-import { sendAdminMail } from "@/lib/admin/mail";
 
 type Tx = Prisma.TransactionClient;
 
@@ -48,16 +47,23 @@ async function alertLowStock(snapshot: InventorySnapshot, productName: string) {
     "inventory dropped to/below low-stock threshold"
   );
 
-  const to = process.env.INVENTORY_ALERT_EMAIL || process.env.SMTP_FROM || process.env.SMTP_USER;
+  const to = process.env.INVENTORY_ALERT_EMAIL || process.env.SMTP_USER;
   if (!to) return;
-  await sendAdminMail({
-    to,
-    subject: `Low stock: ${productName}`,
-    text: `${productName} (SKU ${snapshot.sku || "—"}) is at ${available} available, at or below the threshold of ${snapshot.lowStockThreshold}. Consider restocking.`
-  }).catch(() => undefined);
+  const { buildLowStockMail } = await import("@/lib/email/transactional");
+  const { sendTransactionalMail } = await import("@/lib/admin/mail");
+  // Extract mailbox if SMTP_FROM was used previously with display name
+  const toAddr = to.includes("<") ? (to.match(/<([^>]+)>/)?.[1] ?? to) : to;
+  const mail = buildLowStockMail({
+    productName,
+    sku: snapshot.sku,
+    available,
+    threshold: snapshot.lowStockThreshold
+  });
+  await sendTransactionalMail({ to: toAddr, mail }).catch(() => undefined);
 }
 
-/** Applies an on-hand delta (and optional reserved delta), mirrors to Product.stockQty, and appends a transaction row. */
+/** Applies an on-hand delta (and optional reserved delta), mirrors available qty to Product.stockQty, and appends a transaction row.
+ * H9: Inventory is source of truth; Product.stockQty is denormalized (onHand − reserved) for catalog reads. */
 async function applyDelta(
   tx: Tx,
   inventory: InventorySnapshot,
@@ -74,12 +80,13 @@ async function applyDelta(
   const before = inventory.quantityOnHand;
   const after = before + delta;
   const reservedAfter = Math.max(0, inventory.quantityReserved + (opts.reservedDelta ?? 0));
+  const available = Math.max(0, after - reservedAfter);
 
   const updated = await tx.inventory.update({
     where: { id: inventory.id },
     data: { quantityOnHand: after, quantityReserved: reservedAfter }
   });
-  await tx.product.update({ where: { id: inventory.productId }, data: { stockQty: after } });
+  await tx.product.update({ where: { id: inventory.productId }, data: { stockQty: available } });
   await tx.inventoryTransaction.create({
     data: {
       inventoryId: inventory.id,
@@ -137,8 +144,8 @@ export async function initializeInventory(
 }
 
 /** Lazily returns an inventory row, creating one from the product's current stockQty if missing. */
-export async function ensureInventory(productId: string): Promise<InventorySnapshot> {
-  const existing = await db.inventory.findUnique({ where: { productId } });
+export async function ensureInventory(productId: string, client: Tx | typeof db = db): Promise<InventorySnapshot> {
+  const existing = await client.inventory.findUnique({ where: { productId } });
   if (existing) {
     return {
       id: existing.id,
@@ -149,17 +156,16 @@ export async function ensureInventory(productId: string): Promise<InventorySnaps
       lowStockThreshold: existing.lowStockThreshold
     };
   }
-  const product = await db.product.findUnique({ where: { id: productId } });
+  const product = await client.product.findUnique({ where: { id: productId } });
   if (!product) throw new Error(`Product ${productId} not found`);
 
-  const created = await db.$transaction(async (tx) =>
-    initializeInventory(tx, {
-      productId: product.id,
-      sku: product.sku,
-      quantity: product.stockQty,
-      threshold: product.lowStockThreshold
-    })
-  );
+  // Nested create when already inside an interactive tx: use the same client.
+  const created = await initializeInventory(client as Tx, {
+    productId: product.id,
+    sku: product.sku,
+    quantity: product.stockQty,
+    threshold: product.lowStockThreshold
+  });
   return {
     id: created.id,
     productId: created.productId,
@@ -223,6 +229,7 @@ export async function adjustStockManually(input: {
  * Deducts physical stock for a confirmed order. Idempotency is enforced by the caller (Order.stockDeducted).
  * When `releaseReserved` is set, the matching reservation created at checkout is also drawn down so a
  * reserved unit is not double-counted after it becomes an actual deduction.
+ * Also allocates FEFO InventoryLot rows onto each OrderItem (true lot provenance) before aggregate deduct.
  */
 export async function deductStockForOrder(input: {
   orderId: string;
@@ -230,18 +237,33 @@ export async function deductStockForOrder(input: {
   releaseReserved?: boolean;
   createdBy?: string | null;
 }) {
+  const { allocateLotsForFulfillment } = await import("@/modules/admin/services/inventory-lots.service");
   const trackable = await filterTrackable(input.lines);
+  const orderItems = await db.orderItem.findMany({ where: { orderId: input.orderId } });
+
   for (const line of trackable) {
     const snapshot = await ensureInventory(line.productId);
-    const result = await db.$transaction((tx) =>
-      applyDelta(tx, snapshot, -line.quantity, "order_confirmed", {
+    const result = await db.$transaction(async (tx) => {
+      const matching = orderItems.filter((i) => i.productId === line.productId);
+      let qtyLeft = line.quantity;
+      for (const item of matching) {
+        if (qtyLeft <= 0) break;
+        const take = Math.min(item.quantity, qtyLeft);
+        await allocateLotsForFulfillment(
+          { productId: line.productId, orderItemId: item.id, quantity: take },
+          tx
+        );
+        qtyLeft -= take;
+      }
+
+      return applyDelta(tx, snapshot, -line.quantity, "order_confirmed", {
         referenceType: "order",
         referenceId: input.orderId,
         note: `Order fulfillment`,
         createdBy: input.createdBy,
         reservedDelta: input.releaseReserved ? -line.quantity : 0
-      })
-    );
+      });
+    });
     await alertLowStock(result, line.productName ?? "Product");
   }
 }
@@ -253,17 +275,23 @@ export async function restoreStockForOrder(input: {
   changeType?: Extract<InventoryChangeType, "order_cancelled" | "order_returned">;
   createdBy?: string | null;
 }) {
+  const { restoreLotsForOrderItem } = await import("@/modules/admin/services/inventory-lots.service");
   const trackable = await filterTrackable(input.lines);
+  const orderItems = await db.orderItem.findMany({ where: { orderId: input.orderId } });
+
   for (const line of trackable) {
     const snapshot = await ensureInventory(line.productId);
-    await db.$transaction((tx) =>
-      applyDelta(tx, snapshot, line.quantity, input.changeType ?? "order_cancelled", {
+    await db.$transaction(async (tx) => {
+      await applyDelta(tx, snapshot, line.quantity, input.changeType ?? "order_cancelled", {
         referenceType: "order",
         referenceId: input.orderId,
         note: `Stock returned from order`,
         createdBy: input.createdBy
-      })
-    );
+      });
+      for (const item of orderItems.filter((i) => i.productId === line.productId)) {
+        await restoreLotsForOrderItem(item.id, tx);
+      }
+    });
   }
 }
 
@@ -311,27 +339,33 @@ export async function releaseStock(input: { productId: string; quantity: number 
 export async function reserveStockForOrder(input: {
   orderId: string;
   lines: StockLine[];
+  /** When provided, reservations participate in the caller's interactive transaction. */
+  tx?: Tx;
 }): Promise<{ ok: true } | { ok: false; error: string }> {
-  const trackable = await filterTrackable(input.lines);
+  const client = input.tx ?? db;
+  const trackable = await filterTrackable(input.lines, client);
   const reserved: Array<{ productId: string; quantity: number }> = [];
 
   for (const line of trackable) {
-    const snapshot = await ensureInventory(line.productId);
-    const affected = await db.$executeRaw`
+    const snapshot = await ensureInventory(line.productId, client);
+    const affected = await client.$executeRaw`
       UPDATE "Inventory"
       SET "quantityReserved" = "quantityReserved" + ${line.quantity}, "updatedAt" = now()
       WHERE "id" = ${snapshot.id} AND ("quantityOnHand" - "quantityReserved") >= ${line.quantity}`;
 
     if (affected === 0) {
       for (const r of reserved) {
-        await releaseStock(r).catch(() => undefined);
+        await client.$executeRaw`
+          UPDATE "Inventory"
+          SET "quantityReserved" = GREATEST("quantityReserved" - ${r.quantity}, 0), "updatedAt" = now()
+          WHERE "productId" = ${r.productId}`.catch(() => undefined);
       }
       return { ok: false, error: `Not enough stock for ${line.productName ?? "an item"}.` };
     }
 
-    const fresh = await db.inventory.findUnique({ where: { id: snapshot.id } });
+    const fresh = await client.inventory.findUnique({ where: { id: snapshot.id } });
     if (fresh) {
-      await db.inventoryTransaction.create({
+      await client.inventoryTransaction.create({
         data: {
           inventoryId: snapshot.id,
           changeType: "order_placed",
@@ -343,6 +377,11 @@ export async function reserveStockForOrder(input: {
           referenceId: input.orderId,
           note: "Reserved at checkout"
         }
+      });
+      // Keep Product.stockQty = available (H9 denormalized mirror).
+      await client.product.update({
+        where: { id: line.productId },
+        data: { stockQty: Math.max(0, fresh.quantityOnHand - fresh.quantityReserved) }
       });
     }
     reserved.push({ productId: line.productId, quantity: line.quantity });
@@ -373,10 +412,13 @@ export async function getAvailableQuantity(sku: string): Promise<number | null> 
   return inv.quantityOnHand - inv.quantityReserved;
 }
 
-async function filterTrackable(lines: StockLine[]): Promise<Array<StockLine & { productId: string }>> {
+async function filterTrackable(
+  lines: StockLine[],
+  client: Tx | typeof db = db
+): Promise<Array<StockLine & { productId: string }>> {
   const withProduct = lines.filter((l): l is StockLine & { productId: string } => Boolean(l.productId) && l.quantity > 0);
   if (withProduct.length === 0) return [];
-  const products = await db.product.findMany({
+  const products = await client.product.findMany({
     where: { id: { in: withProduct.map((l) => l.productId) }, hasInventoryTracking: true },
     select: { id: true }
   });
@@ -448,25 +490,75 @@ export async function listInventory(params: {
 
   const include = { product: { select: { name: true, imageUrl: true, active: true } } } as const;
 
+  if (params.lowOnly) {
+    const q = params.q?.trim() ? `%${params.q.trim()}%` : null;
+    const skip = (page - 1) * pageSize;
+
+    const rawRows = await db.$queryRaw<
+      {
+        id: string;
+        productId: string;
+        sku: string;
+        quantityOnHand: number;
+        quantityReserved: number;
+        lowStockThreshold: number;
+        updatedAt: Date;
+        productName: string;
+        imageUrl: string;
+        active: boolean;
+      }[]
+    >`
+      SELECT i.*, p.name as "productName", p."imageUrl", p.active
+      FROM "Inventory" i
+      JOIN "Product" p ON p.id = i."productId"
+      WHERE (i."quantityOnHand" - i."quantityReserved") <= i."lowStockThreshold"
+        AND (${q}::text IS NULL OR i.sku ILIKE ${q} OR p.name ILIKE ${q})
+      ORDER BY (i."quantityOnHand" - i."quantityReserved") ASC
+      LIMIT ${pageSize} OFFSET ${skip}
+    `;
+
+    const countRes = await db.$queryRaw<{ count: bigint }[]>`
+      SELECT COUNT(*)::bigint as count
+      FROM "Inventory" i
+      JOIN "Product" p ON p.id = i."productId"
+      WHERE (i."quantityOnHand" - i."quantityReserved") <= i."lowStockThreshold"
+        AND (${q}::text IS NULL OR i.sku ILIKE ${q} OR p.name ILIKE ${q})
+    `;
+
+    const total = Number(countRes[0]?.count ?? 0);
+    const items = rawRows.map((r) => {
+      const available = r.quantityOnHand - r.quantityReserved;
+      return {
+        id: r.id,
+        productId: r.productId,
+        productName: r.productName,
+        sku: r.sku,
+        imageUrl: r.imageUrl,
+        active: r.active,
+        quantityOnHand: r.quantityOnHand,
+        quantityReserved: r.quantityReserved,
+        quantityAvailable: available,
+        lowStockThreshold: r.lowStockThreshold,
+        isLow: available <= r.lowStockThreshold,
+        updatedAt: r.updatedAt
+      };
+    });
+
+    return { items, total };
+  }
+
   const [rows, total] = await Promise.all([
-    params.lowOnly
-      ? db.inventory.findMany({
-          where,
-          include,
-          orderBy: { updatedAt: "desc" },
-          take: 2000
-        })
-      : db.inventory.findMany({
-          where,
-          include,
-          orderBy: { updatedAt: "desc" },
-          skip: (page - 1) * pageSize,
-          take: pageSize
-        }),
+    db.inventory.findMany({
+      where,
+      include,
+      orderBy: { updatedAt: "desc" },
+      skip: (page - 1) * pageSize,
+      take: pageSize
+    }),
     db.inventory.count({ where })
   ]);
 
-  let items = rows.map((r) => {
+  const items = rows.map((r) => {
     const available = r.quantityOnHand - r.quantityReserved;
     return {
       id: r.id,
@@ -483,12 +575,6 @@ export async function listInventory(params: {
       updatedAt: r.updatedAt
     };
   });
-
-  if (params.lowOnly) {
-    items = items.filter((i) => i.isLow);
-    const start = (page - 1) * pageSize;
-    return { items: items.slice(start, start + pageSize), total: items.length };
-  }
 
   return { items, total };
 }

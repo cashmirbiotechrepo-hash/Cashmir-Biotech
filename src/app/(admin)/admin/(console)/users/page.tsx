@@ -1,4 +1,4 @@
-import { redirect } from "next/navigation";
+
 import { UsersModule } from "@/components/admin/users-module";
 import { AdminPageHeader } from "@/components/admin/page-header";
 import { requireAdminRole } from "@/lib/auth";

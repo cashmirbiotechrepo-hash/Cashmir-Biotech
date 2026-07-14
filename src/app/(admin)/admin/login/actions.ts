@@ -3,7 +3,6 @@
 import { redirect } from "next/navigation";
 import { headers } from "next/headers";
 import {
-  clearAdminSessionCookies,
   setAdminSessionCookies
 } from "@/lib/auth";
 import { AdminAuthService, AccountLockedError, AdminAuthError } from "@/lib/admin/auth-service";
@@ -71,13 +70,13 @@ export async function loginAction(formData: FormData): Promise<LoginState> {
 
   if (
     !skipPoW &&
-    !verifyPoW({
+    !(await verifyPoW({
       challenge: powChallenge,
       nonce: powNonce,
       timestamp: powTimestamp,
       signature: powSignature,
       difficulty: powDifficulty
-    })
+    }))
   ) {
     return { error: "Security verification failed. Please refresh and try again." };
   }

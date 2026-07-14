@@ -146,9 +146,19 @@ export function FormStatus({ state }: { state: ActionState }) {
   return null;
 }
 
-export function SaveButton({ pending, label = "Save changes" }: { pending: boolean; label?: string }) {
+export function SaveButton({
+  pending,
+  label = "Save changes",
+  disabled,
+  variant = "default"
+}: {
+  pending: boolean;
+  label?: string;
+  disabled?: boolean;
+  variant?: "default" | "outline" | "destructive" | "secondary" | "ghost" | "link";
+}) {
   return (
-    <Button type="submit" disabled={pending}>
+    <Button type="submit" variant={variant} disabled={pending || disabled}>
       {pending ? "Saving…" : label}
     </Button>
   );

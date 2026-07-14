@@ -13,16 +13,33 @@ export const metadata: Metadata = {
 
 const inr = new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 0 });
 
+function redactEmail(email: string | null | undefined) {
+  if (!email) return "your email";
+  const [user, domain] = email.split("@");
+  if (!user || !domain) return "your email";
+  const visible = user.slice(0, Math.min(2, user.length));
+  return `${visible}***@${domain}`;
+}
+
 export default async function OrderConfirmationPage({
-  params
+  params,
+  searchParams
 }: {
   params: Promise<{ orderNumber: string }>;
+  searchParams: Promise<{ t?: string }>;
 }) {
   const { orderNumber } = await params;
-  const order = await getOrderSummaryByNumber(orderNumber);
+  const { t: token } = await searchParams;
+  if (!token) notFound();
+
+  const order = await getOrderSummaryByNumber(orderNumber, token);
   if (!order) notFound();
 
-  const paid = order.status === "paid" || order.status === "processing" || order.status === "shipped" || order.status === "delivered";
+  const paid =
+    order.status === "paid" ||
+    order.status === "processing" ||
+    order.status === "shipped" ||
+    order.status === "delivered";
 
   return (
     <div className="pb-8">
@@ -54,23 +71,44 @@ export default async function OrderConfirmationPage({
             ) : (
               <div className="mt-5 space-y-4">
                 <p className="text-sm text-ink-mute">
-                  A confirmation has been sent to {order.customerEmail}. We&apos;ll email you again when it ships.
+                  A confirmation has been sent to {redactEmail(order.customerEmail)}. We&apos;ll email you again when
+                  it ships.
                 </p>
                 {order.customerEmail ? (
                   <div className="rounded-xl border border-ink/10 bg-ivory/80 px-5 py-4">
-                    <p className="text-sm font-medium text-ink">Your Research Portal is ready</p>
+                    <p className="text-sm font-medium text-ink">Your Customer Portal is ready</p>
                     <p className="mt-1 text-sm text-ink-mute">
-                      Track this order, download invoices, and revisit every formulation tied to this email —
-                      even past guest checkouts once you verify with a one-time code.
+                      Track this order, download invoices, and revisit every formulation tied to this email — even past
+                      guest checkouts once you verify with a one-time code.
                     </p>
                     <Link
-                      href={`/portal/login?email=${encodeURIComponent(order.customerEmail)}`}
+                      href="/portal/login"
                       className="mt-4 inline-flex items-center gap-2 rounded-full bg-ink px-6 py-3 text-[13px] font-medium text-paper"
                     >
-                      Continue to Research Portal →
+                      Continue to Customer Portal →
                     </Link>
                   </div>
                 ) : null}
+                <div className="flex flex-wrap gap-4">
+                  <a
+                    href={`/api/order/${order.orderNumber}/invoice.pdf?t=${order.confirmationToken}`}
+                    className="inline-flex text-sm text-ink underline-offset-4 hover:underline"
+                  >
+                    Download tax invoice (PDF)
+                  </a>
+                  <a
+                    href={`/api/order/${order.orderNumber}/packing.pdf?t=${order.confirmationToken}`}
+                    className="inline-flex text-sm text-ink underline-offset-4 hover:underline"
+                  >
+                    Packing slip (PDF)
+                  </a>
+                  <Link
+                    href={`/order/${order.orderNumber}/invoice?t=${order.confirmationToken}`}
+                    className="inline-flex text-sm text-ink-mute underline-offset-4 hover:underline"
+                  >
+                    Printable invoice
+                  </Link>
+                </div>
               </div>
             )}
 
@@ -92,7 +130,9 @@ export default async function OrderConfirmationPage({
               </div>
               <div className="flex justify-between">
                 <dt className="text-ink-mute">Shipping</dt>
-                <dd className="text-ink">{order.shippingCents === 0 ? "Free" : inr.format(order.shippingCents / 100)}</dd>
+                <dd className="text-ink">
+                  {order.shippingCents === 0 ? "Free" : inr.format(order.shippingCents / 100)}
+                </dd>
               </div>
               <div className="flex justify-between border-t border-ink/10 pt-2 text-base">
                 <dt className="font-medium text-ink">Total</dt>
@@ -106,7 +146,7 @@ export default async function OrderConfirmationPage({
                   href={`/portal/login?email=${encodeURIComponent(order.customerEmail)}`}
                   className="inline-flex items-center gap-2 rounded-full bg-ink px-7 py-3.5 text-[13px] font-medium text-paper"
                 >
-                  Open Research Portal
+                  Open Customer Portal
                 </Link>
               ) : null}
               <Link

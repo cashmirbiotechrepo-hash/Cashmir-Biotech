@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from "next";
+import { headers } from "next/headers";
 import { Inter, Space_Mono } from "next/font/google";
 import "./globals.css";
 
@@ -33,6 +34,16 @@ export const metadata: Metadata = {
     "precision medicine",
     "Cashmir Biotech"
   ],
+  applicationName: "Cashmir Biotech",
+  icons: {
+    icon: [
+      { url: "/favicon.ico", sizes: "48x48" },
+      { url: "/favicon.svg", type: "image/svg+xml" },
+      { url: "/favicon-96x96.png", sizes: "96x96", type: "image/png" }
+    ],
+    apple: [{ url: "/apple-touch-icon.png", sizes: "180x180", type: "image/png" }]
+  },
+  manifest: "/site.webmanifest",
   openGraph: {
     title: "Cashmir Biotech — Precision Biology from the Himalaya",
     description:
@@ -48,10 +59,12 @@ export const viewport: Viewport = {
   colorScheme: "light"
 };
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  const nonce = (await headers()).get("x-nonce") ?? undefined;
+
   return (
     <html lang="en" suppressHydrationWarning>
-      <body className={`${inter.variable} ${spaceMono.variable} font-sans antialiased`}>
+      <body className={`${inter.variable} ${spaceMono.variable} font-sans antialiased`} data-nonce={nonce}>
         {children}
       </body>
     </html>

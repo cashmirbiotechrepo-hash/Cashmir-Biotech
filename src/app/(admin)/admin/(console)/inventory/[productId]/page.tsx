@@ -13,6 +13,9 @@ import {
   TableRow
 } from "@/components/ui/table";
 import { listInventoryTransactions } from "@/modules/admin/services/inventory.service";
+import { listLotsForProduct } from "@/modules/admin/services/inventory-lots.service";
+import { CoaManager } from "@/components/admin/coa-manager";
+import { LotManager } from "@/components/admin/lot-manager";
 
 export const metadata = { title: "Inventory history" };
 
@@ -29,10 +32,16 @@ const CHANGE_LABELS: Record<string, string> = {
 
 export default async function InventoryHistoryPage({ params }: { params: Promise<{ productId: string }> }) {
   const { productId } = await params;
-  const [product, inventory, transactions] = await Promise.all([
+  const [product, inventory, transactions, certificates, lots] = await Promise.all([
     db.product.findUnique({ where: { id: productId }, select: { name: true, sku: true } }),
     db.inventory.findUnique({ where: { productId } }),
-    listInventoryTransactions(productId, 200)
+    listInventoryTransactions(productId, 200),
+    db.certificateOfAnalysis.findMany({
+      where: { productId },
+      orderBy: { issuedAt: "desc" },
+      take: 50
+    }),
+    listLotsForProduct(productId)
   ]);
   if (!product) notFound();
 
@@ -69,6 +78,30 @@ export default async function InventoryHistoryPage({ params }: { params: Promise
             <p className="mt-1 text-2xl font-light tabular-nums">{available}</p>
           </CardContent>
         </Card>
+      </div>
+
+      <div className="mb-8 grid gap-8 lg:grid-cols-2">
+        <LotManager
+          productId={productId}
+          lots={lots.map((l) => ({
+            id: l.id,
+            lotCode: l.lotCode,
+            quantityOnHand: l.quantityOnHand,
+            expiresAt: l.expiresAt?.toISOString() ?? null,
+            active: l.active
+          }))}
+        />
+        <CoaManager
+          productId={productId}
+          certificates={certificates.map((c) => ({
+            id: c.id,
+            lotCode: c.lotCode,
+            title: c.title,
+            fileUrl: c.fileUrl,
+            issuedAt: c.issuedAt.toISOString(),
+            active: c.active
+          }))}
+        />
       </div>
 
       <Card>

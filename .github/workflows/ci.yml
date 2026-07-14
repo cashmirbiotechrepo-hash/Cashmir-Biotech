@@ -1,0 +1,70 @@
+name: Cashmir Biotech CI / CD
+
+on:
+  push:
+    branches: ["main", "master"]
+  pull_request:
+    branches: ["main", "master"]
+
+env:
+  DATABASE_URL: "postgresql://postgres:postgres@localhost:5432/cashmir_test?schema=public"
+  DIRECT_URL: "postgresql://postgres:postgres@localhost:5432/cashmir_test?schema=public"
+  NODE_ENV: "test"
+  JWT_SECRET: "ci-test-jwt-secret-do-not-use-in-prod-32chars"
+  PASSWORD_PEPPER: "ci-test-pepper-do-not-use-in-prod-32chars"
+  ENCRYPTION_KEY: "ci-test-encryption-key-32chars!!"
+  CRON_SECRET: "ci-test-cron-secret-16"
+  POW_SECRET: "ci-test-pow-secret-do-not-use-in-prod-32chars"
+  NEXT_PUBLIC_SITE_URL: "http://localhost:3000"
+  UPSTASH_REDIS_REST_URL: "https://example.upstash.io"
+  UPSTASH_REDIS_REST_TOKEN: "ci-upstash-token-not-real"
+  RAZORPAY_KEY_ID: "rzp_test_ci"
+  RAZORPAY_KEY_SECRET: "ci_razorpay_secret"
+  RAZORPAY_WEBHOOK_SECRET: "ci_webhook_secret"
+
+jobs:
+  test-and-validate:
+    name: Build, Lint, Test & Schema Check
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: cashmir_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20.x"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Validate & generate Prisma Client
+        run: |
+          npx prisma validate
+          npx prisma generate
+
+      - name: Run unit test suite (Vitest)
+        run: npm test
+
+      - name: Run code linter
+        run: npm run lint --if-present
+
+      - name: Test production build (Next.js)
+        run: npm run build

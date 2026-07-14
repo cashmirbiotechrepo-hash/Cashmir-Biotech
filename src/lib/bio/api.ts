@@ -10,12 +10,21 @@ export function fail(error: string, status = 400) {
   return NextResponse.json({ success: false, error }, { status });
 }
 
-/** Read + guard a JSON body; returns [body, errorResponse]. */
+/** Read + guard a JSON body; returns [body, errorResponse]. Enforces 2MB limit (MED-02). */
 export async function readBody<T = Record<string, unknown>>(
-  req: Request
+  req: Request,
+  maxBytes = 2 * 1024 * 1024
 ): Promise<[T | null, ReturnType<typeof fail> | null]> {
   try {
-    const body = (await req.json()) as T;
+    const cl = req.headers.get("content-length");
+    if (cl && parseInt(cl, 10) > maxBytes) {
+      return [null, fail("Payload too large. Maximum size is 2MB.", 413)];
+    }
+    const text = await req.text();
+    if (text.length > maxBytes) {
+      return [null, fail("Payload too large. Maximum size is 2MB.", 413)];
+    }
+    const body = JSON.parse(text) as T;
     return [body, null];
   } catch {
     return [null, fail("Invalid JSON body.")];

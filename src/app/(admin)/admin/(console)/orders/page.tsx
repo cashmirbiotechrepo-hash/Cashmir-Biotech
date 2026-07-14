@@ -71,7 +71,7 @@ export default async function AdminOrdersPage({
     <>
       <AdminPageHeader
         title="Orders"
-        description="Operations command center — documents, fulfillment, timeline, and customer context."
+        description="Warehouse queue — move each order through packing, shipping, and delivery."
         actions={
           <Link href="/api/admin/orders/export" className={buttonVariants({ variant: "outline", size: "sm" })}>
             Export CSV

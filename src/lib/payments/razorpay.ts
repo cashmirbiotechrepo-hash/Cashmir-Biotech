@@ -84,3 +84,99 @@ export function verifyWebhookSignature(rawBody: string, signature: string | null
   const expected = createHmac("sha256", secret).update(rawBody).digest("hex");
   return safeEqualHex(expected, signature);
 }
+
+export type RazorpayPayment = {
+  id: string;
+  amount: number;
+  currency: string;
+  status: string;
+  order_id: string;
+};
+
+/** Fetches a payment and asserts it is captured for the expected Razorpay order + amount. */
+export async function assertCapturedPayment(input: {
+  paymentId: string;
+  razorpayOrderId: string;
+  amountCents: number;
+}): Promise<{ ok: true; payment: RazorpayPayment } | { ok: false; error: string }> {
+  const keyId = process.env.RAZORPAY_KEY_ID;
+  const keySecret = process.env.RAZORPAY_KEY_SECRET;
+  if (!keyId || !keySecret) return { ok: false, error: "Razorpay is not configured." };
+
+  const auth = Buffer.from(`${keyId}:${keySecret}`).toString("base64");
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 15000);
+  try {
+    const res = await fetch(`${RZP_API}/payments/${encodeURIComponent(input.paymentId)}`, {
+      headers: { Authorization: `Basic ${auth}` },
+      signal: controller.signal
+    });
+    const json = (await res.json().catch(() => null)) as RazorpayPayment | null;
+    if (!res.ok || !json) {
+      logger.error({ event: "razorpay_payment_fetch_failed", status: res.status, body: json }, "payment fetch failed");
+      return { ok: false, error: "Could not confirm payment with Razorpay." };
+    }
+    if (json.order_id !== input.razorpayOrderId) {
+      return { ok: false, error: "Payment does not match this order." };
+    }
+    if (json.status !== "captured" && json.status !== "authorized") {
+      return { ok: false, error: `Payment status is ${json.status}.` };
+    }
+    if (Number(json.amount) !== input.amountCents) {
+      logger.error(
+        {
+          event: "razorpay_amount_mismatch",
+          expected: input.amountCents,
+          actual: json.amount,
+          paymentId: input.paymentId
+        },
+        "payment amount mismatch"
+      );
+      return { ok: false, error: "Payment amount does not match order total." };
+    }
+    return { ok: true, payment: json };
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+/** Issues a Razorpay refund against a captured payment (amount in paise). */
+export type RazorpayRefund = { id: string; amount: number; status: string; payment_id: string };
+
+export async function createRazorpayRefund(input: {
+  paymentId: string;
+  amountCents?: number;
+  notes?: Record<string, string>;
+}): Promise<RazorpayRefund> {
+  const keyId = process.env.RAZORPAY_KEY_ID;
+  const keySecret = process.env.RAZORPAY_KEY_SECRET;
+  if (!keyId || !keySecret) throw new Error("Razorpay is not configured.");
+
+  const auth = Buffer.from(`${keyId}:${keySecret}`).toString("base64");
+  const body: Record<string, unknown> = { notes: input.notes ?? {} };
+  if (typeof input.amountCents === "number" && input.amountCents > 0) {
+    body.amount = input.amountCents;
+  }
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 15000);
+  try {
+    const res = await fetch(`${RZP_API}/payments/${encodeURIComponent(input.paymentId)}/refund`, {
+      method: "POST",
+      headers: {
+        Authorization: `Basic ${auth}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify(body),
+      signal: controller.signal
+    });
+    const json = await res.json().catch(() => null);
+    if (!res.ok) {
+      logger.error({ event: "razorpay_refund_failed", status: res.status, body: json }, "Razorpay refund failed");
+      throw new Error(json?.error?.description ?? "Failed to create refund.");
+    }
+    return json as RazorpayRefund;
+  } finally {
+    clearTimeout(timeout);
+  }
+}

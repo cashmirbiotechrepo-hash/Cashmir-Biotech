@@ -1,11 +1,11 @@
 "use client";
 
-import { useRef, useState } from "react";
-import { AlertCircle } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import Link from "next/link";
+import { AlertCircle, Eye, EyeOff, Loader2 } from "lucide-react";
 import { loginAction, resendTwoFactorAction } from "./actions";
 import { solvePoWChallenge } from "@/lib/admin/pow-client";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
@@ -22,15 +22,34 @@ async function fetchPoWChallenge(): Promise<PoWChallenge> {
   return res.json();
 }
 
-export function LoginForm({ next, rateLimited }: { next: string; rateLimited: boolean }) {
+export function LoginForm({
+  next,
+  rateLimited,
+  sessionExpired
+}: {
+  next: string;
+  rateLimited: boolean;
+  sessionExpired?: boolean;
+}) {
+  const emailRef = useRef<HTMLInputElement>(null);
   const formRef = useRef<HTMLFormElement>(null);
   const [pending, setPending] = useState(false);
   const [twoFactor, setTwoFactor] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [capsLock, setCapsLock] = useState(false);
   const [savedCreds, setSavedCreds] = useState({ email: "", password: "" });
-  const [powFields, setPowFields] = useState<PoWChallenge & { nonce: number } | null>(null);
+  const [powFields, setPowFields] = useState<(PoWChallenge & { nonce: number }) | null>(null);
   const [error, setError] = useState<string | undefined>(
-    rateLimited ? "Too many attempts. Please wait a minute and try again." : undefined
+    rateLimited
+      ? "Too many attempts. Please wait a minute and try again."
+      : sessionExpired
+        ? "Your session expired. Sign in again to continue."
+        : undefined
   );
+
+  useEffect(() => {
+    if (!twoFactor) emailRef.current?.focus();
+  }, [twoFactor]);
 
   async function onSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -68,24 +87,29 @@ export function LoginForm({ next, rateLimited }: { next: string; rateLimited: bo
       }
       if (result?.error) setError(result.error);
     } catch {
-      setError("Security verification failed. Please try again.");
+      setError("Could not complete sign-in. Please try again.");
     } finally {
       setPending(false);
     }
   }
 
   return (
-    <Card className="shadow-lg">
-      <CardHeader className="pb-2">
-        <CardTitle className="text-xl">{twoFactor ? "Verify sign-in" : "Sign in"}</CardTitle>
-        <CardDescription>
+    <div className="border border-border bg-card">
+      <div className="h-px bg-[#b89458]" aria-hidden />
+
+      <div className="px-7 pt-7 pb-1 sm:px-8 sm:pt-8">
+        <h2 className="text-xl font-medium tracking-tight text-foreground sm:text-[22px]">
+          {twoFactor ? "Verify identity" : "Sign in to Operations"}
+        </h2>
+        <p className="mt-1.5 text-[13px] leading-relaxed text-muted-foreground">
           {twoFactor
-            ? "Enter the 6-digit code sent to your email. In development, check the server console."
-            : "Use your credentials to access the operations console."}
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="pt-4">
-        <form ref={formRef} onSubmit={onSubmit} className="space-y-5">
+            ? "Enter the 6-digit code sent to your email."
+            : "Restricted access for authorized Cashmir Biotech personnel."}
+        </p>
+      </div>
+
+      <div className="px-7 pb-7 pt-5 sm:px-8 sm:pb-8">
+        <form ref={formRef} onSubmit={onSubmit} className="space-y-4">
           <input type="hidden" name="next" value={next} />
           {twoFactor ? (
             <>
@@ -96,42 +120,70 @@ export function LoginForm({ next, rateLimited }: { next: string; rateLimited: bo
 
           {!twoFactor ? (
             <>
-              <div className="space-y-2">
-                <Label htmlFor="email">Email</Label>
+              <div className="space-y-1.5">
+                <Label htmlFor="email" className="text-[13px]">
+                  Email
+                </Label>
                 <Input
+                  ref={emailRef}
                   id="email"
                   type="email"
                   name="email"
                   required
-                  autoComplete="email"
+                  autoComplete="username"
+                  autoFocus
                   placeholder="you@cashmirbiotech.com"
+                  className="h-11"
                 />
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="password">Password</Label>
-                <Input
-                  id="password"
-                  type="password"
-                  name="password"
-                  required
-                  autoComplete="current-password"
-                  placeholder="••••••••"
-                />
+              <div className="space-y-1.5">
+                <Label htmlFor="password" className="text-[13px]">
+                  Password
+                </Label>
+                <div className="relative">
+                  <Input
+                    id="password"
+                    type={showPassword ? "text" : "password"}
+                    name="password"
+                    required
+                    autoComplete="current-password"
+                    placeholder="••••••••"
+                    className="h-11 pr-11"
+                    onKeyUp={(e) => setCapsLock(e.getModifierState?.("CapsLock") ?? false)}
+                    onKeyDown={(e) => setCapsLock(e.getModifierState?.("CapsLock") ?? false)}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword((v) => !v)}
+                    className="absolute inset-y-0 right-0 flex w-11 items-center justify-center text-muted-foreground hover:text-foreground"
+                    aria-label={showPassword ? "Hide password" : "Show password"}
+                  >
+                    {showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+                  </button>
+                </div>
+                {capsLock ? (
+                  <p className="text-[12px] text-amber-700" role="status">
+                    Caps Lock is on
+                  </p>
+                ) : null}
               </div>
             </>
           ) : (
-            <div className="space-y-2">
-              <Label htmlFor="twoFactorCode">Verification code</Label>
+            <div className="space-y-1.5">
+              <Label htmlFor="twoFactorCode" className="text-[13px]">
+                Verification code
+              </Label>
               <Input
                 id="twoFactorCode"
                 name="twoFactorCode"
                 inputMode="numeric"
                 autoComplete="one-time-code"
+                autoFocus
                 pattern="\d{6}"
                 maxLength={6}
                 required
                 placeholder="000000"
-                className="text-center text-lg tracking-[0.3em]"
+                className="h-11 text-center text-lg tracking-[0.3em]"
               />
             </div>
           )}
@@ -139,59 +191,77 @@ export function LoginForm({ next, rateLimited }: { next: string; rateLimited: bo
           {error ? (
             <div
               role="alert"
-              className="flex items-start gap-2 rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2.5 text-sm text-destructive"
+              className="flex items-start gap-2 border border-destructive/25 bg-destructive/5 px-3 py-2.5 text-[13px] text-destructive"
             >
               <AlertCircle className="mt-0.5 size-4 shrink-0" />
               <span>{error}</span>
             </div>
           ) : null}
 
-          <Button type="submit" disabled={pending} size="lg" className="w-full">
-            {pending ? (twoFactor ? "Verifying…" : "Verifying security…") : twoFactor ? "Confirm code" : "Sign in"}
+          <Button type="submit" disabled={pending} size="lg" className="h-11 w-full">
+            {pending ? (
+              <span className="inline-flex items-center gap-2">
+                <Loader2 className="size-4 animate-spin" aria-hidden />
+                {twoFactor ? "Verifying…" : "Signing in…"}
+              </span>
+            ) : twoFactor ? (
+              "Confirm code"
+            ) : (
+              "Sign in"
+            )}
           </Button>
 
           {twoFactor ? (
-            <Button
-              type="button"
-              variant="outline"
-              className="w-full"
-              disabled={pending}
-              onClick={async () => {
-                setPending(true);
-                setError(undefined);
-                try {
-                  const fd = new FormData();
-                  fd.set("email", savedCreds.email);
-                  const result = await resendTwoFactorAction(fd);
-                  if (result?.error) setError(result.error);
-                  else setError("A new code was sent. Check your email (or server console in dev).");
-                } catch {
-                  setError("Could not resend code.");
-                } finally {
-                  setPending(false);
-                }
-              }}
-            >
-              Resend code
-            </Button>
-          ) : null}
-
-          {twoFactor ? (
-            <Button
-              type="button"
-              variant="ghost"
-              className="w-full"
-              onClick={() => {
-                setTwoFactor(false);
-                setPowFields(null);
-                setError(undefined);
-              }}
-            >
-              Back to sign in
-            </Button>
+            <div className="flex gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                className="h-10 flex-1"
+                disabled={pending}
+                onClick={async () => {
+                  setPending(true);
+                  setError(undefined);
+                  try {
+                    const fd = new FormData();
+                    fd.set("email", savedCreds.email);
+                    const result = await resendTwoFactorAction(fd);
+                    if (result?.error) setError(result.error);
+                    else setError("A new code was sent to your email.");
+                  } catch {
+                    setError("Could not resend code.");
+                  } finally {
+                    setPending(false);
+                  }
+                }}
+              >
+                Resend code
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                className="h-10 flex-1"
+                onClick={() => {
+                  setTwoFactor(false);
+                  setPowFields(null);
+                  setError(undefined);
+                }}
+              >
+                Back
+              </Button>
+            </div>
           ) : null}
         </form>
-      </CardContent>
-    </Card>
+
+        {!twoFactor ? (
+          <p className="mt-5 border-t border-border pt-4 text-[12px] leading-relaxed text-muted-foreground">
+            Access is managed internally. For account provisioning contact{" "}
+            <Link href="/contact" className="text-foreground underline-offset-4 hover:underline">
+              Cashmir Biotech IT
+            </Link>
+            .
+          </p>
+        ) : null}
+      </div>
+    </div>
   );
 }

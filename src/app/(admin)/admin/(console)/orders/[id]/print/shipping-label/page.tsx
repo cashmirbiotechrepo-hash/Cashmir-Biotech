@@ -79,7 +79,7 @@ export default async function ShippingLabelPage({ params }: { params: Promise<{ 
         <div className="mt-5 border border-dashed border-ink/40 p-3 text-center">
           <p className="font-mono text-lg tracking-widest">{order.orderNumber}</p>
           <p className="mt-1 text-[10px] text-ink-mute">
-            Barcode placeholder — scan order # in warehouse mode
+            Scan order # in warehouse mode
           </p>
         </div>
       </div>

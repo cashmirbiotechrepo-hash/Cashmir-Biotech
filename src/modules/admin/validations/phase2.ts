@@ -41,17 +41,34 @@ export const dealSchema = z.object({
   expectedCloseAt: z.string().optional()
 });
 
-export const couponSchema = z.object({
-  id: z.string().optional(),
-  code: nonEmpty.max(50).transform((v) => v.toUpperCase()),
-  type: z.enum(["percent", "fixed"]),
-  value: z.coerce.number().int().min(1),
-  maxUses: z.coerce.number().int().min(1).optional().or(z.literal("")),
-  expiresAt: z.string().optional(),
-  active: z
-    .union([z.literal("on"), z.literal("true"), z.literal("false"), z.undefined()])
-    .transform((v) => v === "on" || v === "true")
-});
+export const couponSchema = z
+  .object({
+    id: z.string().optional(),
+    code: nonEmpty.max(50).transform((v) => v.toUpperCase()),
+    type: z.enum(["percent", "fixed"]),
+    value: z.coerce.number().int().min(1),
+    maxUses: z.coerce.number().int().min(1).optional().or(z.literal("")),
+    expiresAt: z.string().optional(),
+    active: z
+      .union([z.literal("on"), z.literal("true"), z.literal("false"), z.undefined()])
+      .transform((v) => v === "on" || v === "true")
+  })
+  .superRefine((val, ctx) => {
+    if (val.type === "percent" && val.value > 100) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Percent coupons cannot exceed 100.",
+        path: ["value"]
+      });
+    }
+    if (val.type === "fixed" && val.value > 500_000) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Fixed coupon INR value is unreasonably large.",
+        path: ["value"]
+      });
+    }
+  });
 
 export const expenseSchema = z.object({
   title: nonEmpty.max(500),
