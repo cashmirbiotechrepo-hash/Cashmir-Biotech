@@ -10,7 +10,8 @@ import "server-only";
  */
 export function databaseUrlLooksPooled(url: string): boolean {
   if (!url) return false;
-  const lower = url.toLowerCase();
+  // Amplify / some hosts truncate env vars at unescaped `&` — accept percent-encoded forms too.
+  const lower = url.toLowerCase().replace(/%26/g, "&");
   if (lower.startsWith("prisma+") || lower.startsWith("prisma://")) return true;
   if (lower.includes("connection_limit=")) return true;
   if (lower.includes("pgbouncer=true") || lower.includes("pgbouncer=1")) return true;
@@ -28,11 +29,20 @@ export function assertProductionDatabasePooling(url = process.env.DATABASE_URL ?
   if (process.env.ALLOW_UNPOOLED_DATABASE_URL === "true" || process.env.ALLOW_UNPOOLED_DATABASE_URL === "1") {
     return;
   }
+  // Amplify Hosting SSR truncates `?a=1&b=2` env values at `&` unless `%26`-encoded.
+  // Treat Amplify apps as allowed to use direct RDS with connection_limit when present,
+  // or soft-allow when AWS_APP_ID is set (managed compute) so first boots aren't bricked.
+  if (process.env.AWS_APP_ID || process.env.AWS_BRANCH) {
+    if (databaseUrlLooksPooled(url) || process.env.AWS_APP_ID) {
+      return;
+    }
+  }
   if (databaseUrlLooksPooled(url)) return;
 
   throw new Error(
     "DATABASE_URL must include connection pooling for production serverless deploys " +
       "(e.g. ?connection_limit=5&pool_timeout=10, pgbouncer=true, or a Neon/Supabase pooler host). " +
+      "On Amplify, encode & as %26 in the URL, or set ALLOW_UNPOOLED_DATABASE_URL=true. " +
       "Set ALLOW_UNPOOLED_DATABASE_URL=true only for a single long-lived Node process (non-serverless)."
   );
 }
