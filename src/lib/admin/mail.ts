@@ -1,6 +1,7 @@
 import "server-only";
 import type { Transporter } from "nodemailer";
 import { logger } from "@/lib/logger";
+import { applyBakedAmplifyEnv } from "@/lib/apply-baked-env";
 
 type SendMailInput = {
   to: string;
@@ -15,6 +16,8 @@ type SendMailInput = {
 let cachedTransport: Transporter | null = null;
 
 function getSmtpConfig() {
+  applyBakedAmplifyEnv();
+
   const host = process.env.SMTP_HOST;
   const user = process.env.SMTP_USER;
   // Gmail App Passwords are often pasted with spaces — strip them.

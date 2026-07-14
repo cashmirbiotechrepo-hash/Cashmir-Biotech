@@ -1,6 +1,5 @@
 "use server";
 
-import { redirect } from "next/navigation";
 import { headers } from "next/headers";
 import {
   setAdminSessionCookies
@@ -16,6 +15,8 @@ export type LoginState = {
   error?: string;
   requireTwoFactor?: boolean;
   email?: string;
+  ok?: boolean;
+  next?: string;
 };
 
 function safeNext(next: FormDataEntryValue | null): string {
@@ -101,7 +102,8 @@ export async function loginAction(formData: FormData): Promise<LoginState> {
 
     await setAdminSessionCookies(result.accessToken, result.refreshToken);
     logger.info({ event: "admin_login_success", email: result.user.email }, "admin signed in");
-    redirect(safeNext(formData.get("next")));
+    // Prefer client navigation — Amplify SSR often surfaces redirect() as a caught exception.
+    return { ok: true, next: safeNext(formData.get("next")) };
   } catch (err) {
     if (err instanceof AccountLockedError) {
       return { error: err.message };

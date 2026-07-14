@@ -156,11 +156,18 @@ export async function requestPortalOtp(emailRaw: string): Promise<{ ok: true } |
 
   if (smtpReady) {
     const { sendOtpMail } = await import("@/lib/admin/mail");
-    await sendOtpMail({
+    const sent = await sendOtpMail({
       to: email,
       kind: "portal_login",
       code
     });
+    if (!sent) {
+      logger.error({ event: "portal_otp_send_failed", email }, "portal OTP SMTP send returned false");
+      return {
+        ok: false,
+        error: "Login email could not be sent. Please try again later or contact support."
+      };
+    }
   } else {
     // Local development only.
     logger.info({ event: "portal_otp_dev", email, code }, `[DEV] Portal OTP for ${email}`);

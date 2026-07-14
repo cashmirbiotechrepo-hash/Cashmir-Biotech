@@ -77,6 +77,10 @@ export function LoginForm({
       }
 
       const result = await loginAction(fd);
+      if (result?.ok && result.next) {
+        window.location.assign(result.next);
+        return;
+      }
       if (result?.requireTwoFactor) {
         setSavedCreds({
           email: String(fd.get("email") ?? ""),
@@ -88,6 +92,17 @@ export function LoginForm({
       if (result?.error) setError(result.error);
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
+      // Successful redirect() from an older build, or stale Server Action id after deploy
+      if (
+        (typeof err === "object" &&
+          err !== null &&
+          "digest" in err &&
+          String((err as { digest?: string }).digest).startsWith("NEXT_REDIRECT")) ||
+        /NEXT_REDIRECT/i.test(msg)
+      ) {
+        window.location.assign("/admin/dashboard");
+        return;
+      }
       if (/Failed to find Server Action|server action/i.test(msg)) {
         setError("This page is out of date after a deploy. Refreshing…");
         window.location.reload();
