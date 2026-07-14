@@ -22,11 +22,14 @@ npm-debug.log*
 test-results/
 playwright-report/
 playwright/.cache/
+/e2e/
 
-# IDE
+# IDE / local agent tooling
 .idea
 .vscode/*
 !.vscode/extensions.json
+.cursor/
+.agents/
 
 # typescript
 *.tsbuildinfo
