@@ -1,10 +1,13 @@
 import "server-only";
+import { applyBakedAmplifyEnv } from "@/lib/apply-baked-env";
 
 /**
  * Amplify Hosting truncates environment values at unescaped `&`.
  * Prefer discrete DB_* parts when present; otherwise use DATABASE_URL as-is.
  */
 export function resolveDatabaseUrl(): string {
+  applyBakedAmplifyEnv();
+
   const host = (process.env.DB_HOST ?? "").trim();
   const user = (process.env.DB_USER ?? "").trim();
   const password = process.env.DB_PASSWORD ?? "";
@@ -24,11 +27,8 @@ export function resolveDatabaseUrl(): string {
   }
 
   // Amplify truncates at `&` — many URLs are stored with `%26` instead.
-  // Prisma/libpq need real `&` separators at runtime.
   const existing = (process.env.DATABASE_URL ?? "").trim().replace(/%26/gi, "&");
-  if (existing && existing !== process.env.DATABASE_URL) {
-    process.env.DATABASE_URL = existing;
-  }
+  if (existing) process.env.DATABASE_URL = existing;
   const direct = (process.env.DIRECT_URL ?? "").trim().replace(/%26/gi, "&");
   if (direct) process.env.DIRECT_URL = direct;
 
@@ -40,7 +40,7 @@ export function ensureDatabaseUrl(): string {
   const url = resolveDatabaseUrl();
   if (!url) {
     console.warn(
-      "[db] No DATABASE_URL and no DB_HOST/DB_USER/DB_PASSWORD/DB_NAME — set Amplify env vars then redeploy."
+      "[db] DATABASE_URL missing and DB_HOST/DB_USER/DB_PASSWORD/DB_NAME not set"
     );
   }
   return url;

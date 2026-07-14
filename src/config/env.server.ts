@@ -2,6 +2,7 @@ import "server-only";
 import { z } from "zod";
 import { ensureDatabaseUrl } from "@/lib/database-url";
 
+// Hydrates Amplify baked env + DATABASE_URL before Zod validation.
 ensureDatabaseUrl();
 
 const KNOWN_INSECURE = new Set([

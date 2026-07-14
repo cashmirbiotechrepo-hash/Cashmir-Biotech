@@ -78,7 +78,7 @@ const DEFAULT_PIPELINE = [
 
 const DEFAULT_METRICS = [
   { value: 99.7, decimals: 1, suffix: "%", label: "Purity Protocol", note: "Verified compound purity across production batches." },
-  { value: 13, suffix: "+", label: "IP Assets", note: "Patents, designs, trademarks, and international filings." },
+  { value: 14, suffix: "+", label: "IP Assets", note: "Patents, designs, trademarks, and international filings." },
   { value: 1, label: "Research Partner", note: "SKUAST-K faculty–student innovation model." }
 ];
 

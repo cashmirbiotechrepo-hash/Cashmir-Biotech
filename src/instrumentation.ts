@@ -5,6 +5,8 @@
 export async function register() {
   if (process.env.NEXT_RUNTIME === "nodejs") {
     await import("../sentry.server.config");
+    const { applyBakedAmplifyEnv } = await import("@/lib/apply-baked-env");
+    applyBakedAmplifyEnv();
     const { ensureDatabaseUrl } = await import("@/lib/database-url");
     ensureDatabaseUrl();
     const { assertProductionDatabasePooling, databaseUrlLooksPooled } = await import("@/lib/db-pool");
