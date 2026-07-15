@@ -288,6 +288,7 @@ export async function middleware(request: NextRequest) {
       pathname === "/api/payment/verify" ||
       pathname === "/api/newsletter" ||
       pathname === "/api/contact" ||
+      pathname.startsWith("/api/certificate/") ||
       pathname.startsWith("/api/order/") ||
       pathname.startsWith("/api/portal/") ||
       pathname.startsWith("/api/tools/")) &&

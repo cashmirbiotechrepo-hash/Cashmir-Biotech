@@ -20,6 +20,7 @@ frontend:
             echo "Normalized DATABASE_URL (%26 → &)"
           fi
         - node scripts/ensure-shipping-settings.cjs
+        - node scripts/ensure-certificate-enrollment.cjs
         - node scripts/write-amplify-runtime-env.cjs
         - npm run build
   artifacts:

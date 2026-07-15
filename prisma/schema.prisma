@@ -714,3 +714,37 @@ model CustomerAddress {
 
   @@index([customerId])
 }
+
+/// Unlisted computational-biology short-course enrollments (/certificate). Not linked from main nav.
+model CertificateEnrollment {
+  id                 String    @id @default(cuid())
+  enrollmentNumber   String    @unique
+  accessToken        String    @unique
+  invoiceNumber      String    @unique
+  status             String    @default("pending")
+  studentName        String
+  studentEmail       String
+  studentPhone       String    @default("")
+  institution        String    @default("")
+  placeOfSupply      String    @default("Jammu and Kashmir")
+  courseIds          Json
+  courseLines        Json
+  credits            Int
+  /// Taxable value (ex-GST) in paise
+  subtotalCents      Int
+  taxCents           Int
+  totalCents         Int
+  /// Inclusive fee is GST-inclusive; breakdown stored for invoice
+  gstDetails         Json
+  razorpayOrderId    String?
+  razorpayPaymentId  String?
+  paymentOutcome     String    @default("pending")
+  paidAt             DateTime?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  @@index([status])
+  @@index([studentEmail])
+  @@index([razorpayOrderId])
+  @@index([createdAt])
+}

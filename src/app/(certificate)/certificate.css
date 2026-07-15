@@ -1,0 +1,33 @@
+.cert-root {
+  --cert-pine: #0c2b24;
+  --cert-pine-deep: #071a16;
+  --cert-foil: #b08d4f;
+  --cert-sapphire: #1a4a73;
+  --cert-paper: #f4f1ea;
+  --cert-card: #fbfaf7;
+  --cert-ink: #121a1c;
+  --cert-mute: #5a6568;
+  --cert-line: rgba(12, 43, 36, 0.12);
+  --cert-glow: rgba(176, 141, 79, 0.18);
+  color: var(--cert-ink);
+  font-family: var(--cert-sans), "IBM Plex Sans", system-ui, sans-serif;
+  background:
+    radial-gradient(1200px 600px at 12% -10%, var(--cert-glow), transparent 55%),
+    radial-gradient(900px 500px at 100% 0%, rgba(26, 74, 115, 0.1), transparent 50%),
+    linear-gradient(180deg, #e8ebe4 0%, var(--cert-paper) 28%, #ebe6dc 100%);
+}
+
+.cert-root h1,
+.cert-root h2,
+.cert-root h3,
+.cert-display {
+  font-family: var(--cert-display), Newsreader, Georgia, serif;
+  letter-spacing: -0.02em;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cert-root * {
+    animation: none !important;
+    transition: none !important;
+  }
+}
