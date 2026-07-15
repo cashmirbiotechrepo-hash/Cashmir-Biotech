@@ -18,7 +18,7 @@ export default async function CheckoutPage() {
   ]);
 
   return (
-    <div className="pb-10">
+    <div>
       <CheckoutView
         prefillEmail={customer?.email ?? ""}
         flatShippingInr={rates.flatShippingInr}

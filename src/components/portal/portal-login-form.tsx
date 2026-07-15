@@ -1,8 +1,8 @@
 "use client";
 
+import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useState, useTransition } from "react";
-import Link from "next/link";
+import { cn } from "@/lib/utils";
 
 export function PortalLoginForm({ initialEmail = "" }: { initialEmail?: string }) {
   const router = useRouter();
@@ -15,6 +15,17 @@ export function PortalLoginForm({ initialEmail = "" }: { initialEmail?: string }
   const [error, setError] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
+
+  const emailRef = useRef<HTMLInputElement>(null);
+  const codeRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (sent) {
+      codeRef.current?.focus();
+      return;
+    }
+    emailRef.current?.focus();
+  }, [sent]);
 
   function requestCode() {
     setError(null);
@@ -31,7 +42,7 @@ export function PortalLoginForm({ initialEmail = "" }: { initialEmail?: string }
         return;
       }
       setSent(true);
-      setInfo(data.message ?? "Check your inbox for a 6-digit code. It expires in 10 minutes.");
+      setInfo(data.message ?? "Check your inbox for a 6-digit code.");
     });
   }
 
@@ -53,124 +64,143 @@ export function PortalLoginForm({ initialEmail = "" }: { initialEmail?: string }
     });
   }
 
+  const canSend = email.includes("@") && email.includes(".");
+  const canVerify = code.length === 6;
+
   return (
-    <div className="w-full max-w-md border border-ink/12 bg-paper/90 p-7 shadow-glass md:p-8">
-      <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-gold">Password-free login</p>
-      <h2 className="mt-2 text-xl font-light tracking-tight text-ink md:text-2xl">
-        {sent ? "Enter your secure code" : "Sign in with email"}
-      </h2>
-      <p className="mt-2 text-[13px] leading-relaxed text-ink-mute">
-        {sent
-          ? "We emailed a one-time code. It takes about 30 seconds — no password to remember."
-          : "We’ll send a one-time login code. Secure, expires in 10 minutes."}
-      </p>
+    <div className="w-full border border-ink/10 bg-paper px-5 py-6 sm:px-6 sm:py-7">
+      <ol className="flex items-center gap-2 text-[12px] text-ink-mute" aria-label="Sign-in steps">
+        <li className={cn("font-medium", !sent ? "text-ink" : "text-ink-mute")}>
+          <span className={cn("mr-1.5 tabular-nums", !sent ? "text-gold" : "text-ink-faint")}>1</span>
+          Email
+        </li>
+        <li aria-hidden className="text-ink/20">
+          →
+        </li>
+        <li className={cn("font-medium", sent ? "text-ink" : "text-ink-faint")}>
+          <span className={cn("mr-1.5 tabular-nums", sent ? "text-gold" : "text-ink-faint")}>2</span>
+          Verify
+        </li>
+      </ol>
 
       {!sent ? (
-        <div className="mt-7 space-y-4">
+        <form
+          className="mt-5 space-y-4"
+          onSubmit={(e) => {
+            e.preventDefault();
+            if (canSend && !pending) requestCode();
+          }}
+        >
           <label className="block">
-            <span className="font-mono text-[10px] uppercase tracking-[0.16em] text-ink-faint">
-              Checkout email
-            </span>
+            <span className="text-[13px] font-medium text-ink">Checkout email</span>
             <input
+              ref={emailRef}
               type="email"
               autoComplete="email"
+              inputMode="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="mt-2 w-full border border-ink/15 bg-ivory px-4 py-3 text-sm text-ink outline-none ring-gold/40 focus:ring-2"
+              className="mt-2 w-full border border-ink/15 bg-ivory px-4 py-3.5 text-[16px] text-ink outline-none ring-gold/35 transition-[box-shadow,border-color] focus:border-ink/25 focus:ring-2"
               placeholder="you@example.com"
+              required
             />
           </label>
+
           <button
-            type="button"
-            disabled={pending || !email.includes("@")}
-            onClick={requestCode}
-            className="w-full bg-ink py-3.5 text-sm font-medium text-paper transition-opacity disabled:opacity-40"
+            type="submit"
+            disabled={pending || !canSend}
+            className={cn(
+              "w-full py-3.5 text-[15px] font-medium transition-[transform,opacity,background-color]",
+              canSend && !pending
+                ? "bg-ink text-paper hover:-translate-y-px"
+                : "cursor-not-allowed bg-ink/25 text-paper"
+            )}
           >
-            {pending ? "Sending…" : "Send login code"}
+            {pending ? "Sending…" : "Continue"}
           </button>
-        </div>
-      ) : (
-        <div className="mt-7 space-y-4">
-          <p className="text-sm text-ink-mute">
-            Code sent to <span className="text-ink">{email}</span>
+
+          <p className="text-[13px] leading-snug text-ink-mute">
+            We&apos;ll email a secure one-time login code.
           </p>
+        </form>
+      ) : (
+        <form
+          className="mt-5 space-y-4"
+          onSubmit={(e) => {
+            e.preventDefault();
+            if (canVerify && !pending) verifyCode();
+          }}
+        >
+          <p className="text-[14px] text-ink-mute">
+            Code sent to <span className="font-medium text-ink">{email}</span>
+          </p>
+
           <label className="block">
-            <span className="font-mono text-[10px] uppercase tracking-[0.16em] text-ink-faint">
-              One-time code
-            </span>
+            <span className="text-[13px] font-medium text-ink">One-time code</span>
             <input
+              ref={codeRef}
               type="text"
               inputMode="numeric"
               autoComplete="one-time-code"
               maxLength={6}
               value={code}
               onChange={(e) => setCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
-              className="mt-2 w-full border border-ink/15 bg-ivory px-4 py-3 text-center font-mono text-2xl tracking-[0.4em] text-ink outline-none ring-gold/40 focus:ring-2"
+              className="mt-2 w-full border border-ink/15 bg-ivory px-4 py-3.5 text-center font-mono text-[1.35rem] tracking-[0.35em] text-ink outline-none ring-gold/35 transition-[box-shadow,border-color] focus:border-ink/25 focus:ring-2"
               placeholder="······"
+              required
             />
           </label>
+
           <button
-            type="button"
-            disabled={pending || code.length !== 6}
-            onClick={verifyCode}
-            className="w-full bg-ink py-3.5 text-sm font-medium text-paper disabled:opacity-40"
+            type="submit"
+            disabled={pending || !canVerify}
+            className={cn(
+              "w-full py-3.5 text-[15px] font-medium transition-[transform,opacity,background-color]",
+              canVerify && !pending
+                ? "bg-ink text-paper hover:-translate-y-px"
+                : "cursor-not-allowed bg-ink/25 text-paper"
+            )}
           >
             {pending ? "Verifying…" : "Open my account"}
           </button>
-          <button
-            type="button"
-            disabled={pending}
-            onClick={requestCode}
-            className="w-full text-center font-mono text-[10px] uppercase tracking-[0.14em] text-ink-faint hover:text-ink"
-          >
-            Resend code
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              setSent(false);
-              setCode("");
-              setInfo(null);
-              setError(null);
-            }}
-            className="w-full text-center text-xs text-ink-mute hover:text-ink"
-          >
-            Use a different email
-          </button>
-        </div>
+
+          <p className="text-[13px] text-ink-mute">Code expires in 10 minutes.</p>
+
+          <div className="flex flex-col gap-1 pt-1">
+            <button
+              type="button"
+              disabled={pending}
+              onClick={requestCode}
+              className="inline-flex min-h-11 items-center justify-center text-[13px] text-ink-soft hover:text-ink disabled:opacity-50"
+            >
+              Resend code
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setSent(false);
+                setCode("");
+                setInfo(null);
+                setError(null);
+              }}
+              className="inline-flex min-h-11 items-center justify-center text-[13px] text-ink-soft hover:text-ink"
+            >
+              Use a different email
+            </button>
+          </div>
+        </form>
       )}
 
-      {error ? <p className="mt-4 text-sm text-red-600">{error}</p> : null}
-      {info && !error ? <p className="mt-4 text-sm text-ink-mute">{info}</p> : null}
-
-      <ul className="mt-7 space-y-1.5 border-t border-ink/8 pt-5 font-mono text-[10px] uppercase tracking-[0.12em] text-ink-faint">
-        <li>Secure login · no password stored</li>
-        <li>OTP expires in 10 minutes</li>
-        <li>Session cookies encrypted</li>
-      </ul>
-
-      <div className="mt-6 space-y-2 border-t border-ink/8 pt-5 text-[12px] text-ink-mute">
-        <p className="font-medium text-ink-soft">No account yet?</p>
-        <p>
-          If you&apos;ve placed an order, we create your customer account when the email is verified — nothing extra
-          to set up.
+      {error ? (
+        <p className="mt-4 text-[13px] text-red-700" role="alert">
+          {error}
         </p>
-      </div>
-
-      <div className="mt-6 flex flex-wrap gap-x-4 gap-y-2 font-mono text-[10px] uppercase tracking-[0.14em] text-ink-faint">
-        <Link href="/contact" className="hover:text-ink">
-          Contact support
-        </Link>
-        <Link href="/order/lookup" className="hover:text-ink">
-          Find an order
-        </Link>
-        <Link href="/contact" className="hover:text-ink">
-          Institution enquiries
-        </Link>
-        <Link href="/products" className="hover:text-ink">
-          Back to store
-        </Link>
-      </div>
+      ) : null}
+      {info && !error && sent ? (
+        <p className="sr-only" role="status">
+          {info}
+        </p>
+      ) : null}
     </div>
   );
 }

@@ -51,3 +51,4 @@ deploy/aws/out/
 !/README.md
 /*.txt
 /dataset_*.json
+.tmp/

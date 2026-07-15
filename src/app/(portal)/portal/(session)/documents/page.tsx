@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { Download, FileText } from "lucide-react";
 import { requireCustomerSession } from "@/lib/customer/auth";
 import { getCustomerDocuments } from "@/lib/customer/portal";
 
@@ -8,119 +9,132 @@ export const metadata: Metadata = {
   robots: { index: false, follow: false }
 };
 
+function DocRow({
+  title,
+  meta,
+  href,
+  fallbackHref
+}: {
+  title: string;
+  meta: string;
+  href?: string | null;
+  fallbackHref?: string;
+}) {
+  return (
+    <li className="flex items-center gap-3 px-3 py-3">
+      <span className="grid h-10 w-10 shrink-0 place-items-center border border-ink/10 bg-pearl text-ink">
+        <FileText className="h-4 w-4" strokeWidth={1.75} aria-hidden />
+      </span>
+      <div className="min-w-0 flex-1">
+        <p className="truncate text-[14px] font-medium text-ink">{title}</p>
+        <p className="text-[12px] text-ink-mute">{meta}</p>
+      </div>
+      {href ? (
+        <a
+          href={href}
+          className="inline-flex min-h-10 min-w-10 items-center justify-center gap-1.5 border border-ink/12 px-3 text-[12px] font-medium text-ink"
+        >
+          <Download className="h-4 w-4" />
+          <span className="hidden sm:inline">PDF</span>
+        </a>
+      ) : fallbackHref ? (
+        <Link
+          href={fallbackHref}
+          className="inline-flex min-h-10 items-center px-2 text-[12px] font-medium text-ink-mute"
+        >
+          View
+        </Link>
+      ) : null}
+    </li>
+  );
+}
+
 export default async function PortalDocumentsPage() {
   const session = await requireCustomerSession();
   const docs = await getCustomerDocuments(session.id);
 
   return (
-    <div className="space-y-10">
+    <div className="mx-auto max-w-2xl space-y-6">
       <header>
-        <p className="font-mono text-[11px] uppercase tracking-[0.2em] text-gold">Scientific archive</p>
-        <h1 className="mt-2 text-3xl font-light tracking-tight text-ink">Documents</h1>
-        <p className="mt-2 max-w-xl text-sm text-ink-mute">
-          GST invoices (PDF), certificates of analysis, and patent references for your formulations.
-        </p>
+        <h1 className="text-[1.65rem] font-light tracking-tight text-ink">Invoices</h1>
+        <p className="mt-1 text-[13px] text-ink-mute">GST PDFs, packing slips, and certificates.</p>
       </header>
 
       <section>
-        <h2 className="mb-4 text-lg font-light text-ink">Invoices</h2>
+        <h2 className="mb-2 text-[13px] font-medium text-ink-mute">GST invoices</h2>
         {docs.invoices.length === 0 ? (
-          <p className="text-sm text-ink-mute">No invoices yet — they appear once an order is paid.</p>
-        ) : (
-          <ul className="divide-y divide-ink/10 border-y border-ink/10">
-            {docs.invoices.map((doc, i) => (
-              <li key={`${doc.label}-${i}`} className="flex flex-wrap items-center justify-between gap-3 py-4">
-                <div>
-                  <p className="text-sm text-ink">{doc.label}</p>
-                  <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-ink-faint">
-                    Order {doc.orderNumber}
-                  </p>
-                </div>
-                {doc.href ? (
-                  <a href={doc.href} className="font-mono text-[10px] uppercase tracking-[0.14em] text-gold">
-                    Download PDF
-                  </a>
-                ) : (
-                  <Link
-                    href={`/portal/orders/${doc.orderNumber}`}
-                    className="font-mono text-[10px] uppercase tracking-[0.14em] text-ink-faint"
-                  >
-                    View order
-                  </Link>
-                )}
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
-
-      <section>
-        <h2 className="mb-4 text-lg font-light text-ink">Packing slips</h2>
-        {docs.packingSlips.length === 0 ? (
-          <p className="text-sm text-ink-mute">Packing slips appear for paid orders with a confirmation link.</p>
-        ) : (
-          <ul className="divide-y divide-ink/10 border-y border-ink/10">
-            {docs.packingSlips.map((doc, i) => (
-              <li key={`${doc.label}-${i}`} className="flex flex-wrap items-center justify-between gap-3 py-4">
-                <p className="text-sm text-ink">{doc.label}</p>
-                <a href={doc.href} className="font-mono text-[10px] uppercase tracking-[0.14em] text-gold">
-                  Download PDF
-                </a>
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
-
-      <section>
-        <h2 className="mb-4 text-lg font-light text-ink">Certificates of Analysis</h2>
-        {docs.certificates.length === 0 ? (
-          <p className="text-sm text-ink-mute">
-            CoA files for products you have ordered appear here when published by the lab.
+          <p className="border border-dashed border-ink/15 px-4 py-6 text-[13px] text-ink-mute">
+            No invoices yet — they appear once an order is paid.
           </p>
         ) : (
-          <ul className="divide-y divide-ink/10 border-y border-ink/10">
-            {docs.certificates.map((doc, i) => (
-              <li key={`${doc.label}-${i}`} className="flex flex-wrap items-center justify-between gap-3 py-4">
-                <div>
-                  <p className="text-sm text-ink">{doc.label}</p>
-                  <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-ink-faint">
-                    {doc.productName}
-                  </p>
-                </div>
-                <a
-                  href={doc.href}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="font-mono text-[10px] uppercase tracking-[0.14em] text-gold"
-                >
-                  Download
-                </a>
-              </li>
+          <ul className="divide-y divide-ink/8 border border-ink/10 bg-paper">
+            {docs.invoices.map((doc, i) => (
+              <DocRow
+                key={`${doc.label}-${i}`}
+                title={doc.label}
+                meta={`Order ${doc.orderNumber} · PDF`}
+                href={doc.href}
+                fallbackHref={`/portal/orders/${doc.orderNumber}`}
+              />
             ))}
           </ul>
         )}
       </section>
 
       <section>
-        <h2 className="mb-4 text-lg font-light text-ink">Research library</h2>
+        <h2 className="mb-2 text-[13px] font-medium text-ink-mute">Packing slips</h2>
+        {docs.packingSlips.length === 0 ? (
+          <p className="text-[13px] text-ink-mute">Available for paid orders with a confirmation link.</p>
+        ) : (
+          <ul className="divide-y divide-ink/8 border border-ink/10 bg-paper">
+            {docs.packingSlips.map((doc, i) => (
+              <DocRow
+                key={`${doc.label}-${i}`}
+                title={doc.label}
+                meta="PDF"
+                href={doc.href}
+              />
+            ))}
+          </ul>
+        )}
+      </section>
+
+      <section>
+        <h2 className="mb-2 text-[13px] font-medium text-ink-mute">Certificates of Analysis</h2>
+        {docs.certificates.length === 0 ? (
+          <p className="text-[13px] text-ink-mute">
+            CoA files for products you have ordered appear when published by the lab.
+          </p>
+        ) : (
+          <ul className="divide-y divide-ink/8 border border-ink/10 bg-paper">
+            {docs.certificates.map((doc, i) => (
+              <DocRow
+                key={`${doc.label}-${i}`}
+                title={doc.label}
+                meta={`${doc.productName} · PDF`}
+                href={doc.href}
+              />
+            ))}
+          </ul>
+        )}
+      </section>
+
+      <section>
+        <h2 className="mb-2 text-[13px] font-medium text-ink-mute">Research library</h2>
         {docs.patents.length === 0 ? (
-          <p className="text-sm text-ink-mute">
-            Patent-backed notes appear for formulations linked to our registry.{" "}
+          <p className="text-[13px] text-ink-mute">
+            Patent notes appear for linked formulations.{" "}
             <Link href="/patents" className="text-ink underline-offset-4 hover:underline">
               Browse patents
             </Link>
           </p>
         ) : (
-          <ul className="space-y-3">
+          <ul className="divide-y divide-ink/8 border border-ink/10 bg-paper">
             {docs.patents.map((p) => (
-              <li key={p.label} className="rounded-xl border border-ink/10 px-5 py-4">
-                <p className="text-sm text-ink">{p.label}</p>
-                <Link
-                  href={p.href}
-                  className="mt-2 inline-block font-mono text-[10px] uppercase tracking-[0.14em] text-gold"
-                >
-                  View →
+              <li key={p.label} className="flex items-center justify-between gap-3 px-3 py-3">
+                <p className="min-w-0 truncate text-[14px] text-ink">{p.label}</p>
+                <Link href={p.href} className="shrink-0 text-[13px] font-medium text-ink">
+                  View
                 </Link>
               </li>
             ))}

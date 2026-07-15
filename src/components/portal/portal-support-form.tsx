@@ -13,23 +13,24 @@ export function PortalSupportForm({
   const [state, formAction, pending] = useActionState(createSupportTicket, initial);
 
   return (
-    <form action={formAction} className="max-w-xl space-y-3 rounded-2xl border border-ink/10 bg-paper/60 p-5">
+    <form action={formAction} className="space-y-3 border border-ink/10 bg-paper p-4">
       {state.error ? (
-        <p role="alert" className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">
+        <p role="alert" className="border border-red-200 bg-red-50 px-3 py-2 text-[13px] text-red-800">
           {state.error}
         </p>
       ) : null}
       {state.ok ? (
-        <p role="status" className="text-sm text-ink-mute">
+        <p role="status" className="text-[13px] text-ink-mute">
           Ticket submitted — we&apos;ll reply by email.
         </p>
       ) : null}
+
       <label className="block">
-        <span className="font-mono text-[10px] uppercase tracking-[0.14em] text-ink-faint">Topic</span>
+        <span className="text-[13px] font-medium text-ink">Topic</span>
         <select
           name="topic"
           required
-          className="mt-1.5 w-full rounded-xl border border-ink/15 bg-ivory px-3 py-2.5 text-sm"
+          className="mt-1.5 w-full border border-ink/12 bg-ivory px-3 py-2.5 text-[16px] text-ink outline-none focus:border-ink/25"
           defaultValue="question"
         >
           <option value="shipment">Shipment</option>
@@ -38,9 +39,14 @@ export function PortalSupportForm({
           <option value="question">General question</option>
         </select>
       </label>
+
       <label className="block">
-        <span className="font-mono text-[10px] uppercase tracking-[0.14em] text-ink-faint">Order (optional)</span>
-        <select name="orderNumber" className="mt-1.5 w-full rounded-xl border border-ink/15 bg-ivory px-3 py-2.5 text-sm" defaultValue="">
+        <span className="text-[13px] font-medium text-ink">Order (optional)</span>
+        <select
+          name="orderNumber"
+          className="mt-1.5 w-full border border-ink/12 bg-ivory px-3 py-2.5 text-[16px] text-ink outline-none focus:border-ink/25"
+          defaultValue=""
+        >
           <option value="">No specific order</option>
           {orderOptions.map((o) => (
             <option key={o.orderNumber} value={o.orderNumber}>
@@ -49,28 +55,33 @@ export function PortalSupportForm({
           ))}
         </select>
       </label>
+
       <label className="block">
-        <span className="font-mono text-[10px] uppercase tracking-[0.14em] text-ink-faint">Subject</span>
+        <span className="text-[13px] font-medium text-ink">Subject</span>
         <input
           name="subject"
           required
-          className="mt-1.5 w-full rounded-xl border border-ink/15 bg-ivory px-3 py-2.5 text-sm outline-none ring-gold/30 focus:ring-2"
+          placeholder="e.g. Tracking for my latest order"
+          className="mt-1.5 w-full border border-ink/12 bg-ivory px-3 py-2.5 text-[16px] text-ink outline-none ring-gold/30 focus:ring-2"
         />
       </label>
+
       <label className="block">
-        <span className="font-mono text-[10px] uppercase tracking-[0.14em] text-ink-faint">Message</span>
+        <span className="text-[13px] font-medium text-ink">Message</span>
         <textarea
           name="body"
           required
           minLength={10}
-          rows={5}
-          className="mt-1.5 w-full rounded-xl border border-ink/15 bg-ivory px-3 py-2.5 text-sm outline-none ring-gold/30 focus:ring-2"
+          rows={4}
+          placeholder="Describe what you need help with…"
+          className="mt-1.5 w-full border border-ink/12 bg-ivory px-3 py-2.5 text-[16px] text-ink outline-none ring-gold/30 focus:ring-2"
         />
       </label>
+
       <button
         type="submit"
         disabled={pending}
-        className="rounded-full bg-ink px-6 py-3 text-sm font-medium text-paper disabled:opacity-60"
+        className="w-full min-h-11 bg-ink text-[15px] font-medium text-paper disabled:opacity-60"
       >
         {pending ? "Sending…" : "Submit ticket"}
       </button>

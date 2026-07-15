@@ -1,31 +1,26 @@
 import type { Metadata } from "next";
+import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { Download, Package } from "lucide-react";
 import { requireCustomerSession } from "@/lib/customer/auth";
 import { getCustomerOrderDetail } from "@/lib/customer/portal";
+import { PORTAL_STATUS_LABEL, toCustomerTimeline } from "@/lib/customer/portal-ui";
+import { cn } from "@/lib/utils";
 
 export const metadata: Metadata = {
   title: "Order detail · Customer Portal",
   robots: { index: false, follow: false }
 };
 
-const inr = new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 0 });
-
-const STATUS_LABEL: Record<string, string> = {
-  pending: "Awaiting payment",
-  paid: "Paid",
-  processing: "Preparing",
-  shipped: "In transit",
-  delivered: "Delivered",
-  cancelled: "Cancelled",
-  payment_failed: "Payment failed",
-  refunded: "Refunded",
-  partially_refunded: "Partially refunded"
-};
+const inr = new Intl.NumberFormat("en-IN", {
+  style: "currency",
+  currency: "INR",
+  maximumFractionDigits: 0
+});
 
 const PIPELINE = ["Placed", "Paid", "Preparing", "Shipped", "Delivered"] as const;
 
-/** Maps OrderStatus to the customer-facing pipeline step (0-indexed). */
 function pipelineIndex(status: string): number {
   switch (status) {
     case "delivered":
@@ -54,142 +49,190 @@ export default async function PortalOrderDetailPage({
 
   const { order, timeline } = detail;
   const activeIdx = pipelineIndex(order.status);
+  const { customer: customerEvents, technical } = toCustomerTimeline(timeline);
+  const title =
+    order.items.length === 1
+      ? order.items[0]!.productName
+      : `${order.items[0]?.productName ?? "Order"} +${order.items.length - 1}`;
 
   return (
-    <div className="space-y-12">
+    <div className="mx-auto max-w-2xl space-y-6">
       <div>
-        <Link
-          href="/portal/orders"
-          className="font-mono text-[10px] uppercase tracking-[0.16em] text-ink-faint hover:text-ink"
-        >
+        <Link href="/portal/orders" className="inline-flex min-h-10 items-center text-[13px] text-ink-mute hover:text-ink">
           ← Orders
         </Link>
-        <h1 className="mt-4 text-3xl font-light tracking-tight text-ink">
-          {order.items[0]?.productName ?? "Order"}
-        </h1>
-        <p className="mt-2 font-mono text-[11px] uppercase tracking-[0.16em] text-ink-faint">
-          {order.orderNumber} · {STATUS_LABEL[order.status] ?? order.status} · {inr.format(order.totalCents / 100)}
-        </p>
+        <div className="mt-3 flex gap-3">
+          <div className="relative h-16 w-16 shrink-0 overflow-hidden bg-pearl">
+            {order.items[0]?.product?.imageUrl ? (
+              <Image
+                src={order.items[0].product.imageUrl}
+                alt=""
+                fill
+                sizes="64px"
+                className="object-contain p-1.5"
+              />
+            ) : (
+              <div className="grid h-full place-items-center text-ink-faint">
+                <Package className="h-6 w-6" strokeWidth={1.25} />
+              </div>
+            )}
+          </div>
+          <div className="min-w-0">
+            <h1 className="text-[1.35rem] font-light leading-snug tracking-tight text-ink">{title}</h1>
+            <p className="mt-1 text-[15px] font-medium tabular-nums text-ink">
+              {inr.format(order.totalCents / 100)}
+            </p>
+            <p className="mt-1 text-[12px] text-ink-mute">
+              {PORTAL_STATUS_LABEL[order.status] ?? order.status}
+              <span className="text-ink-faint"> · {order.orderNumber}</span>
+            </p>
+          </div>
+        </div>
         {(order.refundedCents ?? 0) > 0 ? (
-          <p className="mt-3 rounded-xl border border-ink/10 bg-pearl/50 px-4 py-3 text-sm text-ink-mute" role="status">
+          <p className="mt-3 border border-ink/10 bg-pearl/60 px-3 py-2 text-[13px] text-ink-mute" role="status">
             Refunded so far: {inr.format(order.refundedCents / 100)}
-            {order.status === "partially_refunded"
-              ? ` · Remaining ${inr.format((order.totalCents - order.refundedCents) / 100)}`
-              : order.status === "refunded"
-                ? " · Full refund"
-                : null}
           </p>
         ) : null}
       </div>
 
-      <section>
-        <h2 className="mb-5 text-lg font-light text-ink">Current status</h2>
-        <ol className="space-y-0">
+      <section className="border border-ink/10 bg-paper p-4">
+        <h2 className="text-[13px] font-medium text-ink-mute">Progress</h2>
+        <ol className="mt-3 space-y-0">
           {PIPELINE.map((label, i) => {
-            const done = i <= activeIdx;
+            const done = i < activeIdx;
+            const current = i === activeIdx;
             return (
-              <li key={label} className="flex gap-4">
+              <li key={label} className="flex gap-3">
                 <div className="flex w-4 flex-col items-center">
                   <span
-                    className={`mt-1 h-2.5 w-2.5 rounded-full ${done ? "bg-gold" : "bg-ink/15"}`}
+                    className={cn(
+                      "mt-1 h-2.5 w-2.5 rounded-full",
+                      done || current ? "bg-gold" : "bg-ink/15",
+                      current && "ring-2 ring-gold/30 ring-offset-2 ring-offset-paper"
+                    )}
                   />
                   {i < PIPELINE.length - 1 ? (
-                    <span className={`w-px flex-1 ${done && i < activeIdx ? "bg-gold/50" : "bg-ink/10"}`} />
+                    <span className={cn("w-px flex-1", done ? "bg-gold/50" : "bg-ink/10")} />
                   ) : null}
                 </div>
-                <p className={`pb-5 text-sm ${done ? "text-ink" : "text-ink-faint"}`}>{label}</p>
+                <p
+                  className={cn(
+                    "pb-3 text-[14px]",
+                    current ? "font-medium text-ink" : done ? "text-ink" : "text-ink-faint"
+                  )}
+                >
+                  {label}
+                </p>
               </li>
             );
           })}
         </ol>
         {order.trackingNumber ? (
-          <p className="mt-2 text-sm text-ink-mute">
+          <p className="mt-1 border-t border-ink/8 pt-3 text-[13px] text-ink-mute">
             {order.carrier ? `${order.carrier} · ` : ""}
             Tracking {order.trackingNumber}
           </p>
         ) : null}
       </section>
 
+      <div className="grid gap-2 sm:grid-cols-2">
+        {order.invoices[0]?.pdfUrl ? (
+          <a
+            href={order.invoices[0].pdfUrl}
+            className="inline-flex min-h-11 items-center justify-center gap-2 border border-ink/12 bg-paper text-[13px] font-medium text-ink"
+          >
+            <Download className="h-4 w-4" />
+            Download invoice
+          </a>
+        ) : null}
+        <Link
+          href="/portal/support"
+          className="inline-flex min-h-11 items-center justify-center border border-ink/12 bg-paper text-[13px] font-medium text-ink"
+        >
+          Contact support
+        </Link>
+        {order.items[0]?.product?.slug ? (
+          <Link
+            href={`/products/${order.items[0].product.slug}`}
+            className="inline-flex min-h-11 items-center justify-center bg-ink text-[13px] font-medium text-paper sm:col-span-2"
+          >
+            Reorder
+          </Link>
+        ) : null}
+      </div>
+
       <section>
-        <h2 className="mb-4 text-lg font-light text-ink">Items</h2>
-        <ul className="space-y-4">
+        <h2 className="mb-2 text-[13px] font-medium text-ink-mute">Items</h2>
+        <ul className="divide-y divide-ink/8 border border-ink/10 bg-paper">
           {order.items.map((item) => (
-            <li key={item.id} className="rounded-2xl border border-ink/10 bg-paper/60 p-5">
-              <p className="text-base font-light text-ink">{item.productName}</p>
-              <dl className="mt-3 grid gap-2 text-sm text-ink-mute sm:grid-cols-2">
-                {item.product?.sizeLabel ? (
-                  <div>
-                    <dt className="font-mono text-[10px] uppercase tracking-[0.14em] text-ink-faint">Size</dt>
-                    <dd>{item.product.sizeLabel}</dd>
-                  </div>
+            <li key={item.id} className="flex gap-3 px-3 py-3">
+              <div className="relative h-12 w-12 shrink-0 overflow-hidden bg-pearl">
+                {item.product?.imageUrl ? (
+                  <Image
+                    src={item.product.imageUrl}
+                    alt=""
+                    fill
+                    sizes="48px"
+                    className="object-contain p-1"
+                  />
                 ) : null}
-                <div>
-                  <dt className="font-mono text-[10px] uppercase tracking-[0.14em] text-ink-faint">Qty</dt>
-                  <dd>{item.quantity}</dd>
-                </div>
-                {item.product?.patent ? (
-                  <div className="sm:col-span-2">
-                    <dt className="font-mono text-[10px] uppercase tracking-[0.14em] text-ink-faint">Research</dt>
-                    <dd>
-                      Patent · {item.product.patent.title}
-                      {item.product.patent.applicationNumber
-                        ? ` (${item.product.patent.applicationNumber})`
-                        : ""}
-                    </dd>
-                  </div>
-                ) : null}
-              </dl>
-              {item.product?.slug ? (
-                <Link
-                  href={`/products/${item.product.slug}`}
-                  className="mt-4 inline-block font-mono text-[10px] uppercase tracking-[0.14em] text-gold"
-                >
-                  View scientific documents →
-                </Link>
-              ) : null}
-            </li>
-          ))}
-        </ul>
-      </section>
-
-      {order.invoices.length > 0 ? (
-        <section>
-          <h2 className="mb-4 text-lg font-light text-ink">Documents</h2>
-          <ul className="space-y-2">
-            {order.invoices.map((inv) => (
-              <li key={inv.id} className="flex items-center justify-between border-b border-ink/10 py-3 text-sm">
-                <span>Invoice {inv.invoiceNumber}</span>
-                {inv.pdfUrl ? (
-                  <a href={inv.pdfUrl} className="font-mono text-[10px] uppercase tracking-[0.14em] text-gold">
-                    Download
-                  </a>
-                ) : (
-                  <span className="text-xs text-ink-faint">On file</span>
-                )}
-              </li>
-            ))}
-          </ul>
-        </section>
-      ) : null}
-
-      <section>
-        <h2 className="mb-4 text-lg font-light text-ink">Timeline</h2>
-        <ul className="space-y-4 border-l border-ink/10 pl-5">
-          {timeline.map((e) => (
-            <li key={e.id}>
-              <p className="text-sm text-ink">{e.title}</p>
-              {e.detail ? <p className="text-xs text-ink-faint">{e.detail}</p> : null}
-              <p className="mt-1 font-mono text-[10px] text-ink-faint">
-                {e.at.toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" })}
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="text-[14px] font-medium text-ink">{item.productName}</p>
+                <p className="mt-0.5 text-[12px] text-ink-mute">
+                  Qty {item.quantity}
+                  {item.product?.sizeLabel ? ` · ${item.product.sizeLabel}` : ""}
+                </p>
+              </div>
+              <p className="text-[13px] tabular-nums text-ink">
+                {inr.format((item.unitPriceCents * item.quantity) / 100)}
               </p>
             </li>
           ))}
         </ul>
       </section>
 
-      <Link href="/portal/support" className="inline-block text-sm text-ink-mute underline-offset-4 hover:underline">
-        Need help with this order?
-      </Link>
+      {customerEvents.length > 0 ? (
+        <section>
+          <h2 className="mb-2 text-[13px] font-medium text-ink-mute">Updates</h2>
+          <ol className="border border-ink/10 bg-paper px-4 py-3">
+            {customerEvents.map((e, i) => (
+              <li key={e.id} className="flex gap-3">
+                <div className="flex w-3 flex-col items-center">
+                  <span className="mt-1.5 h-2 w-2 rounded-full bg-gold" />
+                  {i < customerEvents.length - 1 ? <span className="w-px flex-1 bg-ink/10" /> : null}
+                </div>
+                <div className="min-w-0 pb-3">
+                  <p className="text-[14px] text-ink">{e.title}</p>
+                  {e.detail ? <p className="text-[12px] text-ink-mute">{e.detail}</p> : null}
+                  <p className="mt-0.5 text-[12px] text-ink-mute">
+                    {e.at.toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" })}
+                  </p>
+                </div>
+              </li>
+            ))}
+          </ol>
+        </section>
+      ) : null}
+
+      {technical.length > 0 ? (
+        <details className="border border-ink/10 bg-paper px-4 py-3">
+          <summary className="cursor-pointer text-[13px] font-medium text-ink-mute">
+            Technical history
+          </summary>
+          <ul className="mt-3 space-y-3 border-t border-ink/8 pt-3">
+            {technical.map((e) => (
+              <li key={e.id}>
+                <p className="text-[13px] text-ink-soft">{e.title}</p>
+                {e.detail ? <p className="text-[12px] text-ink-faint">{e.detail}</p> : null}
+                <p className="mt-0.5 text-[11px] text-ink-faint">
+                  {e.at.toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" })}
+                </p>
+              </li>
+            ))}
+          </ul>
+        </details>
+      ) : null}
     </div>
   );
 }

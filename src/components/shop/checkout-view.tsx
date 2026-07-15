@@ -5,14 +5,17 @@ import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
+import type { LucideIcon } from "lucide-react";
 import {
   ArrowLeft,
   Check,
   ChevronDown,
-  Circle,
   CreditCard,
+  FlaskConical,
   Lock,
+  Mail,
   Smartphone,
+  Truck,
   Wallet
 } from "lucide-react";
 import { useCart } from "@/components/shop/cart-context";
@@ -26,15 +29,6 @@ const inr = new Intl.NumberFormat("en-IN", {
 });
 
 const RZP_SCRIPT = "https://checkout.razorpay.com/v1/checkout.js";
-
-const TRUST_LINES = [
-  "Patent-backed formulation",
-  "Developed with SKUAST-K researchers",
-  "GMP manufacturing standards",
-  "Secure Razorpay payment",
-  "GST invoice included",
-  "Batch verified before dispatch"
-] as const;
 
 const INDIAN_STATES = [
   "Andhra Pradesh",
@@ -121,6 +115,7 @@ type FormState = {
 
 type FieldKey = keyof FormState;
 type Errors = Partial<Record<FieldKey, string>>;
+type StepId = "contact" | "delivery";
 
 const EMPTY: FormState = {
   fullName: "",
@@ -186,6 +181,12 @@ function validateAll(form: FormState): Errors {
   return next;
 }
 
+function shipsByLabel() {
+  const d = new Date();
+  d.setDate(d.getDate() + 7);
+  return d.toLocaleDateString("en-IN", { weekday: "short", day: "numeric", month: "short" });
+}
+
 export type SavedCheckoutAddress = {
   id: string;
   label: string;
@@ -222,7 +223,9 @@ export function CheckoutView({
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pinStatus, setPinStatus] = useState<"idle" | "loading" | "ok" | "miss">("idle");
-  const [shippingMethod, setShippingMethod] = useState<"standard">("standard");
+  const [openStep, setOpenStep] = useState<StepId>("contact");
+
+  const shipsBy = useMemo(() => shipsByLabel(), []);
 
   useEffect(() => {
     if (ready && items.length === 0 && !submitting) {
@@ -255,6 +258,12 @@ export function CheckoutView({
   }, [form, touched, attempted]);
 
   const isValid = useMemo(() => Object.keys(validateAll(form)).length === 0, [form]);
+
+  useEffect(() => {
+    if (contactDone && openStep === "contact" && !addressDone) {
+      // keep contact open until they continue
+    }
+  }, [contactDone, addressDone, openStep]);
 
   const set =
     (key: FieldKey) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
@@ -306,17 +315,21 @@ export function CheckoutView({
       "email",
       "phone",
       "fullName",
+      "postalCode",
       "line1",
       "city",
       "state",
-      "postalCode",
       "country"
     ];
     const first = order.find((k) => errs[k]);
     if (!first) return;
-    const el = document.getElementById(`field-${first}`);
-    el?.focus();
-    el?.scrollIntoView({ behavior: "smooth", block: "center" });
+    if (["email", "phone"].includes(first)) setOpenStep("contact");
+    else setOpenStep("delivery");
+    window.setTimeout(() => {
+      const el = document.getElementById(`field-${first}`);
+      el?.focus();
+      el?.scrollIntoView({ behavior: "smooth", block: "center" });
+    }, 80);
   }, []);
 
   async function handleSubmit(e: React.FormEvent) {
@@ -347,7 +360,6 @@ export function CheckoutView({
         return;
       }
 
-      // Test mode: server completed the order without Razorpay.
       if (data.skipPayment && data.orderNumber) {
         clear();
         const t = data.confirmationToken ? `?t=${encodeURIComponent(data.confirmationToken)}` : "";
@@ -369,7 +381,11 @@ export function CheckoutView({
         name: "Cashmir Biotech",
         description: `Order ${data.orderNumber}`,
         order_id: data.razorpayOrderId,
-        prefill: { name: data.customer?.name, email: data.customer?.email, contact: data.customer?.phone },
+        prefill: {
+          name: data.customer?.name,
+          email: data.customer?.email,
+          contact: data.customer?.phone
+        },
         theme: { color: "#111111" },
         handler: async (response) => {
           try {
@@ -416,347 +432,443 @@ export function CheckoutView({
 
   if (!ready) {
     return (
-      <div className="frame pt-5">
-        <div className="h-40 animate-pulse bg-pearl/80" />
+      <div className="mx-auto max-w-lg px-5 pt-8">
+        <div className="h-48 animate-pulse bg-pearl/80" />
       </div>
     );
   }
 
+  const primary = items[0];
+  const moreCount = Math.max(0, items.length - 1);
+
   return (
-    <div className="frame pt-4 md:pt-5">
-      <div className="flex flex-col gap-3 border-b border-ink/10 pb-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <p className="text-[12px] text-ink-mute">Cashmir Biotech · Research purchase</p>
-          <h1 className="mt-0.5 text-[1.35rem] font-light tracking-tight text-ink md:text-[1.5rem]">
-            Complete your order
-          </h1>
-        </div>
-        <CheckoutProgress contactDone={contactDone} addressDone={addressDone} />
-      </div>
+    <div className="relative min-h-dvh bg-ivory pb-28 lg:pb-12">
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-x-0 top-0 h-56"
+        style={{
+          backgroundImage:
+            "radial-gradient(ellipse at 50% -10%, rgb(184 148 88 / 0.12), transparent 55%)"
+        }}
+      />
 
-      <div className="mt-6 grid grid-cols-1 gap-10 lg:mt-7 lg:grid-cols-[minmax(0,1.2fr)_minmax(300px,0.8fr)] lg:gap-14">
-        <form id="checkout-form" onSubmit={handleSubmit} noValidate>
-          <Section title="Contact" index="01" complete={contactDone}>
-            <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2 sm:gap-4">
-              <Field
-                id="field-email"
-                label="Email"
-                type="email"
-                autoComplete="email"
-                value={form.email}
-                onChange={set("email")}
-                onBlur={blur("email")}
-                error={errors.email}
-                className="sm:col-span-2"
-                required
-              />
-              <Field
-                id="field-phone"
-                label="Mobile"
-                autoComplete="tel"
-                inputMode="tel"
-                value={form.phone}
-                onChange={set("phone")}
-                onBlur={blur("phone")}
-                error={errors.phone}
-                hint="For OTP and courier updates"
-                required
-              />
-            </div>
-          </Section>
-
-          <Section title="Ship to" index="02" complete={addressDone}>
-            {savedAddresses.length > 0 ? (
-              <div className="mb-4 space-y-2">
-                <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-ink-faint">
-                  Saved portal addresses
-                </p>
-                <div className="flex flex-wrap gap-2">
-                  {savedAddresses.map((a) => (
-                    <button
-                      key={a.id}
-                      type="button"
-                      onClick={() => {
-                        setForm((f) => ({
-                          ...f,
-                          fullName: a.fullName || f.fullName,
-                          phone: a.phone || f.phone,
-                          line1: a.line1,
-                          line2: a.line2,
-                          city: a.city,
-                          state: a.state,
-                          postalCode: a.postalCode,
-                          country: a.country || "India"
-                        }));
-                        setTouched((t) => ({
-                          ...t,
-                          fullName: true,
-                          phone: true,
-                          line1: true,
-                          city: true,
-                          state: true,
-                          postalCode: true,
-                          country: true
-                        }));
-                      }}
-                      className="rounded-full border border-ink/15 px-3 py-1.5 text-left text-[12px] text-ink transition-colors hover:border-gold/50 hover:bg-pearl/60"
-                    >
-                      <span className="font-medium">{a.label}</span>
-                      {a.isDefault ? <span className="ml-1 text-gold">· default</span> : null}
-                      <span className="mt-0.5 block text-[11px] text-ink-mute">
-                        {a.city}, {a.state}
-                      </span>
-                    </button>
-                  ))}
-                </div>
-              </div>
-            ) : null}
-            <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2 sm:gap-4">
-              <Field
-                id="field-fullName"
-                label="Full name"
-                autoComplete="name"
-                value={form.fullName}
-                onChange={set("fullName")}
-                onBlur={blur("fullName")}
-                error={errors.fullName}
-                className="sm:col-span-2"
-                required
-              />
-              <Field
-                id="field-line1"
-                label="Address"
-                autoComplete="address-line1"
-                value={form.line1}
-                onChange={set("line1")}
-                onBlur={blur("line1")}
-                error={errors.line1}
-                className="sm:col-span-2"
-                required
-              />
-              <Field
-                id="field-line2"
-                label="Apartment, suite (optional)"
-                autoComplete="address-line2"
-                value={form.line2}
-                onChange={set("line2")}
-                onBlur={blur("line2")}
-                className="sm:col-span-2"
-              />
-              <Field
-                id="field-postalCode"
-                label="PIN code"
-                autoComplete="postal-code"
-                inputMode="numeric"
-                maxLength={6}
-                value={form.postalCode}
-                onChange={set("postalCode")}
-                onBlur={blur("postalCode")}
-                error={errors.postalCode}
-                hint={
-                  pinStatus === "loading"
-                    ? "Looking up locality…"
-                    : pinStatus === "ok"
-                      ? "City & state filled from PIN"
-                      : pinStatus === "miss"
-                        ? "PIN not found — enter city manually"
-                        : "Auto-fills city & state"
-                }
-                required
-              />
-              <Field
-                id="field-city"
-                label="City"
-                autoComplete="address-level2"
-                value={form.city}
-                onChange={set("city")}
-                onBlur={blur("city")}
-                error={errors.city}
-                required
-              />
-              <SelectField
-                id="field-state"
-                label="State"
-                autoComplete="address-level1"
-                value={form.state}
-                onChange={set("state")}
-                onBlur={blur("state")}
-                error={errors.state}
-                required
-              >
-                <option value="">Select state</option>
-                {INDIAN_STATES.map((s) => (
-                  <option key={s} value={s}>
-                    {s}
-                  </option>
-                ))}
-              </SelectField>
-              <SelectField
-                id="field-country"
-                label="Country"
-                autoComplete="country-name"
-                value={form.country}
-                onChange={set("country")}
-                onBlur={blur("country")}
-                error={errors.country}
-                required
-              >
-                <option value="India">India</option>
-              </SelectField>
-            </div>
-          </Section>
-
-          <Section title="Delivery" index="03" complete>
-            <button
-              type="button"
-              onClick={() => setShippingMethod("standard")}
-              className={cn(
-                "group w-full border px-4 py-3.5 text-left transition-all duration-200 ease-expo",
-                shippingMethod === "standard"
-                  ? "border-ink bg-pearl/80 shadow-[inset_3px_0_0_0_#c4a574]"
-                  : "border-ink/15 hover:border-ink/30"
-              )}
-            >
-              <div className="flex items-start gap-3">
-                <span
-                  className={cn(
-                    "mt-0.5 grid h-5 w-5 shrink-0 place-items-center border transition-colors duration-200",
-                    shippingMethod === "standard"
-                      ? "border-ink bg-ink text-paper"
-                      : "border-ink/25 text-transparent"
-                  )}
-                  aria-hidden
-                >
-                  <Check className="h-3 w-3" strokeWidth={2.5} />
-                </span>
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-start justify-between gap-4">
-                    <div>
-                      <p className="text-[14px] font-medium text-ink">Standard research dispatch</p>
-                      <p className="mt-1 text-[12px] leading-relaxed text-ink-soft">
-                        Assayed lot prepared and shipped within ~7 days. Tracking after payment
-                        confirmation.
-                      </p>
-                    </div>
-                    <p className="shrink-0 text-[13px] tabular-nums text-ink">
-                      {shipping === 0 ? "Free" : inr.format(shipping)}
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </button>
-            <p className="mt-3 text-[12px] text-ink-soft">
-              Arrival window firms after PIN & courier assignment. Orders at{" "}
-              {inr.format(freeShippingThresholdInr)}+ ship complimentary.
-            </p>
-          </Section>
-
-          <Section title="Why researchers trust us" index="04">
-            <ul className="grid gap-2.5 sm:grid-cols-2">
-              {TRUST_LINES.map((line) => (
-                <li key={line} className="flex gap-2.5 text-[13px] leading-snug text-ink-soft">
-                  <Check className="mt-0.5 h-3.5 w-3.5 shrink-0 text-gold" strokeWidth={2.5} />
-                  <span>{line}</span>
-                </li>
-              ))}
-            </ul>
-          </Section>
-
-          {error ? (
-            <p
-              role="alert"
-              className="mt-6 border border-red-400 bg-red-50 px-4 py-3 text-sm text-red-800"
-            >
-              {error}
-            </p>
-          ) : null}
-
-          <div className="mt-8 space-y-3 lg:hidden">
-            <PayButton total={total} submitting={submitting} valid={isValid} attempted={attempted} />
-            <PaymentStrip />
-          </div>
-        </form>
-
-        <aside className="h-fit border-t border-ink/10 bg-pearl/55 p-5 shadow-[0_12px_40px_-24px_rgba(17,17,17,0.35)] lg:sticky lg:top-[4.5rem] lg:border lg:border-ink/8 lg:bg-[#f7f5f1] lg:p-6">
-          <div className="flex items-center justify-between gap-3">
-            <h2 className="text-[14px] font-medium text-ink">Your formula</h2>
+      <div className="relative mx-auto max-w-5xl px-4 pt-5 sm:px-6 lg:px-8 lg:pt-8">
+        <header className="flex items-start justify-between gap-4">
+          <div className="min-w-0">
             <Link
               href="/cart"
-              className="inline-flex items-center gap-1.5 text-[13px] font-medium text-ink underline-offset-4 transition-colors hover:text-gold hover:underline"
+              className="inline-flex min-h-10 items-center gap-1.5 text-[13px] text-ink-mute hover:text-ink"
             >
-              <ArrowLeft className="h-3.5 w-3.5" strokeWidth={2} />
+              <ArrowLeft className="h-3.5 w-3.5" />
               Edit bag
             </Link>
+            <p className="mt-3 text-[13px] font-medium text-gold">Cashmir Biotech</p>
+            <h1 className="mt-1 max-w-[18ch] text-[1.65rem] font-light leading-[1.12] tracking-tight text-ink sm:text-[2rem]">
+              One step from laboratory-grade wellness.
+            </h1>
+            <p className="mt-2 max-w-md text-[14px] leading-relaxed text-ink-mute">
+              Secure your patented formulation. GST invoice and batch records included.
+            </p>
           </div>
+        </header>
 
-          <p className="mt-1.5 text-[11px] leading-relaxed text-ink-soft">
-            Assay verified · SKUAST-K research · Lot prepared at dispatch
-          </p>
+        <StepCapsules contactDone={contactDone} addressDone={addressDone} openStep={openStep} />
 
-          <ul className="mt-5 space-y-4">
-            {items.map((i) => (
-              <li key={i.productId} className="flex gap-3">
-                <div className="relative h-14 w-14 shrink-0 overflow-hidden bg-paper">
-                  {i.imageUrl ? (
+        <div className="mt-6 grid gap-6 lg:mt-8 lg:grid-cols-[minmax(0,1.05fr)_minmax(300px,0.95fr)] lg:items-start lg:gap-10">
+          <form id="checkout-form" onSubmit={handleSubmit} noValidate className="space-y-3">
+            {/* Product lead — mobile first */}
+            <section className="border border-ink/10 bg-paper p-4 lg:hidden">
+              <div className="flex gap-3">
+                <div className="relative h-20 w-20 shrink-0 overflow-hidden bg-pearl">
+                  {primary?.imageUrl ? (
                     <Image
-                      src={i.imageUrl}
+                      src={primary.imageUrl}
                       alt=""
                       fill
-                      sizes="56px"
-                      className="object-contain p-1"
+                      sizes="80px"
+                      className="object-contain p-1.5"
+                      priority
                     />
-                  ) : null}
+                  ) : (
+                    <div className="grid h-full place-items-center text-ink-faint">
+                      <FlaskConical className="h-7 w-7" strokeWidth={1.25} />
+                    </div>
+                  )}
                 </div>
                 <div className="min-w-0 flex-1">
-                  <p className="truncate text-[13px] text-ink">{i.name}</p>
-                  <p className="mt-0.5 text-[11px] text-ink-soft">
-                    {i.quantity} × {i.sizeLabel}
+                  <p className="truncate text-[15px] font-medium text-ink">
+                    {primary?.name ?? "Your formula"}
+                    {moreCount > 0 ? ` +${moreCount}` : ""}
+                  </p>
+                  <p className="mt-0.5 text-[12px] text-ink-mute">
+                    {primary ? `${primary.quantity} × ${primary.sizeLabel}` : null}
                     <span className="text-gold"> · </span>
                     Patent-backed
                   </p>
+                  <p className="mt-2 text-[13px] text-ink-mute">
+                    Ships by <span className="font-medium text-ink">{shipsBy}</span>
+                  </p>
+                  <p className="mt-1 text-[18px] font-light tabular-nums text-ink">
+                    {inr.format(total)}
+                  </p>
                 </div>
-                <p className="shrink-0 text-[13px] tabular-nums text-ink">
-                  <Money value={i.priceInr * i.quantity} />
-                </p>
-              </li>
-            ))}
-          </ul>
+              </div>
+            </section>
 
-          <dl className="mt-5 space-y-3 border-t border-ink/10 pt-5 text-[13px]">
-            <div className="flex justify-between">
-              <dt className="text-ink-soft">Subtotal</dt>
-              <dd className="tabular-nums text-ink">
-                <Money value={subtotalInr} />
-              </dd>
-            </div>
-            <div className="flex justify-between">
-              <dt className="text-ink-soft">Shipping</dt>
-              <dd className="tabular-nums text-ink">
-                {shipping === 0 ? "Free" : <Money value={shipping} />}
-              </dd>
-            </div>
-            <div className="flex justify-between border-t border-ink/10 pt-4 text-[15px]">
-              <dt className="font-medium text-ink">Total</dt>
-              <dd className="font-medium tabular-nums text-ink">
-                <Money value={total} />
-              </dd>
-            </div>
-          </dl>
+            <Accordion
+              step="contact"
+              index="01"
+              title="Contact"
+              open={openStep === "contact"}
+              done={contactDone}
+              summary={
+                contactDone
+                  ? `${form.email}${form.phone ? ` · ${form.phone}` : ""}`
+                  : "Email & mobile for updates"
+              }
+              onOpen={() => setOpenStep("contact")}
+            >
+              <div className="grid gap-3.5">
+                <Field
+                  id="field-email"
+                  label="Email"
+                  icon={Mail}
+                  type="email"
+                  autoComplete="email"
+                  inputMode="email"
+                  value={form.email}
+                  onChange={set("email")}
+                  onBlur={blur("email")}
+                  error={errors.email}
+                  hint="Order confirmation and GST invoice"
+                  required
+                />
+                <Field
+                  id="field-phone"
+                  label="Mobile"
+                  icon={Smartphone}
+                  autoComplete="tel"
+                  inputMode="numeric"
+                  value={form.phone}
+                  onChange={set("phone")}
+                  onBlur={blur("phone")}
+                  error={errors.phone}
+                  hint="Only used for delivery OTP and courier updates"
+                  required
+                />
+                <button
+                  type="button"
+                  disabled={!contactDone}
+                  onClick={() => setOpenStep("delivery")}
+                  className="mt-1 w-full min-h-12 bg-ink text-[14px] font-medium text-paper disabled:bg-ink/25"
+                >
+                  Continue to delivery
+                </button>
+              </div>
+            </Accordion>
 
-          <ul className="mt-5 space-y-2 border-t border-ink/8 pt-4">
-            {["Batch verified", "GST invoice", "Ships ~7 days", "Razorpay protected"].map((t) => (
-              <li key={t} className="flex gap-2 text-[12px] text-ink-soft">
-                <Check className="mt-0.5 h-3.5 w-3.5 shrink-0 text-gold" strokeWidth={2.5} />
-                {t}
-              </li>
-            ))}
-          </ul>
+            <Accordion
+              step="delivery"
+              index="02"
+              title="Delivery"
+              open={openStep === "delivery"}
+              done={addressDone}
+              summary={
+                addressDone
+                  ? `${form.fullName} · ${form.city}, ${form.state} ${form.postalCode}`
+                  : "Where we ship your lot"
+              }
+              onOpen={() => setOpenStep("delivery")}
+            >
+              {savedAddresses.length > 0 ? (
+                <div className="mb-4 space-y-2">
+                  <p className="text-[12px] font-medium text-ink-mute">Saved addresses</p>
+                  <div className="flex flex-wrap gap-2">
+                    {savedAddresses.map((a) => (
+                      <button
+                        key={a.id}
+                        type="button"
+                        onClick={() => {
+                          setForm((f) => ({
+                            ...f,
+                            fullName: a.fullName || f.fullName,
+                            phone: a.phone || f.phone,
+                            line1: a.line1,
+                            line2: a.line2,
+                            city: a.city,
+                            state: a.state,
+                            postalCode: a.postalCode,
+                            country: a.country || "India"
+                          }));
+                          setTouched((t) => ({
+                            ...t,
+                            fullName: true,
+                            phone: true,
+                            line1: true,
+                            city: true,
+                            state: true,
+                            postalCode: true,
+                            country: true
+                          }));
+                        }}
+                        className="border border-ink/12 bg-ivory px-3 py-2 text-left text-[12px] text-ink active:bg-pearl"
+                      >
+                        <span className="font-medium">{a.label}</span>
+                        {a.isDefault ? <span className="ml-1 text-gold">default</span> : null}
+                        <span className="mt-0.5 block text-ink-mute">
+                          {a.city}, {a.state}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
 
-          <div className="mt-6 hidden space-y-3 lg:block">
-            <PayButton total={total} submitting={submitting} valid={isValid} attempted={attempted} />
-            <PaymentStrip />
+              <div className="grid gap-3.5 sm:grid-cols-2">
+                <Field
+                  id="field-postalCode"
+                  label="PIN code"
+                  autoComplete="postal-code"
+                  inputMode="numeric"
+                  maxLength={6}
+                  value={form.postalCode}
+                  onChange={set("postalCode")}
+                  onBlur={blur("postalCode")}
+                  error={errors.postalCode}
+                  hint={
+                    pinStatus === "loading"
+                      ? "Looking up locality…"
+                      : pinStatus === "ok"
+                        ? "City & state filled from PIN"
+                        : pinStatus === "miss"
+                          ? "PIN not found — enter city manually"
+                          : "Auto-fills city & state"
+                  }
+                  required
+                />
+                <Field
+                  id="field-fullName"
+                  label="Full name"
+                  autoComplete="name"
+                  value={form.fullName}
+                  onChange={set("fullName")}
+                  onBlur={blur("fullName")}
+                  error={errors.fullName}
+                  required
+                />
+                <Field
+                  id="field-line1"
+                  label="Address"
+                  autoComplete="address-line1"
+                  value={form.line1}
+                  onChange={set("line1")}
+                  onBlur={blur("line1")}
+                  error={errors.line1}
+                  className="sm:col-span-2"
+                  required
+                />
+                <Field
+                  id="field-line2"
+                  label="Apartment, suite (optional)"
+                  autoComplete="address-line2"
+                  value={form.line2}
+                  onChange={set("line2")}
+                  onBlur={blur("line2")}
+                  className="sm:col-span-2"
+                />
+                <Field
+                  id="field-city"
+                  label="City"
+                  autoComplete="address-level2"
+                  value={form.city}
+                  onChange={set("city")}
+                  onBlur={blur("city")}
+                  error={errors.city}
+                  required
+                />
+                <SelectField
+                  id="field-state"
+                  label="State"
+                  autoComplete="address-level1"
+                  value={form.state}
+                  onChange={set("state")}
+                  onBlur={blur("state")}
+                  error={errors.state}
+                  required
+                >
+                  <option value="">Select state</option>
+                  {INDIAN_STATES.map((s) => (
+                    <option key={s} value={s}>
+                      {s}
+                    </option>
+                  ))}
+                </SelectField>
+                <SelectField
+                  id="field-country"
+                  label="Country"
+                  autoComplete="country-name"
+                  value={form.country}
+                  onChange={set("country")}
+                  onBlur={blur("country")}
+                  error={errors.country}
+                  className="sm:col-span-2"
+                  required
+                >
+                  <option value="India">India</option>
+                </SelectField>
+              </div>
+
+              <div className="mt-4 flex gap-3 border border-ink/10 bg-ivory p-3.5">
+                <span className="grid h-10 w-10 shrink-0 place-items-center bg-paper text-ink">
+                  <Truck className="h-5 w-5" strokeWidth={1.75} />
+                </span>
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <p className="text-[14px] font-medium text-ink">Standard research dispatch</p>
+                      <p className="mt-0.5 text-[12px] leading-snug text-ink-mute">
+                        Assayed lot ships by <span className="text-ink">{shipsBy}</span>. Tracking after
+                        payment.
+                      </p>
+                    </div>
+                    <p className="shrink-0 text-[13px] font-medium tabular-nums text-ink">
+                      {shipping === 0 ? "Free" : inr.format(shipping)}
+                    </p>
+                  </div>
+                  {shipping > 0 ? (
+                    <p className="mt-2 text-[11px] text-ink-mute">
+                      Free shipping on {inr.format(freeShippingThresholdInr)}+
+                    </p>
+                  ) : (
+                    <p className="mt-2 text-[11px] font-medium text-gold">Complimentary shipping unlocked</p>
+                  )}
+                </div>
+              </div>
+            </Accordion>
+
+            <section className="border border-ink/10 bg-paper px-4 py-4">
+              <p className="text-[12px] font-medium text-ink-mute">Before you pay</p>
+              <ul className="mt-3 grid gap-2.5 sm:grid-cols-2">
+                {[
+                  "SSL encrypted checkout",
+                  "Razorpay protected",
+                  "GST invoice auto-generated",
+                  "Batch verified before dispatch"
+                ].map((line) => (
+                  <li key={line} className="flex gap-2 text-[13px] text-ink">
+                    <Check className="mt-0.5 h-3.5 w-3.5 shrink-0 text-gold" strokeWidth={2.5} />
+                    {line}
+                  </li>
+                ))}
+              </ul>
+              <PaymentStrip className="mt-4 justify-start" />
+            </section>
+
+            {error ? (
+              <p
+                role="alert"
+                className="border border-red-300 bg-red-50 px-4 py-3 text-[13px] text-red-800"
+              >
+                {error}
+              </p>
+            ) : null}
+
+            {/* Desktop CTA (sticky aside also has one) */}
+            <div className="hidden lg:block">
+              <PayButton total={total} submitting={submitting} valid={isValid} attempted={attempted} />
+            </div>
+          </form>
+
+          <aside className="hidden h-fit border border-ink/10 bg-paper p-5 lg:sticky lg:top-24 lg:block lg:p-6">
+            <h2 className="text-[13px] font-medium text-ink-mute">Your formula</h2>
+            <ul className="mt-4 space-y-4">
+              {items.map((i) => (
+                <li key={i.productId} className="flex gap-3">
+                  <div className="relative h-20 w-20 shrink-0 overflow-hidden bg-pearl">
+                    {i.imageUrl ? (
+                      <Image src={i.imageUrl} alt="" fill sizes="80px" className="object-contain p-1.5" />
+                    ) : null}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-[14px] font-medium leading-snug text-ink">{i.name}</p>
+                    <p className="mt-1 text-[12px] text-ink-mute">
+                      {i.quantity} × {i.sizeLabel}
+                      <span className="text-gold"> · </span>
+                      Patent-backed
+                    </p>
+                    <p className="mt-2 text-[12px] text-ink-mute">Ships by {shipsBy}</p>
+                  </div>
+                  <p className="shrink-0 text-[14px] tabular-nums text-ink">
+                    <Money value={i.priceInr * i.quantity} />
+                  </p>
+                </li>
+              ))}
+            </ul>
+
+            <dl className="mt-5 space-y-2.5 border-t border-ink/10 pt-4 text-[13px]">
+              <div className="flex justify-between">
+                <dt className="text-ink-mute">Subtotal</dt>
+                <dd className="tabular-nums">
+                  <Money value={subtotalInr} />
+                </dd>
+              </div>
+              <div className="flex justify-between">
+                <dt className="text-ink-mute">Shipping</dt>
+                <dd className="tabular-nums">
+                  {shipping === 0 ? "Free" : <Money value={shipping} />}
+                </dd>
+              </div>
+              <div className="flex justify-between border-t border-ink/10 pt-3 text-[1.35rem] font-light">
+                <dt className="text-ink">Total</dt>
+                <dd className="tabular-nums text-ink">
+                  <Money value={total} />
+                </dd>
+              </div>
+            </dl>
+
+            <ul className="mt-5 space-y-2 border-t border-ink/8 pt-4">
+              {["Batch verified", "GST invoice", `Ships by ${shipsBy}`, "Razorpay protected"].map(
+                (t) => (
+                  <li key={t} className="flex gap-2 text-[12px] text-ink-mute">
+                    <Check className="mt-0.5 h-3.5 w-3.5 shrink-0 text-gold" strokeWidth={2.5} />
+                    {t}
+                  </li>
+                )
+              )}
+            </ul>
+
+            <div className="mt-5">
+              <PayButton total={total} submitting={submitting} valid={isValid} attempted={attempted} />
+              <PaymentStrip className="mt-3" />
+            </div>
+          </aside>
+        </div>
+      </div>
+
+      {/* Mobile sticky pay dock */}
+      <div className="fixed inset-x-0 bottom-0 z-40 border-t border-ink/10 bg-paper/95 pb-[env(safe-area-inset-bottom)] backdrop-blur lg:hidden">
+        <div className="mx-auto flex max-w-lg items-center gap-3 px-4 py-3">
+          <div className="min-w-0">
+            <p className="text-[11px] text-ink-mute">Total</p>
+            <p className="text-[1.25rem] font-light tabular-nums leading-none text-ink">
+              <Money value={total} />
+            </p>
           </div>
-        </aside>
+          <button
+            type="submit"
+            form="checkout-form"
+            disabled={submitting}
+            className="flex min-h-[3.25rem] flex-1 items-center justify-center gap-2 bg-ink px-4 text-[14px] font-medium text-paper shadow-[0_10px_28px_-14px_rgba(17,17,17,0.7)] disabled:opacity-60"
+          >
+            <Lock className="h-4 w-4" strokeWidth={2} />
+            {submitting ? "Opening payment…" : "Complete secure purchase"}
+          </button>
+        </div>
+        {attempted && !isValid ? (
+          <p className="px-4 pb-2 text-center text-[11px] text-red-700">
+            Complete the highlighted fields to continue.
+          </p>
+        ) : null}
       </div>
     </div>
   );
@@ -779,78 +891,122 @@ function Money({ value }: { value: number }) {
   );
 }
 
-function CheckoutProgress({
+function StepCapsules({
   contactDone,
-  addressDone
+  addressDone,
+  openStep
 }: {
   contactDone: boolean;
   addressDone: boolean;
+  openStep: StepId;
 }) {
-  const steps = [
-    { key: "formula", label: "Formula", status: "done" as const, href: "/cart" },
+  const steps: Array<{ id: StepId | "pay"; label: string; done: boolean; active: boolean }> = [
     {
-      key: "shipping",
-      label: "Shipping",
-      status: addressDone && contactDone ? ("done" as const) : ("current" as const)
+      id: "contact",
+      label: "Contact",
+      done: contactDone,
+      active: openStep === "contact"
     },
-    { key: "payment", label: "Payment", status: "todo" as const },
-    { key: "complete", label: "Complete", status: "todo" as const }
+    {
+      id: "delivery",
+      label: "Delivery",
+      done: addressDone,
+      active: openStep === "delivery"
+    },
+    {
+      id: "pay",
+      label: "Payment",
+      done: false,
+      active: contactDone && addressDone
+    }
   ];
 
   return (
-    <ol className="flex flex-wrap items-center gap-x-3 gap-y-2 text-[12px]">
-      {steps.map((step, i) => (
-        <li key={step.key} className="flex items-center gap-3">
-          {i > 0 ? <span className="hidden h-px w-4 bg-ink/15 sm:block" aria-hidden /> : null}
-          {"href" in step && step.href ? (
-            <Link
-              href={step.href}
-              className="inline-flex items-center gap-1.5 text-ink-soft transition-colors hover:text-ink"
-            >
-              <StepIcon status="done" />
-              {step.label}
-            </Link>
-          ) : (
-            <span
-              className={cn(
-                "inline-flex items-center gap-1.5 transition-colors duration-200",
-                step.status === "current" && "font-medium text-ink",
-                step.status === "done" && "text-ink-soft",
-                step.status === "todo" && "text-ink-mute"
-              )}
-            >
-              <StepIcon status={step.status} />
-              {step.label}
-            </span>
+    <ol className="mt-5 flex flex-wrap gap-2">
+      {steps.map((s, i) => (
+        <li
+          key={s.id}
+          className={cn(
+            "inline-flex items-center gap-1.5 border px-2.5 py-1.5 text-[12px]",
+            s.done
+              ? "border-ink/15 bg-paper text-ink"
+              : s.active
+                ? "border-ink bg-ink text-paper"
+                : "border-ink/10 text-ink-mute"
           )}
+        >
+          <span className="tabular-nums opacity-70">0{i + 1}</span>
+          {s.done ? <Check className="h-3 w-3 text-gold" strokeWidth={2.5} /> : null}
+          {s.label}
         </li>
       ))}
     </ol>
   );
 }
 
-function StepIcon({ status }: { status: "done" | "current" | "todo" }) {
-  if (status === "done") {
-    return (
-      <motion.span
-        initial={{ scale: 0.7, opacity: 0 }}
-        animate={{ scale: 1, opacity: 1 }}
-        transition={{ duration: 0.2, ease: EASE_OUT_EXPO }}
-        className="grid h-4 w-4 place-items-center rounded-full bg-ink text-paper"
+function Accordion({
+  index,
+  title,
+  open,
+  done,
+  summary,
+  onOpen,
+  children
+}: {
+  step: StepId;
+  index: string;
+  title: string;
+  open: boolean;
+  done?: boolean;
+  summary: string;
+  onOpen: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <section className="border border-ink/10 bg-paper">
+      <button
+        type="button"
+        onClick={onOpen}
+        className="flex w-full items-center gap-3 px-4 py-3.5 text-left"
+        aria-expanded={open}
       >
-        <Check className="h-2.5 w-2.5" strokeWidth={3} />
-      </motion.span>
-    );
-  }
-  if (status === "current") {
-    return (
-      <span className="relative grid h-4 w-4 place-items-center">
-        <Circle className="h-4 w-4 text-gold" strokeWidth={2} />
-        <span className="absolute h-1.5 w-1.5 rounded-full bg-gold" />
-      </span>
-    );
-  }
-  return <Circle className="h-3.5 w-3.5 text-ink/25" strokeWidth={1.5} />;
+        <span
+          className={cn(
+            "grid h-7 w-7 shrink-0 place-items-center text-[11px] font-medium",
+            done ? "bg-ink text-paper" : open ? "bg-gold text-ink" : "bg-pearl text-ink-mute"
+          )}
+        >
+          {done ? <Check className="h-3.5 w-3.5" strokeWidth={2.5} /> : index}
+        </span>
+        <span className="min-w-0 flex-1">
+          <span className="block text-[15px] font-medium text-ink">{title}</span>
+          {!open ? (
+            <span className="mt-0.5 block truncate text-[12px] text-ink-mute">{summary}</span>
+          ) : null}
+        </span>
+        <ChevronDown
+          className={cn(
+            "h-4 w-4 shrink-0 text-ink-mute transition-transform duration-200",
+            open && "rotate-180"
+          )}
+        />
+      </button>
+      <AnimatePresence initial={false}>
+        {open ? (
+          <motion.div
+            key="body"
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: "auto", opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.28, ease: EASE_OUT_EXPO }}
+            className="overflow-hidden"
+          >
+            <div className="border-t border-ink/8 px-4 pb-4 pt-3">{children}</div>
+          </motion.div>
+        ) : null}
+      </AnimatePresence>
+    </section>
+  );
 }
 
 function PayButton({
@@ -877,32 +1033,29 @@ function PayButton({
         type="submit"
         form="checkout-form"
         disabled={submitting}
-        className="group relative flex w-full items-center justify-center gap-2 overflow-hidden bg-ink py-[1.125rem] text-[13px] font-medium text-paper shadow-[0_8px_24px_-12px_rgba(17,17,17,0.55)] transition-[transform,box-shadow] duration-200 ease-expo hover:-translate-y-0.5 hover:shadow-[0_14px_28px_-14px_rgba(17,17,17,0.55)] disabled:cursor-wait disabled:hover:translate-y-0"
+        className="flex min-h-[3.5rem] w-full items-center justify-center gap-2 bg-ink text-[15px] font-medium text-paper shadow-[0_10px_28px_-14px_rgba(17,17,17,0.55)] transition-transform hover:-translate-y-px disabled:cursor-wait disabled:hover:translate-y-0"
       >
-        <span className="absolute inset-0 origin-left scale-x-0 bg-gold transition-transform duration-500 ease-expo group-hover:scale-x-100 group-disabled:scale-x-0" />
-        <span className="relative z-10 flex items-center gap-2">
-          <Lock className="h-3.5 w-3.5" strokeWidth={2} />
-          {submitting
-            ? skipPayment
-              ? "Placing test order…"
-              : "Opening secure payment…"
-            : skipPayment
-              ? `Complete test order · ${inr.format(total)}`
-              : `Pay ${inr.format(total)} securely`}
-        </span>
+        <Lock className="h-4 w-4" strokeWidth={2} />
+        {submitting
+          ? skipPayment
+            ? "Placing test order…"
+            : "Opening secure payment…"
+          : skipPayment
+            ? `Complete test order · ${inr.format(total)}`
+            : `Complete secure purchase · ${inr.format(total)}`}
       </button>
       {attempted && !valid ? (
         <p className="mt-2 text-center text-[12px] text-red-700">
           Complete the highlighted fields to continue.
         </p>
       ) : (
-        <p className="mt-2 text-center text-[12px] text-ink-soft">No hidden fees · Encrypted</p>
+        <p className="mt-2 text-center text-[12px] text-ink-mute">UPI · Cards · Wallets via Razorpay</p>
       )}
     </div>
   );
 }
 
-function PaymentStrip() {
+function PaymentStrip({ className }: { className?: string }) {
   const methods = [
     { label: "Razorpay", icon: Lock },
     { label: "UPI", icon: Smartphone },
@@ -911,10 +1064,15 @@ function PaymentStrip() {
   ] as const;
 
   return (
-    <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-2 text-[11px] text-ink-soft">
+    <div
+      className={cn(
+        "flex flex-wrap items-center justify-center gap-x-4 gap-y-2 text-[11px] text-ink-mute",
+        className
+      )}
+    >
       {methods.map(({ label, icon: Icon }) => (
         <span key={label} className="inline-flex items-center gap-1.5">
-          <Icon className="h-3 w-3 text-ink-mute" strokeWidth={1.75} />
+          <Icon className="h-3 w-3" strokeWidth={1.75} />
           {label}
         </span>
       ))}
@@ -922,46 +1080,8 @@ function PaymentStrip() {
   );
 }
 
-function Section({
-  title,
-  index,
-  complete,
-  children
-}: {
-  title: string;
-  index: string;
-  complete?: boolean;
-  children: React.ReactNode;
-}) {
-  return (
-    <section className="border-t border-ink/10 py-8 first:border-t-0 first:pt-1 md:py-9">
-      <div className="mb-5 flex items-baseline gap-3">
-        <span
-          className={cn(
-            "font-mono text-[11px] tabular-nums transition-colors duration-200",
-            complete ? "text-gold" : "text-ink/30"
-          )}
-        >
-          {complete ? (
-            <span className="inline-flex items-center gap-1">
-              <Check className="h-3 w-3" strokeWidth={2.5} />
-              {index}
-            </span>
-          ) : (
-            index
-          )}
-        </span>
-        <h2 className="text-[1.05rem] font-medium tracking-tight text-ink md:text-[1.125rem]">
-          {title}
-        </h2>
-      </div>
-      {children}
-    </section>
-  );
-}
-
 const fieldShell =
-  "w-full border bg-pearl/60 px-3.5 py-2.5 text-[14px] text-ink outline-none transition-[border-color,box-shadow,background-color] duration-200 ease-expo hover:border-ink/35 hover:bg-paper focus:border-ink focus:bg-paper focus:shadow-[0_0_0_1px_rgba(17,17,17,0.35)]";
+  "w-full border bg-paper px-3.5 py-3 text-[16px] text-ink outline-none transition-[border-color,box-shadow] duration-200 focus:border-ink focus:shadow-[0_0_0_3px_rgba(184,148,88,0.22)]";
 
 function Field({
   label,
@@ -969,37 +1089,48 @@ function Field({
   error,
   hint,
   id,
+  icon: Icon,
   ...props
 }: React.InputHTMLAttributes<HTMLInputElement> & {
   label: string;
   error?: string;
   hint?: string;
+  icon?: LucideIcon;
 }) {
   return (
     <label className={cn("block", className)}>
       <span
         className={cn(
-          "mb-1.5 block text-[12px]",
-          error ? "font-medium text-red-700" : "text-ink-soft"
+          "mb-1.5 block text-[13px] font-medium",
+          error ? "text-red-700" : "text-ink"
         )}
       >
         {label}
       </span>
-      <input
-        id={id}
-        {...props}
-        aria-invalid={Boolean(error)}
-        className={cn(
-          fieldShell,
-          error
-            ? "border-red-500 bg-red-50/50 focus:border-red-600 focus:shadow-[0_0_0_1px_rgba(220,38,38,0.45)]"
-            : "border-ink/22"
-        )}
-      />
+      <span className="relative block">
+        {Icon ? (
+          <Icon
+            className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-mute"
+            strokeWidth={1.75}
+          />
+        ) : null}
+        <input
+          id={id}
+          {...props}
+          aria-invalid={Boolean(error)}
+          className={cn(
+            fieldShell,
+            Icon && "pl-10",
+            error
+              ? "border-red-500 bg-red-50/40 focus:border-red-600 focus:shadow-[0_0_0_3px_rgba(220,38,38,0.15)]"
+              : "border-ink/15"
+          )}
+        />
+      </span>
       {error ? (
         <span className="mt-1.5 block text-[12px] text-red-700">{error}</span>
       ) : hint ? (
-        <span className="mt-1.5 block text-[12px] text-ink-soft">{hint}</span>
+        <span className="mt-1.5 block text-[12px] text-ink-mute">{hint}</span>
       ) : null}
     </label>
   );
@@ -1020,8 +1151,8 @@ function SelectField({
     <label className={cn("relative block", className)}>
       <span
         className={cn(
-          "mb-1.5 block text-[12px]",
-          error ? "font-medium text-red-700" : "text-ink-soft"
+          "mb-1.5 block text-[13px] font-medium",
+          error ? "text-red-700" : "text-ink"
         )}
       >
         {label}
@@ -1035,8 +1166,8 @@ function SelectField({
             fieldShell,
             "appearance-none pr-10",
             error
-              ? "border-red-500 bg-red-50/50 focus:border-red-600 focus:shadow-[0_0_0_1px_rgba(220,38,38,0.45)]"
-              : "border-ink/22"
+              ? "border-red-500 bg-red-50/40 focus:border-red-600"
+              : "border-ink/15"
           )}
         >
           {children}

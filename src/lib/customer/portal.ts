@@ -21,11 +21,25 @@ export type PaginatedList<T> = T[] & {
   pagination: PaginationMeta;
 };
 
-function normalizePagination(opts?: PaginationOptions): { skip: number; take: number; page: number; pageSize: number } {
+function normalizePagination(opts?: PaginationOptions): {
+  skip: number;
+  take: number;
+  page: number;
+  pageSize: number;
+} {
   const page = Math.max(1, Math.floor(opts?.page ?? 1));
   const pageSize = Math.min(50, Math.max(1, Math.floor(opts?.pageSize ?? 20)));
   return { skip: (page - 1) * pageSize, take: pageSize, page, pageSize };
 }
+
+const portalOrderInclude = {
+  items: {
+    include: {
+      product: { select: { imageUrl: true, slug: true, sizeLabel: true } }
+    }
+  },
+  invoices: { select: { id: true, invoiceNumber: true, issuedAt: true, pdfUrl: true } }
+} as const;
 
 /**
  * HIGH-14: Added offset pagination support to customer portal overview query.
@@ -44,50 +58,72 @@ export async function getPortalOverview(customerId: string, opts?: PaginationOpt
 
   const { skip, take, page, pageSize } = normalizePagination(opts);
 
-  const [total, orders] = await Promise.all([
-    db.order.count({ where: { customerId, status: { in: [...ACTIVE_STATUSES] } } }),
-    db.order.findMany({
-      where: { customerId, status: { in: [...ACTIVE_STATUSES] } },
-      include: {
-        items: true,
-        invoices: { select: { invoiceNumber: true, issuedAt: true, pdfUrl: true } },
-        events: { orderBy: { createdAt: "asc" }, take: 8 }
-      },
-      orderBy: { createdAt: "desc" },
-      skip,
-      take
-    })
-  ]);
+  const [totalActive, spentAgg, inTransit, unpaidCount, urgentUnpaid, urgentShip, recentPaid] =
+    await Promise.all([
+      db.order.count({ where: { customerId, status: { in: [...ACTIVE_STATUSES] } } }),
+      db.order.aggregate({
+        where: { customerId, status: { in: [...ACTIVE_STATUSES] } },
+        _sum: { totalCents: true }
+      }),
+      db.order.count({
+        where: { customerId, status: { in: ["processing", "shipped"] } }
+      }),
+      db.order.count({
+        where: { customerId, status: { in: ["pending", "payment_failed"] } }
+      }),
+      db.order.findFirst({
+        where: { customerId, status: { in: ["pending", "payment_failed"] } },
+        include: portalOrderInclude,
+        orderBy: { createdAt: "desc" }
+      }),
+      db.order.findFirst({
+        where: { customerId, status: { in: ["processing", "shipped"] } },
+        include: portalOrderInclude,
+        orderBy: { createdAt: "desc" }
+      }),
+      db.order.findMany({
+        where: { customerId, status: { in: [...ACTIVE_STATUSES] } },
+        include: portalOrderInclude,
+        orderBy: { createdAt: "desc" },
+        skip,
+        take
+      })
+    ]);
 
-  const spentCents = orders.reduce((s, o) => s + o.totalCents, 0);
-  const inTransit = orders.filter((o) => o.status === "shipped" || o.status === "processing").length;
-  const latest = orders[0] ?? null;
-  const recentEvents = (latest?.events ?? []).slice(-5).reverse();
+  const latest =
+    urgentUnpaid ||
+    urgentShip ||
+    recentPaid[0] ||
+    (await db.order.findFirst({
+      where: { customerId },
+      include: portalOrderInclude,
+      orderBy: { createdAt: "desc" }
+    }));
 
   const pagination: PaginationMeta = {
     page,
     pageSize,
-    total,
-    totalPages: Math.ceil(total / pageSize) || 1
+    total: totalActive,
+    totalPages: Math.ceil(totalActive / pageSize) || 1
   };
 
   return {
     customer,
     stats: {
-      orderCount: total,
-      spentCents,
+      orderCount: totalActive,
+      spentCents: spentAgg._sum.totalCents ?? 0,
       inTransit,
-      formulationCount: new Set(orders.flatMap((o) => o.items.map((i) => i.productName))).size
+      unpaidCount,
+      formulationCount: new Set(recentPaid.flatMap((o) => o.items.map((i) => i.productName))).size
     },
     latest,
-    recentEvents,
-    orders,
+    orders: recentPaid,
     pagination
   };
 }
 
 /**
- * HIGH-14: Added offset pagination support to getCustomerOrders. Returns array with attached pagination property.
+ * HIGH-14: Added offset pagination support to getCustomerOrders.
  */
 export async function getCustomerOrders(
   customerId: string,
@@ -96,8 +132,12 @@ export async function getCustomerOrders(
   PaginatedList<
     Prisma.OrderGetPayload<{
       include: {
-        items: true;
-        invoices: { select: { invoiceNumber: true; issuedAt: true } };
+        items: {
+          include: {
+            product: { select: { imageUrl: true; slug: true } };
+          };
+        };
+        invoices: { select: { invoiceNumber: true; issuedAt: true; pdfUrl: true } };
       };
     }>
   >
@@ -109,8 +149,12 @@ export async function getCustomerOrders(
     db.order.findMany({
       where: { customerId },
       include: {
-        items: true,
-        invoices: { select: { invoiceNumber: true, issuedAt: true } }
+        items: {
+          include: {
+            product: { select: { imageUrl: true, slug: true } }
+          }
+        },
+        invoices: { select: { invoiceNumber: true, issuedAt: true, pdfUrl: true } }
       },
       orderBy: { createdAt: "desc" },
       skip,
@@ -138,6 +182,7 @@ export async function getCustomerOrderDetail(customerId: string, orderNumber: st
             select: {
               slug: true,
               sizeLabel: true,
+              imageUrl: true,
               patent: { select: { title: true, applicationNumber: true } }
             }
           }

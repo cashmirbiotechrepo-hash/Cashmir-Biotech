@@ -4,6 +4,7 @@ import path from "path";
 import { db } from "@/lib/db";
 import { logger } from "@/lib/logger";
 import { buildInvoicePdf, type InvoicePdfInput } from "@/modules/shop/services/invoice-pdf.service";
+import { sanitizePdfFilename } from "@/modules/shop/services/pdf-brand";
 
 /** Persist invoice PDF to Blob (prod) or local public/invoices (dev) and return public URL. */
 export async function persistInvoicePdfFile(
@@ -13,7 +14,7 @@ export async function persistInvoicePdfFile(
 ): Promise<string | null> {
   try {
     const bytes = await buildInvoicePdf(input);
-    const fileName = `${invoiceNumber.replace(/[^a-zA-Z0-9-_]/g, "_")}.pdf`;
+    const fileName = sanitizePdfFilename(`Cashmir-Biotech-Invoice-${invoiceNumber}.pdf`);
     let url: string;
 
     if (process.env.BLOB_READ_WRITE_TOKEN) {

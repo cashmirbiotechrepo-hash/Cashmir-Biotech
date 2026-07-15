@@ -508,8 +508,10 @@ export async function markOrderPaid(input: {
         orderNumber: order.orderNumber,
         customerName: order.customerName,
         customerEmail: order.customerEmail,
+        customerPhone: order.customerPhone,
         shippingAddress: (order.shippingAddress ?? {}) as {
           fullName?: string;
+          phone?: string;
           line1?: string;
           line2?: string;
           city?: string;
@@ -524,15 +526,25 @@ export async function markOrderPaid(input: {
               ).map((item) => ({
                 description: item.productName,
                 qty: item.quantity,
-                amountCents: item.quantity * item.unitPriceCents
+                amountCents: item.quantity * item.unitPriceCents,
+                unitPriceCents: item.unitPriceCents,
+                lot: item.lotCodes || undefined
               })),
         subtotalCents: invoice.subtotalCents,
         taxCents: invoice.taxCents,
         totalCents: invoice.totalCents,
+        shippingCents: order.shippingCents,
+        discountCents: order.discountCents ?? 0,
         gstin: gst.gstin,
         cgstCents: gst.cgstCents,
         sgstCents: gst.sgstCents,
-        placeOfSupply: gst.placeOfSupply
+        placeOfSupply: gst.placeOfSupply,
+        paymentStatus: "paid",
+        paymentMethod: order.razorpayPaymentId?.startsWith("test_skip_") ? "Test checkout" : "Razorpay",
+        razorpayPaymentId: order.razorpayPaymentId || null,
+        razorpayOrderId: order.razorpayOrderId,
+        paidAt: new Date(),
+        confirmationToken: order.confirmationToken
       });
       if (!persisted) {
         await db.invoice.update({ where: { id: inv.invoiceId }, data: { pdfUrl: tokenUrl } }).catch(() => undefined);
@@ -704,7 +716,11 @@ export async function getOrderInvoiceByToken(orderNumber: string, confirmationTo
   const order = await db.order.findFirst({
     where: { orderNumber, confirmationToken },
     include: {
-      items: true,
+      items: {
+        include: {
+          product: { select: { sku: true, sizeLabel: true, imageUrl: true } }
+        }
+      },
       invoices: { orderBy: { issuedAt: "desc" }, take: 1 }
     }
   });
