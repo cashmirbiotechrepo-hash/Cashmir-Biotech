@@ -31,13 +31,10 @@ type Props = {
   className?: string;
 };
 
+/** One continuous shopping object: portrait bottle → essentials → price + CTA. */
 export function ShopProductCard({ product, featured = false, className }: Props) {
   const href = `/products/${product.slug}`;
-  const badge = product.patent?.patentCode
-    ? "Patent-backed"
-    : product.featured
-      ? "Flagship formulation"
-      : product.category;
+  const blurb = product.shortBenefit.replace(/\s+/g, " ").trim();
 
   if (featured) {
     return (
@@ -45,35 +42,41 @@ export function ShopProductCard({ product, featured = false, className }: Props)
         href={href}
         data-cursor="Open"
         className={cn(
-          "group relative grid overflow-hidden bg-paper shadow-glass transition-all duration-500 ease-expo",
-          "ring-1 ring-ink/8 hover:-translate-y-0.5 hover:shadow-premium hover:ring-gold/35",
-          "md:grid-cols-[0.95fr_1.05fr] md:max-h-[min(58vh,460px)]",
+          "group relative grid overflow-hidden bg-paper transition-[transform,box-shadow] duration-300 ease-out",
+          "border border-ink/10 active:scale-[0.985] md:grid-cols-[0.9fr_1.1fr]",
+          "md:hover:-translate-y-0.5 md:hover:shadow-premium md:hover:border-ink/15",
           className
         )}
       >
-        <div className="relative aspect-[5/4] overflow-hidden bg-pearl md:aspect-auto md:min-h-[240px]">
+        <div className="relative aspect-[4/5] bg-pearl md:aspect-auto md:min-h-[280px]">
           {product.imageUrl ? (
             <Image
               src={product.imageUrl}
               alt={product.name}
               fill
-              sizes="(max-width: 768px) 100vw, 48vw"
-              className="object-cover object-center transition-transform duration-700 ease-expo group-hover:scale-[1.03]"
+              sizes="(max-width: 768px) 100vw, 42vw"
+              className="object-contain object-center p-5 transition-transform duration-700 ease-expo group-hover:scale-[1.02] md:p-8"
               priority
             />
           ) : null}
-          <span className="absolute bottom-3 left-3 inline-flex items-center gap-1.5 bg-paper/92 px-3 py-2 text-[12px] font-medium text-ink backdrop-blur-md md:hidden">
-            View formula
-            <ArrowUpRight className="h-3.5 w-3.5" />
-          </span>
         </div>
 
-        <div className="flex flex-col justify-center gap-3 p-5 sm:p-6 md:p-7">
-          <p className="font-mono text-[9px] uppercase tracking-[0.18em] text-gold">{badge}</p>
-          <h2 className="text-xl font-light tracking-tight text-ink sm:text-[1.65rem]">{product.name}</h2>
-          <p className="max-w-sm text-[13px] leading-snug text-ink-mute sm:text-sm">{product.shortBenefit}</p>
+        <div className="flex flex-col justify-center gap-2.5 px-4 pb-4 pt-3 sm:px-5 md:gap-3 md:p-7">
+          {product.patent ? (
+            <p className="inline-flex items-center gap-1.5 text-[11px] text-gold">
+              <Check className="h-3 w-3 shrink-0" strokeWidth={2.25} aria-hidden />
+              Patent-backed
+            </p>
+          ) : (
+            <p className="text-[11px] text-ink-soft">{product.category}</p>
+          )}
 
-          <ul className="mt-1 space-y-1.5">
+          <h2 className="line-clamp-2 text-[1.35rem] font-light tracking-tight text-ink md:text-[1.65rem]">
+            {product.name}
+          </h2>
+          <p className="line-clamp-2 max-w-sm text-[13px] leading-snug text-ink-mute">{blurb}</p>
+
+          <ul className="mt-1 hidden space-y-1.5 md:block">
             {FEATURED_TRUST.map((item) => (
               <li key={item} className="flex items-center gap-2 text-[12px] text-ink-mute">
                 <Check className="h-3 w-3 shrink-0 text-gold" strokeWidth={2} />
@@ -82,25 +85,16 @@ export function ShopProductCard({ product, featured = false, className }: Props)
             ))}
           </ul>
 
-          <div className="flex flex-wrap gap-x-3 gap-y-1 font-mono text-[9px] uppercase tracking-[0.12em] text-ink-faint">
-            <span>{product.category}</span>
-            <span aria-hidden>·</span>
-            <span>{product.sizeLabel}</span>
-            {product.patent?.patentCode ? (
-              <>
-                <span aria-hidden>·</span>
-                <span className="text-gold/80">{product.patent.patentCode}</span>
-              </>
-            ) : null}
-          </div>
-
-          <div className="mt-1 flex flex-wrap items-center justify-between gap-3 border-t border-ink/8 pt-3.5">
-            <p className="text-[15px] text-ink">
-              <span className="font-light">{inr.format(product.mrpInr)}</span>
-            </p>
-            <span className="inline-flex items-center gap-1.5 text-[13px] font-medium text-ink underline-offset-4 group-hover:underline">
-              View formula
-              <ArrowUpRight className="h-3.5 w-3.5 transition-transform duration-400 ease-expo group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
+          <div className="mt-2 flex items-center justify-between gap-3 border-t border-ink/8 pt-3.5">
+            <div>
+              <p className="text-[1.35rem] font-light tracking-tight text-ink md:text-[1.5rem]">
+                {inr.format(product.mrpInr)}
+              </p>
+              <p className="mt-0.5 text-[11px] text-ink-faint">{product.sizeLabel}</p>
+            </div>
+            <span className="inline-flex items-center gap-1.5 text-[13px] font-medium text-ink">
+              View Product
+              <ArrowUpRight className="h-3.5 w-3.5 transition-transform duration-300 group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
             </span>
           </div>
         </div>
@@ -113,45 +107,51 @@ export function ShopProductCard({ product, featured = false, className }: Props)
       href={href}
       data-cursor="Open"
       className={cn(
-        "group relative flex h-full flex-col overflow-hidden bg-paper shadow-glass transition-all duration-500 ease-expo",
-        "ring-1 ring-ink/8 hover:-translate-y-0.5 hover:shadow-premium hover:ring-gold/35",
+        "group relative flex h-full flex-col overflow-hidden bg-paper transition-[transform,box-shadow] duration-300 ease-out",
+        "border border-ink/10 active:scale-[0.985]",
+        "md:hover:-translate-y-0.5 md:hover:shadow-premium md:hover:border-ink/15",
         className
       )}
     >
-      <div className="relative aspect-[4/3] overflow-hidden bg-pearl">
+      {/* Portrait frame — bottles fill ~80% with soft margins, not a square crop */}
+      <div className="relative aspect-[4/5] bg-pearl">
         {product.imageUrl ? (
           <Image
             src={product.imageUrl}
             alt={product.name}
             fill
-            sizes="(max-width: 768px) 100vw, 33vw"
-            className="object-cover object-center transition-transform duration-700 ease-expo group-hover:scale-[1.03]"
+            sizes="(max-width: 640px) 100vw, 50vw"
+            className="object-contain object-center p-4 transition-transform duration-700 ease-expo group-hover:scale-[1.03] sm:p-5"
           />
         ) : null}
-        <span className="absolute inset-x-0 bottom-0 flex translate-y-full items-center justify-between bg-ink/80 px-3 py-2 text-[11px] font-medium text-paper backdrop-blur-sm transition-transform duration-400 ease-expo group-hover:translate-y-0">
-          View formula
-          <ArrowUpRight className="h-3.5 w-3.5" />
-        </span>
       </div>
 
-      <div className="flex flex-1 flex-col p-3.5">
-        <div className="flex items-center justify-between gap-2">
-          <p className="font-mono text-[9px] uppercase tracking-[0.16em] text-gold">{badge}</p>
-          {product.patent?.patentCode ? (
-            <p className="truncate font-mono text-[8px] uppercase tracking-[0.1em] text-ink-faint">
-              {product.patent.patentCode}
-            </p>
-          ) : null}
-        </div>
-        <h2 className="mt-1 text-[15px] font-light tracking-tight text-ink sm:text-base">{product.name}</h2>
-        <p className="mt-1 line-clamp-2 text-[12px] leading-snug text-ink-mute">{product.shortBenefit}</p>
-        <div className="mt-auto flex items-end justify-between gap-2 pt-2.5">
-          <p className="text-[13px] text-ink">
-            <span className="font-light">{inr.format(product.mrpInr)}</span>
-            <span className="mx-1 text-ink-faint">·</span>
-            <span className="text-[10px] text-ink-faint">{product.sizeLabel}</span>
+      <div className="flex flex-1 flex-col px-3.5 pb-3.5 pt-3">
+        {product.patent ? (
+          <p className="mb-1.5 inline-flex items-center gap-1 text-[10px] text-gold">
+            <Check className="h-2.5 w-2.5 shrink-0" strokeWidth={2.5} aria-hidden />
+            Patent-backed
           </p>
-          <span className="font-mono text-[8px] uppercase tracking-[0.12em] text-ink-faint">{product.category}</span>
+        ) : null}
+
+        <h2 className="line-clamp-2 text-[16px] font-light leading-snug tracking-tight text-ink">
+          {product.name}
+        </h2>
+        <p className="mt-1 line-clamp-2 text-[12px] leading-snug text-ink-mute">{blurb}</p>
+
+        <div className="mt-auto flex items-end justify-between gap-3 border-t border-ink/8 pt-3">
+          <div className="min-w-0">
+            <p className="text-[1.2rem] font-light tracking-tight text-ink">{inr.format(product.mrpInr)}</p>
+            <p className="mt-0.5 truncate text-[10px] text-ink-faint">
+              {product.sizeLabel}
+              <span className="mx-1 text-ink/20">·</span>
+              {product.category}
+            </p>
+          </div>
+          <span className="inline-flex shrink-0 items-center gap-1 text-[12px] font-medium text-ink">
+            View Product
+            <ArrowUpRight className="h-3.5 w-3.5" />
+          </span>
         </div>
       </div>
     </Link>
@@ -224,7 +224,7 @@ export function ShopEducationCard({
   return (
     <Link
       href={href}
-      className="group flex h-full flex-col border border-ink/10 bg-paper px-4 py-4 transition-all duration-400 ease-expo hover:border-gold/35 hover:shadow-glass"
+      className="group flex h-full flex-col border border-ink/10 bg-paper px-4 py-4 transition-all duration-400 ease-expo hover:border-gold/35"
     >
       <p className="font-mono text-[9px] uppercase tracking-[0.16em] text-ink-soft">{label}</p>
       <h3 className="mt-2 text-base font-light tracking-tight text-ink">{title}</h3>

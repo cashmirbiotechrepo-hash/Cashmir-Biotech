@@ -1,12 +1,14 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { Search } from "lucide-react";
 import { Reveal } from "@/components/ui/reveal";
 import {
   ShopComingSoonCard,
   ShopEducationCard,
   ShopProductCard
 } from "@/components/shop/shop-product-card";
+import { cn } from "@/lib/utils";
 
 type CatalogProduct = {
   id: string;
@@ -28,6 +30,14 @@ type CatalogProduct = {
 
 function categorySlug(name: string) {
   return name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
+}
+
+function chipLabel(cat: string) {
+  if (/personal care/i.test(cat)) return "Hair & Care";
+  if (/digestive/i.test(cat)) return "Digestive";
+  if (/functional/i.test(cat)) return "Supplements";
+  if (/mineral/i.test(cat)) return "Minerals";
+  return cat;
 }
 
 export function ShopCatalog({
@@ -73,59 +83,71 @@ export function ShopCatalog({
     (!category || featured.category === category) &&
     sort === "featured";
 
+  const visibleCount = filtered.length + (showFeatured ? 1 : 0);
+  const totalCount = catalog.length + (featured ? 1 : 0);
+
   return (
     <>
       {showFeatured ? (
         <Reveal y={24}>
-          <div className="mb-3 flex items-baseline justify-between gap-4">
-            <p className="technical !text-ink-soft">Flagship formulation</p>
-            {featured.patent?.patentCode ? (
-              <p className="font-mono text-[10px] text-ink-soft">{featured.patent.patentCode}</p>
-            ) : null}
+          <div className="mb-2.5">
+            <p className="technical !text-ink-soft">Flagship</p>
           </div>
           <ShopProductCard product={featured} featured />
         </Reveal>
       ) : null}
 
-      <div id="formulas" className="mx-auto mt-9 max-w-4xl scroll-mt-28 md:mt-11">
-        <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+      <div id="formulas" className="mx-auto mt-8 max-w-4xl scroll-mt-28 md:mt-11">
+        <div className="mb-3 flex items-end justify-between gap-3">
           <div>
-            <p className="technical mb-0.5 !text-ink-soft">All formulas</p>
-            <h2 className="text-lg font-light tracking-tight text-ink">The catalog</h2>
+            <h2 className="text-lg font-light tracking-tight text-ink md:text-xl">Browse Formulations</h2>
+            <p className="mt-0.5 text-[12px] text-ink-mute">
+              {visibleCount} product{visibleCount === 1 ? "" : "s"}
+              {q || category ? ` · of ${totalCount}` : ""}
+            </p>
           </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <label className="sr-only" htmlFor="shop-search">
-              Search products
-            </label>
-            <input
-              id="shop-search"
-              value={q}
-              onChange={(e) => setQ(e.target.value)}
-              placeholder="Search formulas…"
-              className="min-w-[10rem] flex-1 rounded-full border border-ink/15 bg-paper px-3 py-2 text-[13px] outline-none ring-gold/30 focus:ring-2 sm:max-w-[14rem]"
-            />
-            <select
-              aria-label="Sort products"
-              value={sort}
-              onChange={(e) => setSort(e.target.value as typeof sort)}
-              className="rounded-full border border-ink/15 bg-paper px-3 py-2 text-[12px] outline-none"
-            >
-              <option value="featured">Featured</option>
-              <option value="name">Name</option>
-              <option value="price-asc">Price ↑</option>
-              <option value="price-desc">Price ↓</option>
-            </select>
-          </div>
+          <select
+            aria-label="Sort products"
+            value={sort}
+            onChange={(e) => setSort(e.target.value as typeof sort)}
+            className="rounded-md border border-ink/12 bg-paper px-2.5 py-1.5 text-[11px] text-ink outline-none"
+          >
+            <option value="featured">Popular</option>
+            <option value="name">Name</option>
+            <option value="price-asc">Price ↑</option>
+            <option value="price-desc">Price ↓</option>
+          </select>
         </div>
 
+        <label className="relative mb-3 block">
+          <span className="sr-only">Search products</span>
+          <Search
+            className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-ink-faint"
+            aria-hidden
+          />
+          <input
+            id="shop-search"
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            placeholder="Search"
+            className="w-full border border-ink/12 bg-paper py-2.5 pl-9 pr-3 text-[13px] outline-none ring-gold/25 focus:ring-2"
+          />
+        </label>
+
         {categories.length > 0 ? (
-          <nav aria-label="Product categories" className="mb-4 flex flex-wrap gap-x-3 gap-y-1">
+          <nav
+            aria-label="Product categories"
+            className="-mx-1 mb-4 flex gap-2 overflow-x-auto px-1 pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+          >
             <button
               type="button"
               onClick={() => setCategory("")}
-              className={`font-mono text-[10px] uppercase tracking-[0.14em] underline-offset-4 hover:underline ${
-                !category ? "text-ink" : "text-ink-mute hover:text-ink"
-              }`}
+              className={cn(
+                "shrink-0 rounded-full border px-3.5 py-1.5 text-[12px] transition-colors",
+                !category
+                  ? "border-ink bg-ink text-paper"
+                  : "border-ink/12 bg-paper text-ink-mute active:bg-pearl"
+              )}
             >
               All
             </button>
@@ -134,19 +156,22 @@ export function ShopCatalog({
                 key={cat}
                 type="button"
                 onClick={() => setCategory(cat)}
-                className={`font-mono text-[10px] uppercase tracking-[0.14em] underline-offset-4 hover:underline ${
-                  category === cat ? "text-ink" : "text-ink-mute hover:text-ink"
-                }`}
+                className={cn(
+                  "shrink-0 rounded-full border px-3.5 py-1.5 text-[12px] transition-colors",
+                  category === cat
+                    ? "border-ink bg-ink text-paper"
+                    : "border-ink/12 bg-paper text-ink-mute active:bg-pearl"
+                )}
               >
-                {cat}
+                {chipLabel(cat)}
               </button>
             ))}
           </nav>
         ) : null}
 
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4">
           {filtered.map((product, i) => (
-            <Reveal key={product.id} delay={0.04 * (i % 2)} y={24}>
+            <Reveal key={product.id} delay={0.03 * (i % 2)} y={18}>
               <div id={categories.length > 1 ? `cat-${categorySlug(product.category)}` : undefined}>
                 <ShopProductCard product={product} />
               </div>
@@ -154,7 +179,7 @@ export function ShopCatalog({
           ))}
 
           {filtered.length === 0 && catalog.length > 0 ? (
-            <p className="sm:col-span-2 py-8 text-center text-sm text-ink-mute">
+            <p className="py-8 text-center text-sm text-ink-mute sm:col-span-2">
               No formulas match your search.
             </p>
           ) : null}

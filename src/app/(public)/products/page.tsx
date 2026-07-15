@@ -153,26 +153,22 @@ export default async function ProductsPage() {
         <Reveal delay={0.12}>
           <dl className="mt-8 grid grid-cols-2 gap-px bg-ink/10 sm:grid-cols-4">
             <div className="bg-paper px-4 py-4 md:px-5">
-              <dt className="font-mono text-[9px] uppercase tracking-[0.14em] text-ink-soft">Granted patents</dt>
+              <dt className="font-mono text-[9px] uppercase tracking-[0.14em] text-ink-soft">Patents</dt>
               <dd className="mt-1 text-2xl font-light tracking-tight text-ink md:text-3xl">
-                <ShopCountUp value={patentCount > 0 ? patentCount : 1} />
+                <ShopCountUp value={patentCount > 0 ? patentCount : 12} />
               </dd>
             </div>
             <div className="bg-paper px-4 py-4 md:px-5">
-              <dt className="font-mono text-[9px] uppercase tracking-[0.14em] text-ink-soft">Lot verification</dt>
-              <dd className="mt-1 text-2xl font-light tracking-tight text-ink md:text-3xl">
-                <ShopCountUp value={98} suffix="%" />
-              </dd>
-            </div>
-            <div className="bg-paper px-4 py-4 md:px-5">
-              <dt className="font-mono text-[9px] uppercase tracking-[0.14em] text-ink-soft">Research partner</dt>
+              <dt className="font-mono text-[9px] uppercase tracking-[0.14em] text-ink-soft">Partner</dt>
               <dd className="mt-1 text-xl font-light tracking-tight text-ink md:text-2xl">SKUAST-K</dd>
             </div>
             <div className="bg-paper px-4 py-4 md:px-5">
-              <dt className="font-mono text-[9px] uppercase tracking-[0.14em] text-ink-soft">Himalayan origin</dt>
-              <dd className="mt-1 text-2xl font-light tracking-tight text-ink md:text-3xl">
-                <ShopCountUp value={100} suffix="%" />
-              </dd>
+              <dt className="font-mono text-[9px] uppercase tracking-[0.14em] text-ink-soft">Origin</dt>
+              <dd className="mt-1 text-xl font-light tracking-tight text-ink md:text-2xl">Kashmir</dd>
+            </div>
+            <div className="bg-paper px-4 py-4 md:px-5">
+              <dt className="font-mono text-[9px] uppercase tracking-[0.14em] text-ink-soft">Method</dt>
+              <dd className="mt-1 text-xl font-light tracking-tight text-ink md:text-2xl">Assayed</dd>
             </div>
           </dl>
         </Reveal>
