@@ -26,8 +26,6 @@ const inr = new Intl.NumberFormat("en-IN", {
 });
 
 const RZP_SCRIPT = "https://checkout.razorpay.com/v1/checkout.js";
-const FREE_SHIPPING_THRESHOLD = 999;
-const FLAT_SHIPPING = 60;
 
 const TRUST_LINES = [
   "Patent-backed formulation",
@@ -204,10 +202,14 @@ export type SavedCheckoutAddress = {
 
 export function CheckoutView({
   savedAddresses = [],
-  prefillEmail = ""
+  prefillEmail = "",
+  flatShippingInr = 60,
+  freeShippingThresholdInr = 999
 }: {
   savedAddresses?: SavedCheckoutAddress[];
   prefillEmail?: string;
+  flatShippingInr?: number;
+  freeShippingThresholdInr?: number;
 }) {
   const { items, ready, subtotalInr, clear } = useCart();
   const router = useRouter();
@@ -228,7 +230,7 @@ export function CheckoutView({
     }
   }, [ready, items.length, submitting, router]);
 
-  const shipping = subtotalInr >= FREE_SHIPPING_THRESHOLD ? 0 : FLAT_SHIPPING;
+  const shipping = subtotalInr >= freeShippingThresholdInr ? 0 : flatShippingInr;
   const total = subtotalInr + shipping;
 
   const contactDone = validateKeys(form, ["email", "phone"]);
@@ -645,7 +647,7 @@ export function CheckoutView({
             </button>
             <p className="mt-3 text-[12px] text-ink-soft">
               Arrival window firms after PIN & courier assignment. Orders at{" "}
-              {inr.format(FREE_SHIPPING_THRESHOLD)}+ ship complimentary.
+              {inr.format(freeShippingThresholdInr)}+ ship complimentary.
             </p>
           </Section>
 

@@ -20,6 +20,7 @@ import {
 } from "@/components/admin/admin-form";
 import { GenerateInvoiceButton, RefundOrderForm } from "@/components/admin/order-ops-actions";
 import { OrderFulfillmentForm } from "@/components/admin/order-fulfillment-form";
+import { OrderShippingOverrideForm } from "@/components/admin/order-shipping-override-form";
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -441,6 +442,18 @@ export function OrderWorkspace({
                 <Row label="Tax" value={formatInr(order.taxCents)} />
                 <Row label="Shipping" value={formatInr(order.shippingCents)} />
                 <Row label="Total" value={formatInr(order.totalCents)} strong />
+              </div>
+              <div className="border-t border-border px-4 py-3">
+                <p className="mb-3 text-sm font-semibold">Override shipping</p>
+                <OrderShippingOverrideForm
+                  order={{
+                    id: order.id,
+                    status: order.status,
+                    shippingCents: order.shippingCents,
+                    totalCents: order.totalCents,
+                    razorpayOrderId: order.razorpayOrderId
+                  }}
+                />
               </div>
             </div>
 

@@ -59,6 +59,46 @@ export async function upsertHomepageContent(input: {
   });
 }
 
+export async function upsertShippingSettings(input: {
+  flatShippingInr: number;
+  freeShippingThresholdInr: number;
+}) {
+  return db.siteSettings.upsert({
+    where: { id: 1 },
+    update: {
+      flatShippingInr: input.flatShippingInr,
+      freeShippingThresholdInr: input.freeShippingThresholdInr
+    },
+    create: {
+      id: 1,
+      companyName: "Cashmir Biotech",
+      heroTitle: "The architecture of daily vitality",
+      heroSubtitle: "Proven biotech innovation from Kashmir biodiversity",
+      heroDescription:
+        "Premium supplements with scientific discipline, patent-backed innovation, and research-grade manufacturing standards.",
+      ctaPrimaryText: "Explore Catalog",
+      ctaPrimaryHref: "/products",
+      ctaSecondaryText: "View Patents",
+      ctaSecondaryHref: "/patents",
+      missionStatement:
+        "A mission to treat disorders with healthy, non-toxic, safe and accessible designer foods powered by biotechnology.",
+      flatShippingInr: input.flatShippingInr,
+      freeShippingThresholdInr: input.freeShippingThresholdInr
+    }
+  });
+}
+
+export async function getShippingSettings() {
+  const settings = await db.siteSettings.findUnique({
+    where: { id: 1 },
+    select: { flatShippingInr: true, freeShippingThresholdInr: true }
+  });
+  return {
+    flatShippingInr: settings?.flatShippingInr ?? 60,
+    freeShippingThresholdInr: settings?.freeShippingThresholdInr ?? 999
+  };
+}
+
 export async function updateProductContent(
   id: string,
   data: {

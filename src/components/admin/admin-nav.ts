@@ -16,6 +16,7 @@ import {
   Shield,
   ShoppingCart,
   Tags,
+  Truck,
   Users,
   UsersRound
 } from "lucide-react";
@@ -38,6 +39,7 @@ export type AdminNavGroup = {
 export const ADMIN_NAV: AdminNavItem[] = [
   { href: "/admin/dashboard", label: "Overview", shortLabel: "Home", icon: LayoutDashboard },
   { href: "/admin/orders", label: "Orders", shortLabel: "Orders", icon: ShoppingCart },
+  { href: "/admin/shipping", label: "Shipping", shortLabel: "Ship", icon: Truck, roles: ["owner", "admin"] },
   { href: "/admin/products", label: "Products", shortLabel: "Catalog", icon: Package },
   { href: "/admin/categories", label: "Categories", shortLabel: "Cats", icon: Tags, roles: ["owner", "admin"] },
   { href: "/admin/inventory", label: "Inventory", shortLabel: "Stock", icon: Boxes, roles: ["owner", "admin"] },
@@ -65,6 +67,7 @@ const GROUP_DEFS: { id: string; label: string; hrefs: string[] }[] = [
     hrefs: [
       "/admin/dashboard",
       "/admin/orders",
+      "/admin/shipping",
       "/admin/products",
       "/admin/categories",
       "/admin/inventory",

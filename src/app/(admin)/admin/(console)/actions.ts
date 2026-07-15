@@ -23,7 +23,8 @@ import {
 } from "@/modules/cms/validations/admin";
 import {
   updatePatentContent,
-  upsertHomepageContent
+  upsertHomepageContent,
+  upsertShippingSettings
 } from "@/modules/cms/services/content.service";
 import { db } from "@/lib/db";
 import { logger } from "@/lib/logger";
@@ -560,6 +561,128 @@ export async function updateOrderFulfillmentAction(formData: FormData): Promise<
   } catch (error) {
     logger.error({ err: error, event: "order_fulfillment_failed" }, "failed to update fulfillment");
     return { error: "Couldn't save fulfillment details." };
+  }
+}
+
+const shippingSettingsSchema = z.object({
+  flatShippingInr: z.coerce.number().int().min(0).max(100_000),
+  freeShippingThresholdInr: z.coerce.number().int().min(0).max(10_000_000)
+});
+
+export async function saveShippingSettingsAction(formData: FormData): Promise<ActionState> {
+  const admin = await requireAdminSession();
+  if (!hasAdminRole(admin.role, OPERATIONS_ROLES)) {
+    return { error: "You do not have permission to update shipping settings." };
+  }
+  const parsed = shippingSettingsSchema.safeParse(fields(formData));
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message ?? "Please check the shipping amounts." };
+  }
+  try {
+    await upsertShippingSettings(parsed.data);
+    await writeAuditLog({
+      userEmail: String(admin.email),
+      action: "update",
+      entityType: "shipping_settings",
+      entityId: "1",
+      diff: parsed.data
+    });
+    revalidatePath("/admin/shipping");
+    revalidatePath("/cart");
+    revalidatePath("/checkout");
+    revalidatePath("/products");
+    return { ok: true, message: "Store shipping defaults saved." };
+  } catch (error) {
+    logger.error({ err: error, event: "shipping_settings_failed" }, "failed to save shipping");
+    return { error: "Couldn't save shipping settings." };
+  }
+}
+
+const orderShippingSchema = z.object({
+  id: z.string().min(1),
+  shippingInr: z.coerce.number().int().min(0).max(100_000)
+});
+
+export async function updateOrderShippingAction(formData: FormData): Promise<ActionState> {
+  const admin = await requireAdminSession();
+  if (!hasAdminRole(admin.role, OPERATIONS_ROLES)) {
+    return { error: "You do not have permission to override order shipping." };
+  }
+  const parsed = orderShippingSchema.safeParse(fields(formData));
+  if (!parsed.success) {
+    return { error: "Enter a valid shipping amount in rupees." };
+  }
+  try {
+    const order = await db.order.findUnique({ where: { id: parsed.data.id } });
+    if (!order) return { error: "Order not found." };
+    if (order.status === "cancelled" || order.status === "refunded") {
+      return { error: "Cannot change shipping on a cancelled or refunded order." };
+    }
+
+    const shippingCents = parsed.data.shippingInr * 100;
+    const discountCents = order.discountCents ?? 0;
+    const totalCents = order.subtotalCents - discountCents + order.taxCents + shippingCents;
+    if (totalCents < 0) return { error: "Shipping would make the order total negative." };
+    if ((order.refundedCents ?? 0) > totalCents) {
+      return { error: "New total would be below amount already refunded." };
+    }
+
+    const unpaid = order.status === "pending" || order.status === "payment_failed";
+    const clearRazorpay = unpaid && Boolean(order.razorpayOrderId);
+
+    await db.order.update({
+      where: { id: order.id },
+      data: {
+        shippingCents,
+        totalCents,
+        ...(clearRazorpay ? { razorpayOrderId: null } : {})
+      }
+    });
+
+    await writeAuditLog({
+      userEmail: String(admin.email),
+      action: "update_shipping",
+      entityType: "order",
+      entityId: order.id,
+      diff: {
+        fromShippingCents: order.shippingCents,
+        toShippingCents: shippingCents,
+        fromTotalCents: order.totalCents,
+        toTotalCents: totalCents,
+        clearedRazorpayOrder: clearRazorpay
+      }
+    });
+
+    const { recordOrderEvent } = await import("@/modules/shop/services/order-ops.service");
+    await recordOrderEvent({
+      orderId: order.id,
+      type: "shipping_overridden",
+      title: "Shipping amount overridden",
+      detail: `₹${order.shippingCents / 100} → ₹${parsed.data.shippingInr}${
+        clearRazorpay ? " · Pending payment intent cleared" : ""
+      }`,
+      actorEmail: String(admin.email),
+      metadata: {
+        fromShippingCents: order.shippingCents,
+        toShippingCents: shippingCents,
+        fromTotalCents: order.totalCents,
+        toTotalCents: totalCents
+      }
+    });
+
+    revalidatePath(`/admin/orders/${order.id}`);
+    revalidatePath("/admin/orders");
+    return {
+      ok: true,
+      message: clearRazorpay
+        ? "Shipping updated. Customer must check out again so payment matches the new total."
+        : unpaid
+          ? "Shipping updated for this order."
+          : "Shipping updated on this order. Razorpay charge is unchanged — issue a refund or note if money already collected."
+    };
+  } catch (error) {
+    logger.error({ err: error, event: "order_shipping_override_failed" }, "failed to override shipping");
+    return { error: "Couldn't update order shipping." };
   }
 }
 

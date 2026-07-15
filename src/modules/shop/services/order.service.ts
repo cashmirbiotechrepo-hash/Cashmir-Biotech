@@ -14,14 +14,55 @@ function newConfirmationToken() {
   return randomBytes(24).toString("base64url");
 }
 
-/** Dynamic shipping threshold and flat rate (in paise) configured via environment variables (MED-03). */
-export function getShippingRates() {
-  const freeThresholdInr = parseInt(process.env.FREE_SHIPPING_THRESHOLD_INR || "999", 10);
-  const flatShippingInr = parseInt(process.env.FLAT_SHIPPING_INR || "60", 10);
+export type ShippingRates = {
+  flatShippingInr: number;
+  freeShippingThresholdInr: number;
+  freeThresholdCents: number;
+  flatShippingCents: number;
+};
+
+function clampInr(value: number, fallback: number) {
+  return Number.isFinite(value) && value >= 0 ? Math.floor(value) : fallback;
+}
+
+function envShippingFallback(): ShippingRates {
+  const freeShippingThresholdInr = clampInr(
+    parseInt(process.env.FREE_SHIPPING_THRESHOLD_INR || "999", 10),
+    999
+  );
+  const flatShippingInr = clampInr(parseInt(process.env.FLAT_SHIPPING_INR || "60", 10), 60);
   return {
-    freeThresholdCents: (Number.isNaN(freeThresholdInr) || freeThresholdInr < 0 ? 999 : freeThresholdInr) * 100,
-    flatShippingCents: (Number.isNaN(flatShippingInr) || flatShippingInr < 0 ? 60 : flatShippingInr) * 100
+    flatShippingInr,
+    freeShippingThresholdInr,
+    freeThresholdCents: freeShippingThresholdInr * 100,
+    flatShippingCents: flatShippingInr * 100
   };
+}
+
+/**
+ * Store-wide delivery defaults from SiteSettings (admin), with env fallback.
+ * Used by cart pricing, checkout UI, and product copy.
+ */
+export async function getShippingRates(): Promise<ShippingRates> {
+  try {
+    const settings = await db.siteSettings.findUnique({
+      where: { id: 1 },
+      select: { flatShippingInr: true, freeShippingThresholdInr: true }
+    });
+    if (settings) {
+      const flatShippingInr = clampInr(settings.flatShippingInr, 60);
+      const freeShippingThresholdInr = clampInr(settings.freeShippingThresholdInr, 999);
+      return {
+        flatShippingInr,
+        freeShippingThresholdInr,
+        freeThresholdCents: freeShippingThresholdInr * 100,
+        flatShippingCents: flatShippingInr * 100
+      };
+    }
+  } catch (error) {
+    logger.warn({ err: error, event: "shipping_rates_fallback" }, "using env shipping defaults");
+  }
+  return envShippingFallback();
 }
 
 /** MRP prices are GST-inclusive, so tax is not added on top. */
@@ -110,7 +151,7 @@ export async function priceCart(items: CartInputItem[], couponCode?: string): Pr
     discountCents = Math.min(subtotalCents, discountCents);
   }
 
-  const { freeThresholdCents, flatShippingCents } = getShippingRates();
+  const { freeThresholdCents, flatShippingCents } = await getShippingRates();
   const subtotalAfterDiscount = subtotalCents - discountCents;
   const shippingCents = subtotalAfterDiscount >= freeThresholdCents ? 0 : flatShippingCents;
   const totalCents = subtotalAfterDiscount + TAX_CENTS + shippingCents;

@@ -17,6 +17,7 @@ import {
   getProductAvailability,
   listPatents
 } from "@/modules/cms/services/content.service";
+import { getShippingRates } from "@/modules/shop/services/order.service";
 import { ProductGallery } from "@/components/ui/product-gallery";
 import { AddToCart } from "@/components/shop/add-to-cart";
 import { ProductDetailAccordion } from "@/components/shop/product-detail-accordion";
@@ -59,7 +60,16 @@ const PROCESS = [
 
 export default async function ProductDetailPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
-  const [product, patents] = await Promise.all([getActiveProductBySlug(slug), listPatents().catch(() => [])]);
+  const [product, patents, rates] = await Promise.all([
+    getActiveProductBySlug(slug),
+    listPatents().catch(() => []),
+    getShippingRates().catch(() => ({
+      flatShippingInr: 60,
+      freeShippingThresholdInr: 999,
+      freeThresholdCents: 99900,
+      flatShippingCents: 6000
+    }))
+  ]);
   if (!product) notFound();
 
   const availability = await getProductAvailability(product);
@@ -92,7 +102,7 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
     {
       id: "shipping",
       title: "Shipping & support",
-      body: `Ships in approximately ${product.leadTimeDays} day${product.leadTimeDays === 1 ? "" : "s"} after payment.\n\nFree shipping on orders of ${inr.format(999)}+ within India. Secure payments via Razorpay. For batch documents, reply to your order confirmation.`
+      body: `Ships in approximately ${product.leadTimeDays} day${product.leadTimeDays === 1 ? "" : "s"} after payment.\n\nFree shipping on orders of ${inr.format(rates.freeShippingThresholdInr)}+ within India. Secure payments via Razorpay. For batch documents, reply to your order confirmation.`
     }
   ];
 

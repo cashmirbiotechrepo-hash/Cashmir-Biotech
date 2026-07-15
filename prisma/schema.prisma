@@ -8,17 +8,21 @@ datasource db {
 }
 
 model SiteSettings {
-  id               Int      @id @default(1)
-  companyName      String
-  heroTitle        String
-  heroSubtitle     String
-  heroDescription  String
-  ctaPrimaryText   String
-  ctaPrimaryHref   String
-  ctaSecondaryText String
-  ctaSecondaryHref String
-  missionStatement String
-  updatedAt        DateTime @updatedAt
+  id                       Int      @id @default(1)
+  companyName              String
+  heroTitle                String
+  heroSubtitle             String
+  heroDescription          String
+  ctaPrimaryText           String
+  ctaPrimaryHref           String
+  ctaSecondaryText         String
+  ctaSecondaryHref         String
+  missionStatement         String
+  /// Flat delivery fee in INR (rupees). Cart uses this until free-shipping threshold.
+  flatShippingInr          Int      @default(60)
+  /// Subtotal (INR) at/above which shipping is waived.
+  freeShippingThresholdInr Int      @default(999)
+  updatedAt                DateTime @updatedAt
 }
 
 model Product {

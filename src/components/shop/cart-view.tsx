@@ -31,9 +31,6 @@ const inr = new Intl.NumberFormat("en-IN", {
   maximumFractionDigits: 0
 });
 
-const FREE_SHIPPING_THRESHOLD = 999;
-const FLAT_SHIPPING = 60;
-
 const BATCH_LABEL = "Current batch · July 2026";
 
 const INCLUDED = [
@@ -86,7 +83,15 @@ function productStory(name: string) {
   return `${name} is a patent-backed nutraceutical developed through SKUAST-K biotechnology research — assayed before it reaches you.`;
 }
 
-export function CartView({ patentCount = 0 }: { patentCount?: number }) {
+export function CartView({
+  patentCount = 0,
+  flatShippingInr = 60,
+  freeShippingThresholdInr = 999
+}: {
+  patentCount?: number;
+  flatShippingInr?: number;
+  freeShippingThresholdInr?: number;
+}) {
   const { items, ready, subtotalInr, setQuantity, remove } = useCart();
   const router = useRouter();
 
@@ -143,10 +148,13 @@ export function CartView({ patentCount = 0 }: { patentCount?: number }) {
     );
   }
 
-  const shipping = subtotalInr >= FREE_SHIPPING_THRESHOLD ? 0 : FLAT_SHIPPING;
+  const shipping = subtotalInr >= freeShippingThresholdInr ? 0 : flatShippingInr;
   const total = subtotalInr + shipping;
-  const toFree = Math.max(0, FREE_SHIPPING_THRESHOLD - subtotalInr);
-  const shipProgress = Math.min(100, (subtotalInr / FREE_SHIPPING_THRESHOLD) * 100);
+  const toFree = Math.max(0, freeShippingThresholdInr - subtotalInr);
+  const shipProgress =
+    freeShippingThresholdInr > 0
+      ? Math.min(100, (subtotalInr / freeShippingThresholdInr) * 100)
+      : 100;
 
   return (
     <>
