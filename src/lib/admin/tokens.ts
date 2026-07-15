@@ -6,9 +6,9 @@ import { env } from "@/config/env.server";
 import { JWT_AUDIENCE, JWT_ISSUER } from "@/config/auth.constants";
 import { logger } from "@/lib/logger";
 
-const ACCESS_TOKEN_EXPIRY = "2h";
-const REFRESH_TOKEN_EXPIRY = "7d";
-const REFRESH_TOKEN_EXPIRY_MS = 7 * 24 * 60 * 60 * 1000;
+const ACCESS_TOKEN_EXPIRY = "7d";
+const REFRESH_TOKEN_EXPIRY = "30d";
+const REFRESH_TOKEN_EXPIRY_MS = 30 * 24 * 60 * 60 * 1000;
 
 function jwtSecret() {
   return new TextEncoder().encode(env.JWT_SECRET);
@@ -104,6 +104,16 @@ export class AdminTokenService {
 
       const session = await db.adminSession.findUnique({ where: { id: payload.sessionId } });
       if (!session || session.isRevoked || session.expiresAt < new Date()) return null;
+
+      await db.adminSession
+        .update({
+          where: { id: session.id },
+          data: {
+            lastUsedAt: new Date(),
+            expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
+          }
+        })
+        .catch(() => undefined);
 
       const user = await db.adminUser.findFirst({
         where: { id: session.userId, active: true }

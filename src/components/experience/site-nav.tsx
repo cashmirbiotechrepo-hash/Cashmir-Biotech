@@ -28,13 +28,24 @@ function isActive(pathname: string, href: string) {
   return href !== "/" && pathname.startsWith(href);
 }
 
-export function SiteNav() {
+export function SiteNav({
+  customer = null
+}: {
+  customer?: { name: string | null; email: string } | null;
+}) {
   const { ready } = useIntro();
   const { count, ready: cartReady } = useCart();
   const pathname = usePathname();
   const [hidden, setHidden] = useState(false);
   const [condensed, setCondensed] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+
+  const firstName = customer
+    ? (customer.name ?? customer.email.split("@")[0] ?? "Account").split(" ")[0]
+    : null;
+  const accountHref = customer ? "/portal" : "/portal/login";
+  const accountLabel = customer ? (firstName ? firstName : "Account") : "Sign in";
+  const accountCursor = customer ? "Account" : "Sign in";
 
   // Keep the latest menu state in a ref so the scroll handler never re-subscribes.
   const menuOpenRef = useRef(menuOpen);
@@ -145,11 +156,11 @@ export function SiteNav() {
 
           <div className="flex items-center gap-3 md:gap-3.5">
             <Link
-              href="/portal/login"
-              data-cursor="Sign in"
+              href={accountHref}
+              data-cursor={accountCursor}
               className="hidden font-mono text-[11px] uppercase tracking-[0.16em] text-ink-mute transition-colors hover:text-ink lg:inline-flex lg:items-center lg:px-1"
             >
-              Sign in
+              {accountLabel}
             </Link>
             <Link
               href="/cart"
@@ -247,10 +258,10 @@ export function SiteNav() {
                 Cart{cartReady && count > 0 ? ` (${count})` : ""}
               </Link>
               <Link
-                href="/portal/login"
+                href={accountHref}
                 className="flex items-center justify-center rounded-full border border-ink/20 py-4 font-mono text-[12px] uppercase tracking-[0.16em] text-ink"
               >
-                Sign in
+                {customer ? `Account · ${accountLabel}` : "Sign in"}
               </Link>
               <Link
                 href={CONTACT_HREF}

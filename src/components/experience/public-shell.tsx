@@ -13,8 +13,14 @@ import { SiteNav } from "@/components/experience/site-nav";
 import { SiteFooter } from "@/components/experience/site-footer";
 import { CheckoutFooter, CheckoutNav } from "@/components/shop/checkout-chrome";
 import { CartProvider } from "@/components/shop/cart-context";
+import { CustomerSessionKeepalive } from "@/components/portal/customer-session-keepalive";
 
 const INTRO_KEY = "cb-intro-seen";
+
+export type PublicShellCustomer = {
+  name: string | null;
+  email: string;
+} | null;
 
 /**
  * Persistent chrome for every public route. Nav, footer, ambient background and
@@ -22,7 +28,13 @@ const INTRO_KEY = "cb-intro-seen";
  * page transitions). The cinematic loader only plays on the first home visit of
  * a session.
  */
-export function PublicShell({ children }: { children: React.ReactNode }) {
+export function PublicShell({
+  children,
+  customer = null
+}: {
+  children: React.ReactNode;
+  customer?: PublicShellCustomer;
+}) {
   const pathname = usePathname();
   const isHome = pathname === "/";
   const isCheckout = pathname === "/checkout" || pathname.startsWith("/checkout/");
@@ -72,6 +84,7 @@ export function PublicShell({ children }: { children: React.ReactNode }) {
     <MotionConfig reducedMotion="user">
       <IntroProvider ready={ready}>
         <CartProvider>
+        <CustomerSessionKeepalive enabled={Boolean(customer)} />
         <a
           href="#main"
           className="sr-only focus-visible:not-sr-only focus-visible:fixed focus-visible:left-4 focus-visible:top-4 focus-visible:z-[110] focus-visible:rounded-full focus-visible:bg-ink focus-visible:px-5 focus-visible:py-2.5 focus-visible:text-sm focus-visible:text-paper"
@@ -86,13 +99,13 @@ export function PublicShell({ children }: { children: React.ReactNode }) {
         <Cursor />
         <Grain />
         {!isCheckout ? <AmbientBackground /> : null}
-        {isCheckout ? <CheckoutNav /> : <SiteNav />}
+        {isCheckout ? <CheckoutNav /> : <SiteNav customer={customer} />}
 
         <SmoothScroll>
           <main id="main" className={isCheckout ? "relative flex min-h-[70vh] flex-col" : "relative"}>
             {children}
           </main>
-          {isCheckout ? <CheckoutFooter /> : <SiteFooter />}
+          {isCheckout ? <CheckoutFooter /> : <SiteFooter customer={customer} />}
         </SmoothScroll>
         </CartProvider>
       </IntroProvider>

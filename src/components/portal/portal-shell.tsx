@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { FileText, Home, LifeBuoy, Package, UserRound } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { CustomerSessionKeepalive } from "@/components/portal/customer-session-keepalive";
 
 const NAV = [
   { href: "/portal", label: "Overview", exact: true },
@@ -59,6 +60,7 @@ export function PortalShell({
 
   return (
     <div className="min-h-dvh bg-ivory text-ink">
+      <CustomerSessionKeepalive />
       <div className="mx-auto flex min-h-dvh max-w-6xl gap-0 md:gap-10 md:px-8 md:py-10">
         <aside className="hidden w-52 shrink-0 flex-col border-r border-ink/10 pr-6 md:flex lg:w-56">
           <Link href="/" className="mb-8 block">

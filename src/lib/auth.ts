@@ -16,8 +16,8 @@ import { AdminAuthService } from "@/lib/admin/auth-service";
 
 export const authCookieName = ADMIN_SESSION_COOKIE;
 
-const SESSION_COOKIE_MAX_AGE = 60 * 60 * 24;
-const REFRESH_COOKIE_MAX_AGE = 60 * 60 * 24 * 7;
+const SESSION_COOKIE_MAX_AGE = 7 * 24 * 60 * 60; // match 7d access JWT
+const REFRESH_COOKIE_MAX_AGE = 30 * 24 * 60 * 60;
 
 export type AdminSession = AdminTokenPayload & {
   email: string;

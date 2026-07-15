@@ -2,10 +2,13 @@
 
 import { useEffect } from "react";
 
-/** Silently rotates the access token before the 24h cookie expires (session valid 7 days). */
+/**
+ * Silently rotates the admin access token so console sessions stay open.
+ * Also refreshes when the tab becomes visible again.
+ */
 export function AdminSessionKeepalive() {
   useEffect(() => {
-    const REFRESH_MS = 12 * 60 * 60 * 1000; // every 12 hours
+    const REFRESH_MS = 60 * 60 * 1000; // every hour (access token lasts 7 days; keep sliding)
 
     async function refresh() {
       try {
@@ -15,15 +18,28 @@ export function AdminSessionKeepalive() {
           cache: "no-store"
         });
         if (res.status === 401) {
-          window.location.href = "/admin/login?expired=1";
+          // Only bounce if we're already inside the console
+          if (window.location.pathname.startsWith("/admin") && !window.location.pathname.startsWith("/admin/login")) {
+            window.location.href = "/admin/login?expired=1";
+          }
         }
       } catch {
         // Network blip — next interval will retry
       }
     }
 
+    void refresh();
     const timer = setInterval(() => void refresh(), REFRESH_MS);
-    return () => clearInterval(timer);
+
+    const onVisible = () => {
+      if (document.visibilityState === "visible") void refresh();
+    };
+    document.addEventListener("visibilitychange", onVisible);
+
+    return () => {
+      clearInterval(timer);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
   }, []);
 
   return null;

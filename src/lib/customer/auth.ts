@@ -14,11 +14,12 @@ import { db } from "@/lib/db";
 import { decryptToken, encryptToken } from "@/lib/admin/encryption";
 import { logger } from "@/lib/logger";
 
-const SESSION_DAYS = 30;
-/** Short access TTL so revoke is effective quickly even without Redis denylist. */
-const ACCESS_TOKEN_EXPIRY = "15m";
+const SESSION_DAYS = 90;
+/** Long-lived access so customers stay signed in across visits; revoke still clears DB session. */
+const ACCESS_TOKEN_EXPIRY = "7d";
+const ACCESS_COOKIE_MAX_AGE = 7 * 24 * 60 * 60; // 7 days in seconds
 
-const REFRESH_COOKIE_MAX_AGE = 30 * 24 * 60 * 60; // 30 days in seconds
+const REFRESH_COOKIE_MAX_AGE = 90 * 24 * 60 * 60; // 90 days in seconds
 const OTP_EXPIRY_MS = 10 * 60 * 1000;
 const OTP_COOLDOWN_MS = 60 * 1000;
 const MAX_OTP_ATTEMPTS = 5;
@@ -289,7 +290,7 @@ async function mintCustomerRefreshToken(sessionId: string): Promise<string> {
     .setIssuedAt()
     .setIssuer(JWT_ISSUER)
     .setAudience(CUSTOMER_JWT_AUDIENCE)
-    .setExpirationTime("30d")
+    .setExpirationTime("90d")
     .sign(jwtSecret());
 }
 
@@ -301,14 +302,14 @@ export async function setCustomerSessionCookies(accessToken: string, refreshToke
     secure: process.env.NODE_ENV === "production",
     sameSite: "lax",
     path: "/",
-    maxAge: 15 * 60 // 15 minutes — matches access token expiry
+    maxAge: ACCESS_COOKIE_MAX_AGE
   });
   if (refreshToken) {
     const encryptedRefresh = await encryptToken(refreshToken);
     jar.set(CUSTOMER_REFRESH_COOKIE, encryptedRefresh, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
-      sameSite: "strict",
+      sameSite: "lax",
       path: "/api/portal/auth/refresh",
       maxAge: REFRESH_COOKIE_MAX_AGE
     });
@@ -335,6 +336,17 @@ export async function rotateCustomerRefresh(encryptedRefreshCookie: string): Pro
 
     const session = await db.customerSession.findUnique({ where: { id: payload.sessionId } });
     if (!session || session.isRevoked || session.expiresAt < new Date()) return null;
+
+    // Sliding expiry — stay logged in while the account is used
+    await db.customerSession
+      .update({
+        where: { id: session.id },
+        data: {
+          lastUsedAt: new Date(),
+          expiresAt: new Date(Date.now() + SESSION_DAYS * 24 * 60 * 60 * 1000)
+        }
+      })
+      .catch(() => undefined);
 
     const customer = await db.customer.findUnique({ where: { id: session.customerId } });
     if (!customer || !customer.active) return null;

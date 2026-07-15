@@ -7,7 +7,7 @@ import { writeAuditLog } from "@/modules/admin/services/audit.service";
 import { AdminPasswordService } from "@/lib/admin/password";
 import { AdminTokenService } from "@/lib/admin/tokens";
 
-const SESSION_EXPIRY_DAYS = 7;
+const SESSION_EXPIRY_DAYS = 30;
 const MAX_FAILED_ATTEMPTS = 5;
 const LOCKOUT_DURATION_MS = 15 * 60 * 1000;
 

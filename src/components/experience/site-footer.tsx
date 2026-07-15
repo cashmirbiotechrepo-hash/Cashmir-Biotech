@@ -11,34 +11,36 @@ import { SITE_CONTACT } from "@/lib/site-contact";
 type FooterLink = { label: string; href: string };
 type FooterColumn = { title: string; links: FooterLink[] };
 
-const COLUMNS: FooterColumn[] = [
-  {
-    title: "Formulations",
-    links: [
-      { label: "Product catalog", href: "/products" },
-      { label: "Institutional inquiry", href: `mailto:${SITE_CONTACT.primaryEmail}` }
-    ]
-  },
-  {
-    title: "Science",
-    links: [
-      { label: "Bioinformatics suite", href: "/tools" },
-      { label: "Patent registry", href: "/patents" },
-      { label: "Certifications", href: "/about" }
-    ]
-  },
-  {
-    title: "Company",
-    links: [
-      { label: "Home", href: "/" },
-      { label: "About us", href: "/about" },
-      { label: "Contact", href: "/contact" },
-      { label: "Board members", href: "/team" },
-      { label: "Customer Portal", href: "/portal/login" },
-      { label: "Operations Console", href: "/admin/login" }
-    ]
-  }
-];
+function companyColumns(portalHref: string): FooterColumn[] {
+  return [
+    {
+      title: "Formulations",
+      links: [
+        { label: "Product catalog", href: "/products" },
+        { label: "Institutional inquiry", href: `mailto:${SITE_CONTACT.primaryEmail}` }
+      ]
+    },
+    {
+      title: "Science",
+      links: [
+        { label: "Bioinformatics suite", href: "/tools" },
+        { label: "Patent registry", href: "/patents" },
+        { label: "Certifications", href: "/about" }
+      ]
+    },
+    {
+      title: "Company",
+      links: [
+        { label: "Home", href: "/" },
+        { label: "About us", href: "/about" },
+        { label: "Contact", href: "/contact" },
+        { label: "Board members", href: "/team" },
+        { label: "Customer Portal", href: portalHref },
+        { label: "Operations Console", href: "/admin/login" }
+      ]
+    }
+  ];
+}
 
 type ConnectLink = { label: string; href: string; icon: ComponentType<{ className?: string }> };
 
@@ -73,8 +75,9 @@ function AnimatedContainer({ children, className, delay = 0.1 }: AnimatedProps) 
   );
 }
 
-export function SiteFooter() {
+export function SiteFooter({ customer = null }: { customer?: { name: string | null; email: string } | null }) {
   const year = new Date().getFullYear();
+  const columns = companyColumns(customer ? "/portal" : "/portal/login");
   return (
     <footer className="relative border-t border-ink/10 bg-ivory">
       {/* Centered hairline glow along the top edge. */}
@@ -98,7 +101,7 @@ export function SiteFooter() {
           </AnimatedContainer>
 
           <div className="grid grid-cols-2 gap-8 sm:grid-cols-4 xl:col-span-2">
-            {COLUMNS.map((col, index) => (
+            {columns.map((col, index) => (
               <AnimatedContainer key={col.title} delay={0.1 + index * 0.1}>
                 <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-ink-faint">
                   {col.title}
@@ -121,7 +124,7 @@ export function SiteFooter() {
               </AnimatedContainer>
             ))}
 
-            <AnimatedContainer delay={0.1 + COLUMNS.length * 0.1}>
+            <AnimatedContainer delay={0.1 + columns.length * 0.1}>
               <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-ink-faint">
                 Connect
               </p>
