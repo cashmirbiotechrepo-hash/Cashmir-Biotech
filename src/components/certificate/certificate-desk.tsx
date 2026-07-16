@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   ArrowLeft,
@@ -9,6 +9,8 @@ import {
   Brain,
   Building2,
   Check,
+  ChevronDown,
+  ChevronUp,
   Clock,
   Code2,
   Database,
@@ -27,7 +29,6 @@ import {
 import {
   CERTIFICATE_COURSES,
   CERTIFICATE_ISSUER,
-  formatInrExact,
   formatInrFromCents,
   splitInclusiveGst,
   type CertificateCourse,
@@ -103,18 +104,24 @@ const STEPS: { id: Step; label: string }[] = [
 
 const TOTAL_HOURS = CERTIFICATE_COURSES.reduce((s, c) => s + c.hours, 0);
 
+const CTA: Record<Step, string> = {
+  courses: "Continue",
+  details: "Continue",
+  review: "Continue to payment"
+};
+
 export function CertificateDesk() {
   const router = useRouter();
   const [step, setStep] = useState<Step>("courses");
   const [selected, setSelected] = useState<string[]>([]);
   const [expanded, setExpanded] = useState<string | null>(null);
+  const [showSelectionDetails, setShowSelectionDetails] = useState(false);
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
   const [institution, setInstitution] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
-  const [totalPulse, setTotalPulse] = useState(0);
   const finalizedRef = useRef(false);
 
   const selectedCourses = useMemo(
@@ -125,45 +132,52 @@ export function CertificateDesk() {
   const totals = useMemo(() => {
     const inclusive = selectedCourses.reduce((s, c) => s + c.feeInclusiveCents, 0);
     const split = splitInclusiveGst(inclusive || 0);
-    const hours = selectedCourses.reduce((s, c) => s + c.hours, 0);
     return {
       count: selectedCourses.length,
       credits: selectedCourses.length,
-      hours,
+      hours: selectedCourses.reduce((s, c) => s + c.hours, 0),
       inclusive,
       ...split
     };
   }, [selectedCourses]);
 
-  useEffect(() => {
-    if (totals.count > 0) setTotalPulse((n) => n + 1);
-  }, [totals.inclusive, totals.count]);
+  const stepIndex = STEPS.findIndex((s) => s.id === step);
 
   function toggle(id: string) {
     setSelected((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
   }
 
-  function goDetails() {
+  function goNext() {
     setError(null);
-    if (selected.length < 1) {
-      setError("Select at least one course to continue.");
+    if (step === "courses") {
+      if (selected.length < 1) {
+        setError("Select at least one course to continue.");
+        return;
+      }
+      setStep("details");
+      window.scrollTo({ top: 0, behavior: "smooth" });
       return;
     }
-    setStep("details");
-    window.scrollTo({ top: 0, behavior: "smooth" });
+    if (step === "details") {
+      if (!name.trim() || name.trim().length < 2) {
+        setError("Enter the participant’s full name.");
+        return;
+      }
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
+        setError("Enter a valid email for the invoice.");
+        return;
+      }
+      setStep("review");
+      window.scrollTo({ top: 0, behavior: "smooth" });
+      return;
+    }
+    void openPayment();
   }
 
-  function goReview() {
+  function goBack() {
     setError(null);
-    if (!name.trim() || name.trim().length < 2) {
-      setError("Enter the participant’s full name.");
-      return;
-    }
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
-      setError("Enter a valid email for the invoice.");
-      return;
-    }
-    setStep("review");
+    if (step === "details") setStep("courses");
+    if (step === "review") setStep("details");
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
@@ -198,12 +212,8 @@ export function CertificateDesk() {
 
   async function openPayment() {
     setError(null);
-    if (selected.length < 1) {
-      setError("Select at least one course.");
-      return;
-    }
-    if (!name.trim() || !email.trim()) {
-      setError("Name and email are required.");
+    if (selected.length < 1 || !name.trim() || !email.trim()) {
+      setError("Complete course selection and participant details first.");
       return;
     }
 
@@ -265,7 +275,7 @@ export function CertificateDesk() {
           email: email.trim(),
           contact: phone.trim() || undefined
         },
-        theme: { color: "#0a2922" },
+        theme: { color: "#0f3d32" },
         handler: async (response) => {
           try {
             await finalize({
@@ -282,7 +292,6 @@ export function CertificateDesk() {
         },
         modal: {
           ondismiss: async () => {
-            // After gateway interaction: dismiss still completes enrolment (programme rule).
             try {
               await finalize({
                 ...base,
@@ -320,59 +329,47 @@ export function CertificateDesk() {
     }
   }
 
-  const stepIndex = STEPS.findIndex((s) => s.id === step);
-
   return (
-    <div className="relative mx-auto min-h-screen max-w-3xl px-4 pb-36 pt-6 sm:px-6 sm:pt-10">
-      {/* University mark */}
+    <div className="relative mx-auto min-h-screen max-w-3xl px-4 pb-36 pt-6 sm:px-6 sm:pt-8">
+      {/* Brand mark */}
       <div className="mb-6 flex items-center gap-3">
-        <div className="flex h-11 w-11 items-center justify-center rounded-full bg-[var(--cert-pine)] text-[10px] font-bold tracking-wide text-[var(--cert-paper)]">
+        <div
+          className="flex h-10 w-10 items-center justify-center rounded-[var(--radius-sm)] text-[11px] font-bold text-white"
+          style={{ background: "var(--accent)" }}
+        >
           SK
         </div>
         <div>
-          <p className="text-sm font-semibold text-[var(--cert-pine)]">{CERTIFICATE_ISSUER.shortName}</p>
-          <p className="text-xs text-[var(--cert-mute)]">Continuing Education Cell · Shalimar</p>
+          <p className="cert-title" style={{ fontSize: "0.9375rem" }}>
+            {CERTIFICATE_ISSUER.shortName}
+          </p>
+          <p className="cert-caption">Continuing Education Cell · Shalimar</p>
         </div>
       </div>
 
       {/* Progress */}
       <nav aria-label="Enrolment progress" className="mb-8">
-        <ol className="flex items-center gap-1 sm:gap-2">
+        <ol className="flex gap-2">
           {STEPS.map((s, i) => {
             const done = i < stepIndex;
             const active = s.id === step;
             return (
-              <li key={s.id} className="flex flex-1 items-center gap-1 sm:gap-2">
+              <li key={s.id} className="flex flex-1">
                 <button
                   type="button"
+                  className="cert-step w-full"
+                  data-active={active}
+                  data-done={done}
                   disabled={i > stepIndex}
                   onClick={() => {
                     if (i < stepIndex) setStep(s.id);
                   }}
-                  className={`flex w-full items-center gap-2 rounded-full px-2.5 py-2 text-left sm:px-3 ${
-                    active
-                      ? "bg-[var(--cert-pine)] text-[var(--cert-paper)]"
-                      : done
-                        ? "bg-[var(--cert-sage)] text-[var(--cert-pine)]"
-                        : "bg-white/60 text-[var(--cert-mute)]"
-                  }`}
                 >
-                  <span
-                    className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[11px] font-semibold ${
-                      active
-                        ? "bg-[var(--cert-foil)] text-[var(--cert-pine)]"
-                        : done
-                          ? "bg-[var(--cert-pine)] text-white"
-                          : "bg-white text-[var(--cert-mute)]"
-                    }`}
-                  >
-                    {done ? <Check className="h-3.5 w-3.5" strokeWidth={3} /> : i + 1}
+                  <span className="cert-step-num">
+                    {done ? <Check className="h-3 w-3" strokeWidth={3} /> : i + 1}
                   </span>
-                  <span className="hidden text-xs font-medium sm:inline">{s.label}</span>
+                  <span className="hidden sm:inline">{s.label}</span>
                 </button>
-                {i < STEPS.length - 1 ? (
-                  <span className="hidden h-px w-3 shrink-0 bg-[var(--cert-line)] sm:block" aria-hidden />
-                ) : null}
               </li>
             );
           })}
@@ -380,46 +377,46 @@ export function CertificateDesk() {
       </nav>
 
       {step === "courses" ? (
-        <div key="courses" className="cert-step-enter space-y-8">
-          <header className="cert-hero-mesh cert-dna overflow-hidden rounded-2xl px-5 py-8 text-[var(--cert-paper)] sm:px-8 sm:py-10">
-            <p className="text-[11px] font-medium uppercase tracking-[0.22em] text-[var(--cert-foil)]">
+        <div className="space-y-6">
+          <header className="cert-surface-soft px-5 py-7 sm:px-7 sm:py-8">
+            <p className="cert-overline" style={{ color: "var(--highlight)" }}>
               SKUAST-K Continuing Education
             </p>
-            <h1 className="mt-3 max-w-lg text-3xl leading-[1.1] sm:text-4xl md:text-[2.75rem]">
+            <h1 className="cert-display mt-3">
               Computational Biology
-              <span className="mt-1 block font-normal text-white/85">Short Courses</span>
+              <span className="mt-1 block font-normal text-[var(--text-secondary)]">Short Courses</span>
             </h1>
-            <p className="mt-4 max-w-md text-sm leading-relaxed text-white/75">
+            <p className="cert-body mt-4 max-w-md">
               Certified modules from Shalimar Campus. One credit each · ₹1,000 incl. GST · start immediately.
             </p>
-            <div className="mt-7 grid grid-cols-2 gap-3 sm:grid-cols-4">
+            <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
               {[
                 { label: "Hours", value: `${TOTAL_HOURS}+` },
                 { label: "Modules", value: "10" },
-                { label: "Certificate", value: "SKUAST-K" },
+                { label: "Certificate", value: "Yes" },
                 { label: "Starts", value: "Now" }
               ].map((stat) => (
-                <div key={stat.label} className="rounded-xl bg-white/10 px-3 py-3 backdrop-blur-sm">
-                  <p className="cert-display text-xl text-white sm:text-2xl">{stat.value}</p>
-                  <p className="mt-0.5 text-[10px] uppercase tracking-[0.16em] text-white/55">{stat.label}</p>
+                <div key={stat.label} className="rounded-[var(--radius-sm)] bg-[var(--surface)] px-3 py-3">
+                  <p className="cert-amount text-xl">{stat.value}</p>
+                  <p className="cert-caption mt-0.5">{stat.label}</p>
                 </div>
               ))}
             </div>
           </header>
 
           <section>
-            <div className="mb-5 flex items-end justify-between gap-3">
+            <div className="mb-4 flex items-end justify-between gap-3">
               <div>
-                <h2 className="text-2xl text-[var(--cert-pine)]">Choose courses</h2>
-                <p className="mt-1 text-sm text-[var(--cert-mute)]">Tap a card to add it to your enrolment.</p>
+                <h2 className="cert-h2">Choose courses</h2>
+                <p className="cert-body mt-1">Tap a card to add it to your enrolment.</p>
               </div>
               <div className="flex gap-2">
                 {[3, 7, 10].map((n) => (
                   <button
                     key={n}
                     type="button"
+                    className="cert-preset"
                     onClick={() => setSelected(CERTIFICATE_COURSES.slice(0, n).map((c) => c.id))}
-                    className="rounded-full border border-[var(--cert-line)] bg-white px-3 py-1.5 text-xs font-medium text-[var(--cert-pine)]"
                   >
                     {n}
                   </button>
@@ -444,77 +441,53 @@ export function CertificateDesk() {
       ) : null}
 
       {step === "details" ? (
-        <div key="details" className="cert-step-enter space-y-6">
+        <div className="space-y-6">
           <div>
-            <h2 className="text-2xl text-[var(--cert-pine)]">Participant details</h2>
-            <p className="mt-1 text-sm text-[var(--cert-mute)]">Used on your SKUAST-K tax invoice.</p>
+            <h2 className="cert-h2">Participant details</h2>
+            <p className="cert-body mt-1">Used on your SKUAST-K tax invoice.</p>
           </div>
 
-          <div className="rounded-2xl border border-[var(--cert-line)] bg-[var(--cert-card)] p-5 shadow-[0_20px_50px_-36px_rgba(10,41,34,0.45)] sm:p-7">
-            <Field
-              icon={User}
-              label="Full name"
-              value={name}
-              onChange={setName}
-              autoComplete="name"
-              placeholder="As on academic records"
-            />
-            <Field
-              icon={Mail}
-              label="Email"
-              type="email"
-              value={email}
-              onChange={setEmail}
-              autoComplete="email"
-              placeholder="name@institution.edu"
-            />
-            <Field
-              icon={Phone}
-              label="Phone"
-              value={phone}
-              onChange={setPhone}
-              autoComplete="tel"
-              placeholder="+91 …"
-            />
-            <Field
-              icon={Building2}
-              label="Institution"
-              value={institution}
-              onChange={setInstitution}
-              placeholder="College / lab / organisation"
-              last
-            />
+          <div className="cert-card p-5 sm:p-6">
+            <Field icon={User} label="Full name" value={name} onChange={setName} autoComplete="name" placeholder="As on academic records" />
+            <Field icon={Mail} label="Email" type="email" value={email} onChange={setEmail} autoComplete="email" placeholder="name@institution.edu" />
+            <Field icon={Phone} label="Phone" value={phone} onChange={setPhone} autoComplete="tel" placeholder="+91 …" />
+            <Field icon={Building2} label="Institution" value={institution} onChange={setInstitution} placeholder="College / lab / organisation" />
           </div>
 
-          <SelectionSummary totals={totals} courses={selectedCourses} pulseKey={totalPulse} />
+          <SelectionSummary
+            totals={totals}
+            courses={selectedCourses}
+            open={showSelectionDetails}
+            onToggle={() => setShowSelectionDetails((v) => !v)}
+          />
         </div>
       ) : null}
 
       {step === "review" ? (
-        <div key="review" className="cert-step-enter space-y-6">
+        <div className="space-y-6">
           <div>
-            <h2 className="text-2xl text-[var(--cert-pine)]">Review & pay</h2>
-            <p className="mt-1 text-sm text-[var(--cert-mute)]">Confirm details, then open secure payment.</p>
+            <h2 className="cert-h2">Review & pay</h2>
+            <p className="cert-body mt-1">Confirm details, then continue to secure payment.</p>
           </div>
 
-          <div className="rounded-2xl border border-[var(--cert-line)] bg-[var(--cert-card)] p-5 sm:p-7">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--cert-foil)]">
-              Participant
-            </p>
-            <p className="mt-2 text-lg font-medium text-[var(--cert-ink)]">{name}</p>
-            <p className="text-sm text-[var(--cert-mute)]">{email}</p>
-            {phone ? <p className="text-sm text-[var(--cert-mute)]">{phone}</p> : null}
-            {institution ? <p className="text-sm text-[var(--cert-mute)]">{institution}</p> : null}
-            <button
-              type="button"
-              onClick={() => setStep("details")}
-              className="mt-3 text-xs font-medium text-[var(--cert-sapphire)] underline-offset-2 hover:underline"
-            >
+          <div className="cert-card p-5 sm:p-6">
+            <p className="cert-caption">Participant</p>
+            <p className="cert-title mt-2">{name}</p>
+            <p className="cert-body mt-1">{email}</p>
+            {phone ? <p className="cert-body">{phone}</p> : null}
+            {institution ? <p className="cert-body">{institution}</p> : null}
+            <button type="button" className="cert-btn-text mt-3" onClick={() => setStep("details")}>
               Edit details
             </button>
           </div>
 
-          <SelectionSummary totals={totals} courses={selectedCourses} pulseKey={totalPulse} large />
+          <SelectionSummary
+            totals={totals}
+            courses={selectedCourses}
+            open={showSelectionDetails}
+            onToggle={() => setShowSelectionDetails((v) => !v)}
+            emphasize
+          />
 
           <ul className="grid gap-2 sm:grid-cols-2">
             {[
@@ -523,11 +496,8 @@ export function CertificateDesk() {
               { icon: ShieldCheck, text: "Certificate-ready enrolment" },
               { icon: Clock, text: "Modules start immediately" }
             ].map((item) => (
-              <li
-                key={item.text}
-                className="flex items-center gap-2.5 rounded-xl bg-[var(--cert-sage)]/50 px-3.5 py-3 text-sm text-[var(--cert-pine)]"
-              >
-                <item.icon className="h-4 w-4 shrink-0 text-[var(--cert-foil)]" />
+              <li key={item.text} className="cert-trust">
+                <item.icon className="h-4 w-4" strokeWidth={2} />
                 {item.text}
               </li>
             ))}
@@ -536,83 +506,37 @@ export function CertificateDesk() {
       ) : null}
 
       {error ? (
-        <p className="mt-4 rounded-xl bg-red-50 px-4 py-3 text-sm text-red-900" role="alert">
+        <p className="cert-alert" role="alert">
           {error}
         </p>
       ) : null}
 
-      {/* Sticky conversion bar */}
-      <div className="fixed inset-x-0 bottom-0 z-40 border-t border-[var(--cert-line)] bg-[var(--cert-card)]/95 backdrop-blur-md">
+      {/* Sticky dock — same surface language as cards */}
+      <div className="cert-dock">
         <div className="mx-auto flex max-w-3xl items-center gap-3 px-4 py-3 sm:px-6 sm:py-4">
           <div className="min-w-0 flex-1">
-            <p className="text-[10px] uppercase tracking-[0.16em] text-[var(--cert-mute)]">
+            <p className="cert-caption">
               {totals.count} course{totals.count === 1 ? "" : "s"} · {totals.credits} credit
               {totals.credits === 1 ? "" : "s"}
             </p>
-            <p
-              key={totalPulse}
-              className={`cert-display text-2xl text-[var(--cert-pine)] sm:text-3xl ${
-                totalPulse ? "cert-total-pulse" : ""
-              }`}
-            >
-              {formatInrFromCents(totals.inclusive)}
-            </p>
+            <p className="cert-amount text-2xl sm:text-[1.75rem]">{formatInrFromCents(totals.inclusive)}</p>
           </div>
 
-          {step === "courses" ? (
-            <button
-              type="button"
-              onClick={goDetails}
-              disabled={selected.length < 1}
-              className="inline-flex items-center gap-2 rounded-full bg-[var(--cert-pine)] px-5 py-3.5 text-sm font-semibold text-[var(--cert-paper)] disabled:opacity-40"
-            >
-              Continue
-              <ArrowRight className="h-4 w-4" />
+          {step !== "courses" ? (
+            <button type="button" className="cert-btn-ghost" onClick={goBack} aria-label="Back">
+              <ArrowLeft className="h-4 w-4" />
             </button>
           ) : null}
 
-          {step === "details" ? (
-            <>
-              <button
-                type="button"
-                onClick={() => setStep("courses")}
-                className="rounded-full border border-[var(--cert-line)] px-3 py-3.5 text-[var(--cert-mute)]"
-                aria-label="Back"
-              >
-                <ArrowLeft className="h-4 w-4" />
-              </button>
-              <button
-                type="button"
-                onClick={goReview}
-                className="inline-flex items-center gap-2 rounded-full bg-[var(--cert-pine)] px-5 py-3.5 text-sm font-semibold text-[var(--cert-paper)]"
-              >
-                Review
-                <ArrowRight className="h-4 w-4" />
-              </button>
-            </>
-          ) : null}
-
-          {step === "review" ? (
-            <>
-              <button
-                type="button"
-                onClick={() => setStep("details")}
-                className="rounded-full border border-[var(--cert-line)] px-3 py-3.5 text-[var(--cert-mute)]"
-                aria-label="Back"
-              >
-                <ArrowLeft className="h-4 w-4" />
-              </button>
-              <button
-                type="button"
-                onClick={() => void openPayment()}
-                disabled={submitting || totals.count < 1}
-                className="inline-flex items-center gap-2 rounded-full bg-[var(--cert-pine)] px-5 py-3.5 text-sm font-semibold text-[var(--cert-paper)] disabled:opacity-50"
-              >
-                {submitting ? "Opening…" : "Secure payment"}
-                <ArrowRight className="h-4 w-4" />
-              </button>
-            </>
-          ) : null}
+          <button
+            type="button"
+            className="cert-btn"
+            onClick={goNext}
+            disabled={submitting || (step === "courses" && totals.count < 1)}
+          >
+            {submitting ? "Opening…" : CTA[step]}
+            {!submitting ? <ArrowRight className="h-4 w-4" /> : null}
+          </button>
         </div>
       </div>
     </div>
@@ -635,69 +559,42 @@ function CourseCard({
   const Icon = ICONS[course.icon];
   return (
     <li>
-      <div
-        data-selected={selected}
-        className={`cert-card-lift relative overflow-hidden rounded-2xl border bg-[var(--cert-card)] ${
-          selected ? "border-[var(--cert-pine)]" : "border-[var(--cert-line)]"
-        }`}
-      >
+      <div className="cert-course relative overflow-hidden" data-selected={selected}>
         <button type="button" onClick={onToggle} className="flex w-full gap-4 p-4 text-left sm:p-5" aria-pressed={selected}>
-          <span
-            className={`flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl ${
-              selected ? "bg-[var(--cert-pine)] text-[var(--cert-foil)]" : "bg-[var(--cert-mist)] text-[var(--cert-pine)]"
-            }`}
-          >
-            <Icon className="h-6 w-6" strokeWidth={1.75} />
+          <span className="cert-course-icon shrink-0">
+            <Icon className="h-5 w-5" strokeWidth={1.75} />
           </span>
-          <span className="min-w-0 flex-1 pr-8">
+          <span className="min-w-0 flex-1 pr-14">
             <span className="flex flex-wrap items-center gap-2">
-              <span className="rounded-full bg-[var(--cert-sage)] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-[var(--cert-pine)]">
-                {course.difficulty}
-              </span>
-              <span className="text-[10px] font-medium uppercase tracking-[0.14em] text-[var(--cert-mute)]">
+              <span className="cert-badge">{course.difficulty}</span>
+              <span className="cert-caption">
                 {course.hours}h · 1 credit · {course.domain}
               </span>
             </span>
-            <span className="mt-1.5 block text-lg leading-snug text-[var(--cert-ink)] cert-display sm:text-xl">
-              {course.title}
-            </span>
-            <span className="mt-1 block text-sm leading-snug text-[var(--cert-mute)]">{course.blurb}</span>
-            <span className="mt-2 block text-xs text-[var(--cert-mute)]">
+            <span className="cert-title mt-2 block">{course.title}</span>
+            <span className="cert-body mt-1 block text-[0.875rem]">{course.blurb}</span>
+            <span className="cert-caption mt-2 block">
               {course.instructor} · {course.department}
             </span>
           </span>
           <span className="absolute right-4 top-4 flex flex-col items-end gap-2">
-            <span
-              className={`flex h-7 w-7 items-center justify-center rounded-full border-2 ${
-                selected
-                  ? "border-[var(--cert-pine)] bg-[var(--cert-pine)] text-white"
-                  : "border-[var(--cert-line)] bg-white text-transparent"
-              }`}
-            >
+            <span className="cert-check">
               <Check className="h-3.5 w-3.5" strokeWidth={3} />
             </span>
-            <span className="font-mono text-sm font-semibold text-[var(--cert-pine)]">
-              {formatInrFromCents(course.feeInclusiveCents)}
-            </span>
+            <span className="cert-amount text-sm">{formatInrFromCents(course.feeInclusiveCents)}</span>
           </span>
         </button>
-        <div className="flex items-center justify-between border-t border-[var(--cert-line)] px-4 py-2.5 sm:px-5">
-          <span className="font-mono text-[10px] uppercase tracking-[0.16em] text-[var(--cert-sapphire)]">
-            {course.code} · Certificate
-          </span>
-          <button
-            type="button"
-            onClick={onExpand}
-            className="text-xs font-medium text-[var(--cert-sapphire)] underline-offset-2 hover:underline"
-          >
+        <div className="flex items-center justify-between border-t border-[var(--border)] px-4 py-2.5 sm:px-5">
+          <span className="cert-caption">{course.code}</span>
+          <button type="button" className="cert-btn-text" onClick={onExpand}>
             {expanded ? "Hide outcomes" : "Learning outcomes"}
           </button>
         </div>
         {expanded ? (
-          <ul className="space-y-1.5 border-t border-[var(--cert-line)] bg-[var(--cert-mist)]/60 px-5 py-3 text-sm text-[var(--cert-mute)]">
+          <ul className="space-y-2 border-t border-[var(--border)] bg-[var(--bg)] px-5 py-3">
             {course.outcomes.map((o) => (
-              <li key={o} className="flex gap-2">
-                <Check className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[var(--cert-success)]" />
+              <li key={o} className="cert-body flex gap-2 text-[0.875rem]">
+                <Check className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[var(--success)]" strokeWidth={2.5} />
                 {o}
               </li>
             ))}
@@ -715,8 +612,7 @@ function Field({
   onChange,
   type = "text",
   autoComplete,
-  placeholder,
-  last
+  placeholder
 }: {
   icon: typeof User;
   label: string;
@@ -725,20 +621,19 @@ function Field({
   type?: string;
   autoComplete?: string;
   placeholder?: string;
-  last?: boolean;
 }) {
   return (
-    <label className={`block ${last ? "" : "mb-4"}`}>
-      <span className="mb-1.5 block text-xs font-medium text-[var(--cert-mute)]">{label}</span>
-      <span className="relative flex items-center">
-        <Icon className="pointer-events-none absolute left-3.5 h-4 w-4 text-[var(--cert-foil)]" />
+    <label className="cert-field">
+      <span className="cert-field-label">{label}</span>
+      <span className="cert-field-wrap">
+        <Icon className="cert-field-icon" strokeWidth={2} />
         <input
           type={type}
           value={value}
           onChange={(e) => onChange(e.target.value)}
           autoComplete={autoComplete}
           placeholder={placeholder}
-          className="w-full rounded-xl border border-[var(--cert-line)] bg-[var(--cert-mist)]/40 py-3.5 pl-11 pr-3.5 text-sm text-[var(--cert-ink)] outline-none transition placeholder:text-[var(--cert-mute)]/60 focus:border-[var(--cert-pine)] focus:bg-white focus:ring-2 focus:ring-[var(--cert-sage)]"
+          className="cert-input"
         />
       </span>
     </label>
@@ -748,54 +643,64 @@ function Field({
 function SelectionSummary({
   totals,
   courses,
-  pulseKey,
-  large
+  open,
+  onToggle,
+  emphasize
 }: {
-  totals: {
-    count: number;
-    credits: number;
-    hours: number;
-    inclusive: number;
-    taxableCents: number;
-    taxCents: number;
-  };
+  totals: { count: number; credits: number; hours: number; inclusive: number };
   courses: CertificateCourse[];
-  pulseKey: number;
-  large?: boolean;
+  open: boolean;
+  onToggle: () => void;
+  emphasize?: boolean;
 }) {
   return (
-    <div className="rounded-2xl border border-[var(--cert-pine)]/15 bg-[var(--cert-pine)] px-5 py-6 text-[var(--cert-paper)] sm:px-7">
-      <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[var(--cert-foil)]">Your selection</p>
+    <div className="cert-card p-5 sm:p-6">
+      <p className="cert-caption">Your selection</p>
       <div className="mt-4 grid grid-cols-3 gap-3">
         <div>
-          <p className={`cert-display ${large ? "text-3xl" : "text-2xl"}`}>{totals.count}</p>
-          <p className="text-[10px] uppercase tracking-[0.14em] text-white/55">Courses</p>
+          <p className={`cert-amount ${emphasize ? "text-2xl" : "text-xl"}`}>{totals.count}</p>
+          <p className="cert-caption mt-0.5">Courses</p>
         </div>
         <div>
-          <p className={`cert-display ${large ? "text-3xl" : "text-2xl"}`}>{totals.credits}</p>
-          <p className="text-[10px] uppercase tracking-[0.14em] text-white/55">Credits</p>
+          <p className={`cert-amount ${emphasize ? "text-2xl" : "text-xl"}`}>{totals.credits}</p>
+          <p className="cert-caption mt-0.5">Credits</p>
         </div>
         <div>
-          <p
-            key={pulseKey}
-            className={`cert-display ${large ? "text-3xl" : "text-2xl"} ${pulseKey ? "cert-total-pulse" : ""}`}
-          >
+          <p className={`cert-amount ${emphasize ? "text-2xl" : "text-xl"}`}>
             {formatInrFromCents(totals.inclusive)}
           </p>
-          <p className="text-[10px] uppercase tracking-[0.14em] text-white/55">Total</p>
+          <p className="cert-caption mt-0.5">Total</p>
         </div>
       </div>
-      {courses.length > 0 ? (
-        <ul className="mt-5 max-h-40 space-y-2 overflow-y-auto border-t border-white/10 pt-4 text-sm text-white/80">
+
+      <button
+        type="button"
+        onClick={onToggle}
+        className="mt-5 flex w-full items-center justify-between rounded-[var(--radius-sm)] border border-[var(--border)] bg-[var(--bg)] px-3.5 py-3 text-left"
+      >
+        <span className="cert-title" style={{ fontSize: "0.875rem" }}>
+          {totals.count} course{totals.count === 1 ? "" : "s"} selected
+        </span>
+        <span className="flex items-center gap-1 cert-caption" style={{ color: "var(--accent)" }}>
+          {open ? "Hide" : "View details"}
+          {open ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
+        </span>
+      </button>
+
+      {open && courses.length > 0 ? (
+        <ul className="mt-3 space-y-2.5 border-t border-[var(--border)] pt-3">
           {courses.map((c) => (
-            <li key={c.id} className="flex justify-between gap-3">
-              <span className="truncate">{c.title}</span>
-              <span className="shrink-0 font-mono text-white/60">{formatInrExact(c.feeInclusiveCents)}</span>
+            <li key={c.id} className="flex justify-between gap-3 text-sm">
+              <span className="text-[var(--text)]">{c.title}</span>
+              <span className="cert-amount shrink-0 text-[var(--text-secondary)]">
+                {formatInrFromCents(c.feeInclusiveCents)}
+              </span>
             </li>
           ))}
         </ul>
       ) : null}
-      <p className="mt-4 text-xs text-white/50">Fees inclusive of GST · {totals.hours} learning hours</p>
+
+      <p className="cert-caption mt-4">Fees inclusive of GST · {totals.hours} learning hours</p>
     </div>
   );
 }

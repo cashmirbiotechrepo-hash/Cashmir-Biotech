@@ -22,81 +22,83 @@ export default async function CertificateReceiptPage({ searchParams }: Props) {
   return (
     <div className="mx-auto max-w-2xl px-4 py-12 sm:px-6 sm:py-16">
       <div className="mb-8 flex items-center gap-3">
-        <div className="flex h-11 w-11 items-center justify-center rounded-full bg-[var(--cert-pine)] text-[10px] font-bold text-[var(--cert-paper)]">
+        <div
+          className="flex h-10 w-10 items-center justify-center rounded-[var(--radius-sm)] text-[11px] font-bold text-white"
+          style={{ background: "var(--accent)" }}
+        >
           SK
         </div>
         <div>
-          <p className="text-sm font-semibold text-[var(--cert-pine)]">{CERTIFICATE_ISSUER.shortName}</p>
-          <p className="text-xs text-[var(--cert-mute)]">Continuing Education Cell</p>
+          <p className="cert-title" style={{ fontSize: "0.9375rem" }}>
+            {CERTIFICATE_ISSUER.shortName}
+          </p>
+          <p className="cert-caption">Continuing Education Cell</p>
         </div>
       </div>
 
       <div className="flex items-start gap-3">
-        <span className="mt-1 flex h-10 w-10 items-center justify-center rounded-full bg-[var(--cert-sage)] text-[var(--cert-pine)]">
+        <span className="mt-1 flex h-10 w-10 items-center justify-center rounded-[var(--radius-sm)] bg-[var(--accent-soft)] text-[var(--accent)]">
           <Award className="h-5 w-5" />
         </span>
         <div>
-          <h1 className="text-3xl text-[var(--cert-pine)] sm:text-4xl">Enrolment confirmed</h1>
-          <p className="mt-2 text-[15px] leading-relaxed text-[var(--cert-mute)]">
+          <h1 className="cert-h2" style={{ fontSize: "1.75rem" }}>
+            Enrolment confirmed
+          </h1>
+          <p className="cert-body mt-2">
             Your Computational Biology short-course enrolment is recorded with {CERTIFICATE_ISSUER.shortName}.
             Download your official tax invoice below.
           </p>
         </div>
       </div>
 
-      <div className="mt-10 rounded-2xl border border-[var(--cert-line)] bg-[var(--cert-card)] p-6 shadow-[0_24px_60px_-40px_rgba(10,41,34,0.4)] sm:p-8">
+      <div className="cert-card mt-8 p-6 sm:p-8">
         <dl className="grid gap-5 sm:grid-cols-2">
           <div>
-            <dt className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--cert-mute)]">Invoice</dt>
-            <dd className="mt-1 font-medium text-[var(--cert-ink)]">{enrollment.invoiceNumber}</dd>
+            <dt className="cert-caption">Invoice</dt>
+            <dd className="cert-title mt-1">{enrollment.invoiceNumber}</dd>
           </div>
           <div>
-            <dt className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--cert-mute)]">Enrolment</dt>
-            <dd className="mt-1 font-medium text-[var(--cert-ink)]">{enrollment.enrollmentNumber}</dd>
+            <dt className="cert-caption">Enrolment</dt>
+            <dd className="cert-title mt-1">{enrollment.enrollmentNumber}</dd>
           </div>
           <div>
-            <dt className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--cert-mute)]">Participant</dt>
-            <dd className="mt-1 font-medium text-[var(--cert-ink)]">{enrollment.studentName}</dd>
-            <dd className="text-sm text-[var(--cert-mute)]">{enrollment.studentEmail}</dd>
+            <dt className="cert-caption">Participant</dt>
+            <dd className="cert-title mt-1">{enrollment.studentName}</dd>
+            <dd className="cert-body">{enrollment.studentEmail}</dd>
           </div>
           <div>
-            <dt className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--cert-mute)]">Credits</dt>
-            <dd className="mt-1 cert-display text-3xl text-[var(--cert-pine)]">{enrollment.credits}</dd>
+            <dt className="cert-caption">Credits</dt>
+            <dd className="cert-amount mt-1 text-3xl">{enrollment.credits}</dd>
           </div>
         </dl>
 
-        <ul className="mt-8 space-y-2.5 border-t border-[var(--cert-line)] pt-6">
+        <ul className="mt-8 space-y-2.5 border-t border-[var(--border)] pt-6">
           {lines.map((line) => (
             <li key={line.id} className="flex justify-between gap-3 text-sm">
               <span>
-                <span className="font-mono text-[10px] text-[var(--cert-sapphire)]">{line.code}</span>
-                <span className="ml-2 text-[var(--cert-ink)]">{line.title}</span>
+                <span className="cert-caption">{line.code}</span>
+                <span className="ml-2 text-[var(--text)]">{line.title}</span>
               </span>
-              <span className="shrink-0 font-mono text-[var(--cert-mute)]">
+              <span className="cert-amount shrink-0 text-[var(--text-secondary)]">
                 {formatInrExact(line.feeInclusiveCents)}
               </span>
             </li>
           ))}
         </ul>
 
-        <div className="mt-6 flex items-baseline justify-between border-t border-[var(--cert-line)] pt-5">
-          <span className="text-sm text-[var(--cert-mute)]">Amount paid (incl. GST)</span>
-          <span className="cert-display text-3xl text-[var(--cert-pine)]">
-            {formatInrExact(enrollment.totalCents)}
-          </span>
+        <div className="mt-6 flex items-baseline justify-between border-t border-[var(--border)] pt-5">
+          <span className="cert-body">Amount paid (incl. GST)</span>
+          <span className="cert-amount text-3xl">{formatInrExact(enrollment.totalCents)}</span>
         </div>
 
-        <a
-          href={pdfHref}
-          className="mt-8 inline-flex w-full items-center justify-center gap-2 rounded-full bg-[var(--cert-pine)] px-5 py-3.5 text-sm font-semibold text-[var(--cert-paper)] transition hover:bg-[var(--cert-pine-mid)] sm:w-auto"
-        >
+        <a href={pdfHref} className="cert-btn mt-8 w-full sm:w-auto">
           <Download className="h-4 w-4" />
           Download SKUAST-K tax invoice
         </a>
       </div>
 
-      <p className="mt-8 text-center text-sm text-[var(--cert-mute)]">
-        <Link href="/certificate" className="font-medium text-[var(--cert-pine)] underline-offset-2 hover:underline">
+      <p className="mt-8 text-center">
+        <Link href="/certificate" className="cert-btn-text">
           Enrol in more courses
         </Link>
       </p>
