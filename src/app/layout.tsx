@@ -69,8 +69,13 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
+        {/*
+          Browsers strip `nonce` from the DOM after CSP applies, so React
+          always sees a client/server attribute mismatch here — suppress it.
+        */}
         <script
           nonce={nonce}
+          suppressHydrationWarning
           dangerouslySetInnerHTML={{ __html: THEME_BOOTSTRAP_SCRIPT }}
         />
       </head>

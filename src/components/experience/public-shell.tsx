@@ -7,7 +7,6 @@ import { IntroProvider } from "@/components/experience/intro-context";
 import { SmoothScroll } from "@/components/experience/smooth-scroll";
 import { AmbientBackground } from "@/components/experience/ambient-background";
 import { Grain } from "@/components/experience/grain";
-import { Cursor } from "@/components/experience/cursor";
 import { Loader } from "@/components/experience/loader";
 import { SiteNav } from "@/components/experience/site-nav";
 import { SiteFooter } from "@/components/experience/site-footer";
@@ -96,7 +95,6 @@ export function PublicShell({
           {showLoader ? <Loader key="loader" onComplete={handleLoaderComplete} /> : null}
         </AnimatePresence>
 
-        <Cursor />
         <Grain />
         {!isCheckout ? <AmbientBackground /> : null}
         {isCheckout ? <CheckoutNav /> : <SiteNav customer={customer} />}

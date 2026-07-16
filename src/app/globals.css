@@ -268,19 +268,10 @@
     border-color: rgb(var(--ivory));
   }
 
-  html.cursor-hidden,
-  html.cursor-hidden * {
-    cursor: none !important;
-  }
-
   :focus-visible {
     outline: 2px solid rgb(var(--gold));
     outline-offset: 3px;
     border-radius: 2px;
-  }
-
-  html.cursor-hidden *:focus-visible {
-    cursor: auto !important;
   }
 
   input:-webkit-autofill,
