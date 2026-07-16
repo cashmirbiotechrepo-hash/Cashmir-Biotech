@@ -91,7 +91,11 @@ export default async function CertificateReceiptPage({ searchParams }: Props) {
           <span className="cert-amount text-3xl">{formatInrExact(enrollment.totalCents)}</span>
         </div>
 
-        <a href={pdfHref} className="cert-btn mt-8 w-full sm:w-auto">
+        <a
+          href={pdfHref}
+          download
+          className="cert-btn mt-8 w-full sm:w-auto"
+        >
           <Download className="h-4 w-4" />
           Download SKUAST-K tax invoice
         </a>

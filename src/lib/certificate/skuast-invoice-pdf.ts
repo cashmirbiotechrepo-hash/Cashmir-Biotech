@@ -50,6 +50,19 @@ type Cols = {
   amt: number;
 };
 
+/** Helvetica/WinAnsi cannot encode many Unicode glyphs (e.g. ✓) — strip/replace. */
+function pdfSafe(text: string): string {
+  return text
+    .replace(/[✓✔√]/g, "")
+    .replace(/[—–−]/g, "-")
+    .replace(/[‘’]/g, "'")
+    .replace(/[“”]/g, '"')
+    .replace(/\u00A0/g, " ")
+    .replace(/[^\t\n\r\x20-\x7E\xA0-\xFF]/g, "?")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 function fmtDate(d: Date) {
   return d.toLocaleDateString("en-IN", {
     day: "2-digit",
@@ -142,12 +155,13 @@ function rightText(
   font: PDFFont,
   color = ink
 ) {
-  const w = font.widthOfTextAtSize(text, size);
-  page.drawText(text, { x: rightX - w, y, size, font, color });
+  const safe = pdfSafe(text);
+  const w = font.widthOfTextAtSize(safe, size);
+  page.drawText(safe, { x: rightX - w, y, size, font, color });
 }
 
 function drawMutedBlock(page: PDFPage, text: string, x: number, startY: number, maxW: number, font: PDFFont) {
-  const lines = wrapText(text, maxW, font, 8);
+  const lines = wrapText(pdfSafe(text), maxW, font, 8);
   let yy = startY;
   for (const line of lines.slice(0, 4)) {
     page.drawText(line, { x, y: yy, size: 8, font, color: mute });
@@ -264,7 +278,7 @@ export async function buildSkuastCertificateInvoicePdf(input: SkuastInvoiceInput
   rightText(page, "TAX INVOICE", PAGE.w - M, PAGE.h - M, 18, fonts.bold, ink);
   rightText(page, "Original for Recipient", PAGE.w - M, PAGE.h - M - 16, 8, fonts.italic, faint);
 
-  const paidLabel = "✓  PAID";
+  const paidLabel = "PAID";
   const paidW = fonts.bold.widthOfTextAtSize(paidLabel, 8) + 16;
   const paidX = PAGE.w - M - paidW;
   const paidY = PAGE.h - M - 42;
@@ -291,7 +305,7 @@ export async function buildSkuastCertificateInvoicePdf(input: SkuastInvoiceInput
 
   // Invoice meta — number is primary
   page.drawText("Invoice number", { x: M, y, size: 7, font: fonts.regular, color: faint });
-  page.drawText(input.invoiceNumber, {
+  page.drawText(pdfSafe(input.invoiceNumber), {
     x: M,
     y: y - 14,
     size: 13,
@@ -306,7 +320,7 @@ export async function buildSkuastCertificateInvoicePdf(input: SkuastInvoiceInput
 
   y -= 70;
   page.drawText("Enrolment reference", { x: M, y, size: 7, font: fonts.regular, color: faint });
-  page.drawText(input.enrollmentNumber, {
+  page.drawText(pdfSafe(input.enrollmentNumber), {
     x: M,
     y: y - 12,
     size: 9,
@@ -332,7 +346,7 @@ export async function buildSkuastCertificateInvoicePdf(input: SkuastInvoiceInput
   page.drawText("ISSUED BY", { x: M + half + 8, y, size: 7, font: fonts.bold, color: faint });
   y -= 14;
 
-  page.drawText(input.studentName, { x: M, y, size: 11, font: fonts.bold, color: ink });
+  page.drawText(pdfSafe(input.studentName), { x: M, y, size: 11, font: fonts.bold, color: ink });
   page.drawText(CERTIFICATE_ISSUER.shortName, {
     x: M + half + 8,
     y,
@@ -387,12 +401,12 @@ export async function buildSkuastCertificateInvoicePdf(input: SkuastInvoiceInput
   y -= 18;
 
   for (const line of input.lines) {
-    const titleLines = wrapText(line.title, 270, fonts.regular, 9);
+    const titleLines = wrapText(pdfSafe(line.title), 270, fonts.regular, 9);
     const rowH = 12 + Math.max(0, titleLines.length - 1) * 10;
     ensureSpace(rowH + 24);
 
-    page.drawText(line.code, { x: col.desc, y, size: 7, font: fonts.regular, color: faint });
-    page.drawText(titleLines[0] ?? line.title, {
+    page.drawText(pdfSafe(line.code), { x: col.desc, y, size: 7, font: fonts.regular, color: faint });
+    page.drawText(titleLines[0] ?? pdfSafe(line.title), {
       x: col.desc,
       y: y - 11,
       size: 9,
@@ -459,7 +473,7 @@ export async function buildSkuastCertificateInvoicePdf(input: SkuastInvoiceInput
   y -= 4;
   page.drawText("Amount in words", { x: M, y, size: 7, font: fonts.regular, color: faint });
   y -= 12;
-  for (const w of wrapText(amountWordsInr(input.totalCents), CONTENT_W * 0.55, fonts.regular, 9)) {
+  for (const w of wrapText(pdfSafe(amountWordsInr(input.totalCents)), CONTENT_W * 0.55, fonts.regular, 9)) {
     page.drawText(w, { x: M, y, size: 9, font: fonts.regular, color: ink });
     y -= 12;
   }
@@ -474,8 +488,8 @@ export async function buildSkuastCertificateInvoicePdf(input: SkuastInvoiceInput
 
   const payCols = [
     { label: "Gateway", value: "Razorpay" },
-    { label: "Transaction ID", value: input.razorpayPaymentId || "—" },
-    { label: "Order ID", value: input.razorpayOrderId || "—" },
+    { label: "Transaction ID", value: input.razorpayPaymentId || "-" },
+    { label: "Order ID", value: input.razorpayOrderId || "-" },
     {
       label: "Status",
       value: input.paymentOutcome === "gateway_success" ? "Captured" : "Settled"
@@ -491,7 +505,7 @@ export async function buildSkuastCertificateInvoicePdf(input: SkuastInvoiceInput
       font: fonts.regular,
       color: faint
     });
-    const v = wrapText(payCols[i]!.value, payW - 8, fonts.regular, 8)[0] ?? "—";
+    const v = wrapText(pdfSafe(payCols[i]!.value), payW - 8, fonts.regular, 8)[0] ?? "-";
     page.drawText(v, { x: px, y: y - 12, size: 8, font: fonts.regular, color: ink });
   }
   y -= 40;
