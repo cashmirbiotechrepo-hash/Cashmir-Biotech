@@ -128,22 +128,23 @@ export async function startCertificateEnrollment(input: StartEnrollmentInput) {
   });
 
   if (!razorpayConfigured()) {
-    // Still allow the page to complete successfully without a gateway.
+    logger.error({ event: "certificate_rzp_missing_keys", enrollmentId: enrollment.id }, "Razorpay keys missing");
     return {
-      ok: true as const,
-      enrollmentId: enrollment.id,
-      accessToken,
-      enrollmentNumber,
-      invoiceNumber,
-      amountCents: totalInclusive,
-      skipGateway: true as const,
-      keyId: "",
-      razorpayOrderId: null as string | null
+      ok: false as const,
+      error: "Payment gateway is not available right now. Please try again in a moment."
+    };
+  }
+
+  const keyId = razorpayPublicKey();
+  if (!keyId) {
+    return {
+      ok: false as const,
+      error: "Payment gateway key is missing. Please contact programme support."
     };
   }
 
   try {
-    const receipt = `cb_${enrollment.id.slice(0, 12)}`;
+    const receipt = `cert_${enrollment.id.replace(/[^a-zA-Z0-9]/g, "").slice(0, 28)}`;
     const rzp = await createRazorpayOrder({
       amountCents: totalInclusive,
       receipt,
@@ -164,24 +165,15 @@ export async function startCertificateEnrollment(input: StartEnrollmentInput) {
       enrollmentNumber,
       invoiceNumber,
       amountCents: totalInclusive,
-      skipGateway: false as const,
-      keyId: razorpayPublicKey(),
+      currency: "INR" as const,
+      keyId,
       razorpayOrderId: rzp.id
     };
   } catch (err) {
     logger.error({ err, event: "certificate_rzp_create_failed", enrollmentId: enrollment.id }, "rzp create failed");
-    // Per product rule: enrollment remains completable even when gateway setup fails.
     return {
-      ok: true as const,
-      enrollmentId: enrollment.id,
-      accessToken,
-      enrollmentNumber,
-      invoiceNumber,
-      amountCents: totalInclusive,
-      skipGateway: true as const,
-      keyId: "",
-      razorpayOrderId: null as string | null,
-      gatewayCreateFailed: true as const
+      ok: false as const,
+      error: "Could not open the payment gateway. Please try again."
     };
   }
 }

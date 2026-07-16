@@ -17,10 +17,9 @@ const sans = IBM_Plex_Sans({
 });
 
 export const metadata: Metadata = {
-  title: "Computational Biology Short Courses",
-  description: "SKUAST-K collaborative short-course enrolment desk.",
-  robots: { index: false, follow: false, nocache: true, googleBot: { index: false, follow: false } },
-  openGraph: { title: "Programme desk", description: "Unlisted enrolment desk." }
+  title: "Computational Biology Short Courses · SKUAST-K",
+  description: "SKUAST-K Continuing Education Cell — Computational Biology short-course enrolment.",
+  robots: { index: false, follow: false, nocache: true, googleBot: { index: false, follow: false } }
 };
 
 export default function CertificateLayout({ children }: { children: React.ReactNode }) {
