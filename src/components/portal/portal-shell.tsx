@@ -5,6 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { FileText, Home, LifeBuoy, Package, UserRound } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { CustomerSessionKeepalive } from "@/components/portal/customer-session-keepalive";
+import { ThemeToggle } from "@/components/experience/theme-toggle";
 
 const NAV = [
   { href: "/portal", label: "Overview", exact: true },
@@ -84,6 +85,9 @@ export function PortalShell({
             ))}
           </nav>
           <div className="mt-8 border-t border-ink/10 pt-5">
+            <div className="mb-3 flex justify-end">
+              <ThemeToggle />
+            </div>
             <div className="flex items-center gap-3">
               <span className="grid h-9 w-9 place-items-center rounded-full bg-ink text-[12px] font-medium text-paper">
                 {mark}
@@ -115,13 +119,16 @@ export function PortalShell({
                 <span className="text-[14px] font-medium text-ink">Portal</span>
               )}
             </Link>
-            <button
-              type="button"
-              onClick={() => void logout()}
-              className="min-h-10 px-2 text-[13px] font-medium text-ink-mute hover:text-ink"
-            >
-              Sign out
-            </button>
+            <div className="flex items-center gap-1">
+              <ThemeToggle />
+              <button
+                type="button"
+                onClick={() => void logout()}
+                className="min-h-10 px-2 text-[13px] font-medium text-ink-mute hover:text-ink"
+              >
+                Sign out
+              </button>
+            </div>
           </header>
           <main className="flex-1 px-4 py-5 md:px-0 md:py-0">{children}</main>
         </div>

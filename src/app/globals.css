@@ -4,68 +4,186 @@
 
 @layer base {
   :root {
-    /* The Whites */
+    /* The Whites — light elevation ladder */
     --paper: 255 255 255;
-    --ivory: 251 251 249;
+    --ivory: 250 250 249;
     --pearl: 244 244 242;
     --mist: 238 238 236;
-    --hairline: 228 228 225;
+    --hairline: 229 229 232;
 
     /* Ink */
-    --ink: 17 17 17;
-    --ink-soft: 45 45 45;
-    --ink-mute: 92 94 96;
-    --ink-faint: 150 152 154;
+    --ink: 17 17 20;
+    --ink-soft: 75 75 82;
+    --ink-mute: 122 122 130;
+    --ink-faint: 180 180 186;
 
     /* Champagne gold — the signature */
-    --gold: 184 148 88;
+    --gold: 184 134 11;
     --gold-soft: 209 184 140;
 
     /* Scientific sky blue */
     --sky: 169 201 222;
     --crystal: 111 168 206;
 
+    /* Semantic aliases (instructionsdm token names) */
+    --bg-page: var(--ivory);
+    --bg-surface: var(--pearl);
+    --bg-card: var(--paper);
+    --bg-card-raised: var(--paper);
+    --bg-modal: var(--paper);
+    --bg-popover: var(--paper);
+    --bg-input: var(--paper);
+    --text-primary: var(--ink);
+    --text-secondary: var(--ink-soft);
+    --text-muted: var(--ink-mute);
+    --text-disabled: var(--ink-faint);
+    --text-link: var(--gold);
+    --border-default: var(--hairline);
+    --border-strong: 208 208 213;
+    --border-focus: var(--gold);
+    --accent-primary: var(--ink);
+    --accent-gold: var(--gold);
+    --status-success: 30 122 62;
+    --status-warning: 166 106 0;
+    --status-error: 179 38 30;
+    --status-info: 26 95 180;
+
+    --shadow-sm: 0 1px 2px rgba(16, 16, 20, 0.06);
+    --shadow-md: 0 4px 12px rgba(16, 16, 20, 0.08);
+    --shadow-lg: 0 12px 32px rgba(16, 16, 20, 0.12);
+
     --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
     --ease-out-quart: cubic-bezier(0.23, 1, 0.32, 1);
 
     /* shadcn / admin console tokens — champagne gold accent */
-    --background: 251 251 249;
-    --foreground: 17 17 17;
+    --background: 250 250 249;
+    --foreground: 17 17 20;
     --card: 255 255 255;
-    --card-foreground: 17 17 17;
+    --card-foreground: 17 17 20;
     --popover: 255 255 255;
-    --popover-foreground: 17 17 17;
-    --primary: 184 148 88;
+    --popover-foreground: 17 17 20;
+    --primary: 184 134 11;
     --primary-foreground: 255 255 255;
     --secondary: 244 244 242;
-    --secondary-foreground: 45 45 45;
+    --secondary-foreground: 75 75 82;
     --muted: 238 238 236;
-    --muted-foreground: 92 94 96;
+    --muted-foreground: 122 122 130;
     --accent: 209 184 140;
-    --accent-foreground: 17 17 17;
-    --destructive: 220 38 38;
+    --accent-foreground: 17 17 20;
+    --destructive: 179 38 30;
     --destructive-foreground: 255 255 255;
-    --border: 228 228 225;
-    --input: 228 228 225;
-    --ring: 184 148 88;
+    --border: 229 229 232;
+    --input: 229 229 232;
+    --ring: 184 134 11;
     --radius: 0.625rem;
     --sidebar: 255 255 255;
-    --sidebar-foreground: 17 17 17;
-    --sidebar-primary: 184 148 88;
+    --sidebar-foreground: 17 17 20;
+    --sidebar-primary: 184 134 11;
     --sidebar-primary-foreground: 255 255 255;
-    --sidebar-accent: 251 251 249;
-    --sidebar-accent-foreground: 17 17 17;
-    --sidebar-border: 228 228 225;
-    --sidebar-ring: 184 148 88;
+    --sidebar-accent: 250 250 249;
+    --sidebar-accent-foreground: 17 17 20;
+    --sidebar-border: 229 229 232;
+    --sidebar-ring: 184 134 11;
+
+    color-scheme: light;
+  }
+
+  /*
+   * Dark mode — second intentional system (not an invert).
+   * Remaps the same channel tokens so existing Tailwind classes theme correctly.
+   * Elevation: page < surface < card < raised < popover < modal (each step lighter).
+   */
+  :root[data-theme="dark"] {
+    --paper: 23 23 27;
+    --ivory: 11 11 13;
+    --pearl: 19 19 22;
+    --mist: 29 29 34;
+    --hairline: 42 42 49;
+
+    --ink: 242 242 243;
+    --ink-soft: 185 185 192;
+    --ink-mute: 138 138 146;
+    --ink-faint: 87 87 95;
+
+    --gold: 224 184 77;
+    --gold-soft: 196 160 90;
+
+    --sky: 80 120 150;
+    --crystal: 96 165 250;
+
+    --bg-page: var(--ivory);
+    --bg-surface: var(--pearl);
+    --bg-card: var(--paper);
+    --bg-card-raised: var(--mist);
+    --bg-modal: 31 31 37;
+    --bg-popover: 32 32 39;
+    --bg-input: var(--paper);
+    --text-primary: var(--ink);
+    --text-secondary: var(--ink-soft);
+    --text-muted: var(--ink-mute);
+    --text-disabled: var(--ink-faint);
+    --text-link: var(--gold);
+    --border-default: var(--hairline);
+    --border-strong: 58 58 66;
+    --border-focus: var(--gold);
+    --accent-primary: var(--ink);
+    --accent-gold: var(--gold);
+    --status-success: 74 222 128;
+    --status-warning: 251 191 36;
+    --status-error: 248 113 113;
+    --status-info: 96 165 250;
+
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4), inset 0 0 0 1px rgba(255, 255, 255, 0.04);
+    --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.5), inset 0 0 0 1px rgba(255, 255, 255, 0.05);
+    --shadow-lg: 0 16px 40px rgba(0, 0, 0, 0.6), inset 0 0 0 1px rgba(255, 255, 255, 0.06);
+
+    --background: 11 11 13;
+    --foreground: 242 242 243;
+    --card: 23 23 27;
+    --card-foreground: 242 242 243;
+    --popover: 32 32 39;
+    --popover-foreground: 242 242 243;
+    --primary: 224 184 77;
+    --primary-foreground: 11 11 13;
+    --secondary: 29 29 34;
+    --secondary-foreground: 185 185 192;
+    --muted: 29 29 34;
+    --muted-foreground: 138 138 146;
+    --accent: 196 160 90;
+    --accent-foreground: 11 11 13;
+    --destructive: 248 113 113;
+    --destructive-foreground: 11 11 13;
+    --border: 42 42 49;
+    --input: 42 42 49;
+    --ring: 224 184 77;
+    --sidebar: 19 19 22;
+    --sidebar-foreground: 242 242 243;
+    --sidebar-primary: 224 184 77;
+    --sidebar-primary-foreground: 11 11 13;
+    --sidebar-accent: 29 29 34;
+    --sidebar-accent-foreground: 242 242 243;
+    --sidebar-border: 42 42 49;
+    --sidebar-ring: 224 184 77;
+
+    color-scheme: dark;
   }
 
   /*
    * Admin console theme — deliberately NOT the marketing aesthetic.
-   * Pure white surfaces, neutral zinc scale, near-black primary. Scoped so it
-   * never leaks into the public site or the bioinformatics tools.
+   * Forces light tokens even when the document theme is dark.
    */
   .admin-scope {
     --hairline: 228 228 231;
+    --paper: 255 255 255;
+    --ivory: 250 250 250;
+    --pearl: 244 244 245;
+    --mist: 244 244 245;
+    --ink: 24 24 27;
+    --ink-soft: 63 63 70;
+    --ink-mute: 113 113 122;
+    --ink-faint: 161 161 170;
+    --gold: 24 24 27;
+    --gold-soft: 113 113 122;
 
     --background: 255 255 255;
     --foreground: 24 24 27;
@@ -96,6 +214,7 @@
     --sidebar-border: 228 228 231;
     --sidebar-ring: 24 24 27;
 
+    color-scheme: light;
     font-family: var(--font-admin), ui-sans-serif, system-ui, sans-serif;
     background-color: rgb(var(--background));
     color: rgb(var(--foreground));
@@ -109,6 +228,7 @@
     scroll-behavior: smooth;
     -webkit-font-smoothing: antialiased;
     text-rendering: optimizeLegibility;
+    scrollbar-color: rgb(var(--ink) / 0.28) transparent;
   }
 
   body {
@@ -116,10 +236,15 @@
     color: rgb(var(--ink));
     font-family: var(--font-sans), system-ui, sans-serif;
     overflow-x: hidden;
+    transition: background-color 0.2s ease, color 0.2s ease;
+  }
+
+  a {
+    color: inherit;
   }
 
   ::selection {
-    background: rgb(var(--gold) / 0.22);
+    background: rgb(var(--gold) / 0.28);
     color: rgb(var(--ink));
   }
 
@@ -138,22 +263,33 @@
     background: rgb(var(--ink) / 0.28);
   }
 
-  /* When the custom cursor is active we hide the native one on fine pointers */
+  :root[data-theme="dark"] ::-webkit-scrollbar-thumb {
+    background: rgb(var(--ink) / 0.22);
+    border-color: rgb(var(--ivory));
+  }
+
   html.cursor-hidden,
   html.cursor-hidden * {
     cursor: none !important;
   }
 
-  /* Keyboard focus must always be obvious — the custom cursor never replaces it. */
   :focus-visible {
     outline: 2px solid rgb(var(--gold));
     outline-offset: 3px;
     border-radius: 2px;
   }
 
-  /* Keyboard users get the native caret/pointer back the moment they tab. */
   html.cursor-hidden *:focus-visible {
     cursor: auto !important;
+  }
+
+  input:-webkit-autofill,
+  textarea:-webkit-autofill,
+  select:-webkit-autofill {
+    -webkit-box-shadow: 0 0 0 1000px rgb(var(--paper)) inset;
+    -webkit-text-fill-color: rgb(var(--ink));
+    caret-color: rgb(var(--ink));
+    transition: background-color 99999s ease-out;
   }
 }
 
@@ -162,7 +298,6 @@
     @apply mx-auto w-full max-w-frame px-6 md:px-10 lg:px-16;
   }
 
-  /* Technical laboratory label */
   .technical {
     font-family: var(--font-mono), ui-monospace, monospace;
     font-size: 0.6875rem;
@@ -179,35 +314,91 @@
     line-height: 0.95;
   }
 
-  /* Optical glass layer */
   .glass {
-    background: rgb(255 255 255 / 0.55);
+    background: rgb(var(--paper) / 0.55);
     backdrop-filter: blur(20px) saturate(150%);
     -webkit-backdrop-filter: blur(20px) saturate(150%);
-    border: 1px solid rgb(255 255 255 / 0.7);
+    border: 1px solid rgb(var(--paper) / 0.7);
     box-shadow:
       0 20px 50px -30px rgb(17 17 17 / 0.16),
       inset 0 1px 0 rgb(255 255 255 / 0.8);
+    transition: background-color 0.2s ease, border-color 0.2s ease;
   }
 
   .glass-strong {
-    background: rgb(255 255 255 / 0.72);
+    background: rgb(var(--paper) / 0.72);
     backdrop-filter: blur(28px) saturate(160%);
     -webkit-backdrop-filter: blur(28px) saturate(160%);
-    border: 1px solid rgb(255 255 255 / 0.85);
+    border: 1px solid rgb(var(--paper) / 0.85);
+    transition: background-color 0.2s ease, border-color 0.2s ease;
+  }
+
+  :root[data-theme="dark"] .glass {
+    background: rgb(23 23 27 / 0.72);
+    border: 1px solid rgb(255 255 255 / 0.08);
+    box-shadow:
+      0 20px 50px -30px rgb(0 0 0 / 0.55),
+      inset 0 0 0 1px rgb(255 255 255 / 0.06);
+    backdrop-filter: blur(24px) saturate(140%);
+    -webkit-backdrop-filter: blur(24px) saturate(140%);
+  }
+
+  :root[data-theme="dark"] .glass-strong {
+    background: rgb(29 29 34 / 0.88);
+    border: 1px solid rgb(255 255 255 / 0.1);
+    box-shadow:
+      0 24px 60px -28px rgb(0 0 0 / 0.65),
+      inset 0 0 0 1px rgb(255 255 255 / 0.06);
+  }
+
+  /* Dark-safe logo plate — never invert photography/wordmarks */
+  .logo-plate {
+    display: inline-flex;
+    align-items: center;
+    border-radius: 999px;
+    padding: 0.15rem 0.35rem;
+  }
+
+  :root[data-theme="dark"] .logo-plate {
+    background: rgb(250 250 249 / 0.94);
+    box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.08);
   }
 
   .hairline-x {
-    background: linear-gradient(
-      90deg,
-      transparent,
-      rgb(var(--ink) / 0.16),
-      transparent
-    );
+    background: linear-gradient(90deg, transparent, rgb(var(--ink) / 0.16), transparent);
   }
 
   .portal-action {
     @apply rounded-full border border-ink/15 px-5 py-2.5 text-xs text-ink-mute transition hover:border-ink/30 hover:text-ink;
+  }
+
+  .theme-toggle {
+    @apply relative flex h-10 w-10 items-center justify-center rounded-full border border-ink/15 text-ink transition-[background-color,border-color,color] duration-200 hover:border-ink;
+  }
+
+  .theme-toggle__icon {
+    position: absolute;
+    transition: opacity 0.2s ease, transform 0.2s ease;
+  }
+
+  .theme-toggle__icon--sun {
+    opacity: 1;
+    transform: rotate(0deg) scale(1);
+  }
+
+  .theme-toggle__icon--moon {
+    opacity: 0;
+    transform: rotate(-45deg) scale(0.6);
+  }
+
+  :root[data-theme="dark"] .theme-toggle__icon--sun {
+    opacity: 0;
+    transform: rotate(45deg) scale(0.6);
+  }
+
+  :root[data-theme="dark"] .theme-toggle__icon--moon {
+    opacity: 1;
+    transform: rotate(0deg) scale(1);
   }
 }
 
@@ -235,5 +426,31 @@
     animation-iteration-count: 1 !important;
     transition-duration: 0.001ms !important;
     scroll-behavior: auto !important;
+  }
+
+  .theme-toggle__icon {
+    transition: none !important;
+  }
+}
+
+@media print {
+  :root,
+  :root[data-theme="dark"] {
+    --paper: 255 255 255;
+    --ivory: 255 255 255;
+    --pearl: 255 255 255;
+    --mist: 245 245 245;
+    --hairline: 200 200 200;
+    --ink: 0 0 0;
+    --ink-soft: 40 40 40;
+    --ink-mute: 80 80 80;
+    --ink-faint: 120 120 120;
+    --gold: 120 90 20;
+    color-scheme: light;
+  }
+
+  body {
+    background: #fff !important;
+    color: #000 !important;
   }
 }

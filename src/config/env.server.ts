@@ -140,6 +140,11 @@ function normalizeProcessEnv() {
   for (const key of ["UPSTASH_REDIS_REST_URL", "UPSTASH_REDIS_REST_TOKEN", "NEXT_PUBLIC_SITE_URL"] as const) {
     if (p[key] != null && String(p[key]).trim() === "") p[key] = undefined;
   }
+  // Amplify SSR often omits NEXT_PUBLIC_* at runtime — default to production origin.
+  if (!p.NEXT_PUBLIC_SITE_URL) {
+    p.NEXT_PUBLIC_SITE_URL = "https://www.cashmirbiotech.com";
+    process.env.NEXT_PUBLIC_SITE_URL = p.NEXT_PUBLIC_SITE_URL;
+  }
   return p;
 }
 

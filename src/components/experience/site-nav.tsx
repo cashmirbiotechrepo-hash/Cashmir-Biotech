@@ -9,6 +9,7 @@ import { ShoppingBag } from "lucide-react";
 import { EASE_OUT_EXPO } from "@/lib/motion/ease";
 import { useIntro } from "@/components/experience/intro-context";
 import { useCart } from "@/components/shop/cart-context";
+import { ThemeToggle } from "@/components/experience/theme-toggle";
 import { cn } from "@/lib/utils";
 import { SITE_CONTACT } from "@/lib/site-contact";
 
@@ -108,17 +109,19 @@ export function SiteNav({
             className="flex items-center"
             aria-label="Cashmir Biotech home"
           >
-            <Image
-              src="/logo.png"
-              alt="Cashmir Biotech"
-              width={240}
-              height={197}
-              priority
-              className={cn(
-                "w-auto transition-all duration-500 ease-expo",
-                condensed || menuOpen ? "h-9" : "h-11"
-              )}
-            />
+            <span className="logo-plate">
+              <Image
+                src="/logo.png"
+                alt="Cashmir Biotech"
+                width={240}
+                height={197}
+                priority
+                className={cn(
+                  "w-auto transition-all duration-500 ease-expo",
+                  condensed || menuOpen ? "h-9" : "h-11"
+                )}
+              />
+            </span>
           </Link>
 
           <ul className="hidden items-center gap-9 md:flex">
@@ -155,6 +158,7 @@ export function SiteNav({
           </ul>
 
           <div className="flex items-center gap-3 md:gap-3.5">
+            <ThemeToggle />
             <Link
               href={accountHref}
               data-cursor={accountCursor}
@@ -250,6 +254,10 @@ export function SiteNav({
               ))}
             </ul>
             <div className="mt-auto flex flex-col gap-4">
+              <div className="flex items-center justify-between rounded-full border border-ink/15 px-4 py-2">
+                <span className="font-mono text-[11px] uppercase tracking-[0.16em] text-ink-mute">Appearance</span>
+                <ThemeToggle />
+              </div>
               <Link
                 href="/cart"
                 className="flex items-center justify-center gap-2 rounded-full border border-ink/20 py-4 text-sm text-ink"

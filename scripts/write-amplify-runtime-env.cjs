@@ -68,6 +68,14 @@ if (out.DB_HOST && out.DB_USER && out.DB_PASSWORD && out.DB_NAME) {
   out.DIRECT_URL = assembled;
 }
 
+// Public origin — required by Zod in production; default when Amplify omits it.
+if (!out.NEXT_PUBLIC_SITE_URL) {
+  out.NEXT_PUBLIC_SITE_URL = "https://www.cashmirbiotech.com";
+  console.warn(
+    "[write-amplify-runtime-env] NEXT_PUBLIC_SITE_URL missing — defaulted to https://www.cashmirbiotech.com"
+  );
+}
+
 const dir = resolve(process.cwd(), "src/generated");
 mkdirSync(dir, { recursive: true });
 const file = resolve(dir, "amplify-runtime-env.json");

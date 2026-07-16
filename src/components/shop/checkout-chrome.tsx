@@ -4,6 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { ShoppingBag } from "lucide-react";
 import { useCart } from "@/components/shop/cart-context";
+import { ThemeToggle } from "@/components/experience/theme-toggle";
 import { SITE_CONTACT } from "@/lib/site-contact";
 
 /** Focused chrome for checkout — logo, bag, help. No browse exits. */
@@ -14,16 +15,19 @@ export function CheckoutNav() {
     <header className="sticky top-0 z-50 border-b border-ink/10 bg-paper/95 backdrop-blur-md">
       <div className="frame flex h-14 items-center justify-between md:h-[3.75rem]">
         <Link href="/" className="flex items-center" aria-label="Cashmir Biotech home">
-          <Image
-            src="/logo.png"
-            alt="Cashmir Biotech"
-            width={180}
-            height={48}
-            className="h-9 w-auto md:h-10"
-            priority
-          />
+          <span className="logo-plate">
+            <Image
+              src="/logo.png"
+              alt="Cashmir Biotech"
+              width={180}
+              height={48}
+              className="h-9 w-auto md:h-10"
+              priority
+            />
+          </span>
         </Link>
-        <div className="flex items-center gap-6">
+        <div className="flex items-center gap-4 md:gap-6">
+          <ThemeToggle />
           <a
             href={`mailto:${SITE_CONTACT.supportEmail}`}
             className="text-[13px] text-ink-mute transition-colors hover:text-ink"
