@@ -39,6 +39,7 @@ export async function POST(request: Request) {
       enrollmentNumber: result.enrollmentNumber,
       invoiceNumber: result.invoiceNumber,
       amountCents: result.amountCents,
+      invoiceTotalCents: result.invoiceTotalCents,
       currency: result.currency,
       keyId: result.keyId,
       razorpayOrderId: result.razorpayOrderId

@@ -268,7 +268,9 @@ export function CertificateDesk() {
         amount: checkout.amountCents,
         currency: checkout.currency || "INR",
         name: CERTIFICATE_ISSUER.shortName,
-        description: `Computational Biology · ${selected.length} course(s)`,
+        description: `Computational Biology · ${selected.length} course(s) · invoice ${formatInrFromCents(
+          selected.length * 100_000
+        )}`,
         order_id: checkout.razorpayOrderId,
         prefill: {
           name: name.trim(),

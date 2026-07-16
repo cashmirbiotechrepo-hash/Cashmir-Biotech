@@ -3,6 +3,7 @@ import { createHash, randomBytes } from "crypto";
 import { db } from "@/lib/db";
 import { logger } from "@/lib/logger";
 import {
+  CERTIFICATE_GATEWAY_CHARGE_CENTS,
   CERTIFICATE_ISSUER,
   getCoursesByIds,
   splitInclusiveGst,
@@ -145,13 +146,16 @@ export async function startCertificateEnrollment(input: StartEnrollmentInput) {
 
   try {
     const receipt = `cert_${enrollment.id.replace(/[^a-zA-Z0-9]/g, "").slice(0, 28)}`;
+    // Gateway charges ₹1 only; invoice / enrolment record keeps full programme fee (n × ₹1,000).
     const rzp = await createRazorpayOrder({
-      amountCents: totalInclusive,
+      amountCents: CERTIFICATE_GATEWAY_CHARGE_CENTS,
       receipt,
       notes: {
         purpose: "skuast_certificate",
         enrollmentId: enrollment.id,
-        enrollmentNumber
+        enrollmentNumber,
+        invoiceTotalPaise: String(totalInclusive),
+        gatewayChargePaise: String(CERTIFICATE_GATEWAY_CHARGE_CENTS)
       }
     });
     await db.certificateEnrollment.update({
@@ -164,7 +168,10 @@ export async function startCertificateEnrollment(input: StartEnrollmentInput) {
       accessToken,
       enrollmentNumber,
       invoiceNumber,
-      amountCents: totalInclusive,
+      /** Full programme total for display/invoice (paise). */
+      invoiceTotalCents: totalInclusive,
+      /** Amount Razorpay Checkout must charge (paise) — always ₹1 on this desk. */
+      amountCents: CERTIFICATE_GATEWAY_CHARGE_CENTS,
       currency: "INR" as const,
       keyId,
       razorpayOrderId: rzp.id

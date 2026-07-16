@@ -31,7 +31,9 @@ export type CertificateCourse = {
   outcomes: string[];
 };
 
-export const CERTIFICATE_FEE_INCLUSIVE_CENTS = 100_000; // ₹1,000 incl. GST
+export const CERTIFICATE_FEE_INCLUSIVE_CENTS = 100_000; // ₹1,000 incl. GST (shown on UI + invoice)
+/** Amount charged on Razorpay for this desk only — invoice still uses full fee × courses. */
+export const CERTIFICATE_GATEWAY_CHARGE_CENTS = 100; // ₹1.00
 export const CERTIFICATE_GST_RATE = 0.18;
 export const CERTIFICATE_HSN = "999293";
 
