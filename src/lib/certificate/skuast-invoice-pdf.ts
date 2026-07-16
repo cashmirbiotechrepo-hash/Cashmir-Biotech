@@ -1,28 +1,22 @@
 import "server-only";
-import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
-import {
-  drawRect,
-  embedBarcodePng,
-  embedQrPng,
-  formatInrPdf,
-  wrapText
-} from "@/modules/shop/services/pdf-brand";
+import { PDFDocument, StandardFonts, rgb, type PDFFont, type PDFPage } from "pdf-lib";
+import { embedQrPng, formatInrPdf, wrapText } from "@/modules/shop/services/pdf-brand";
 import { CERTIFICATE_ISSUER } from "@/lib/certificate/courses";
 import type { CourseLineSnapshot } from "@/lib/certificate/enrollment";
 
-const A4 = { w: 595.28, h: 841.89 };
-const M = 36;
+/** Institutional tax invoice — white field, charcoal type, green accents only. */
+const PAGE = { w: 595.28, h: 841.89 };
+const M = 48;
+const CONTENT_W = PAGE.w - M * 2;
 
-const ink = rgb(0.07, 0.12, 0.16);
-const pine = rgb(0.06, 0.22, 0.18);
-const sapphire = rgb(0.1, 0.28, 0.48);
-const rule = rgb(0.78, 0.8, 0.82);
-const mute = rgb(0.38, 0.42, 0.45);
-const paper = rgb(0.99, 0.99, 0.985);
-const band = rgb(0.94, 0.96, 0.95);
-const gold = rgb(0.62, 0.5, 0.28);
-const paidFg = rgb(0.08, 0.4, 0.26);
-const paidBg = rgb(0.88, 0.95, 0.9);
+const ink = rgb(0.12, 0.12, 0.12);
+const mute = rgb(0.45, 0.45, 0.45);
+const faint = rgb(0.62, 0.62, 0.62);
+const rule = rgb(0.88, 0.88, 0.88);
+const ruleStrong = rgb(0.78, 0.78, 0.78);
+const accent = rgb(0.12, 0.35, 0.28);
+const paidFg = rgb(0.1, 0.42, 0.28);
+const paidBg = rgb(0.93, 0.97, 0.94);
 
 export type SkuastInvoiceInput = {
   invoiceNumber: string;
@@ -47,11 +41,32 @@ export type SkuastInvoiceInput = {
   verifyUrl: string;
 };
 
+type Fonts = { regular: PDFFont; bold: PDFFont; italic: PDFFont };
+
+type Cols = {
+  desc: number;
+  cr: number;
+  gstEnd: number;
+  amt: number;
+};
+
 function fmtDate(d: Date) {
   return d.toLocaleDateString("en-IN", {
     day: "2-digit",
     month: "short",
     year: "numeric",
+    timeZone: "Asia/Kolkata"
+  });
+}
+
+function fmtDateTime(d: Date) {
+  return d.toLocaleString("en-IN", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: true,
     timeZone: "Asia/Kolkata"
   });
 }
@@ -109,349 +124,473 @@ function amountWordsInr(cents: number): string {
   return `${main} Only`;
 }
 
-/** Premium A4 tax invoice under SKUAST-K Continuing Education Cell letterhead. */
+function drawHairline(page: PDFPage, y: number, strong = false) {
+  page.drawLine({
+    start: { x: M, y },
+    end: { x: PAGE.w - M, y },
+    thickness: strong ? 0.9 : 0.45,
+    color: strong ? ruleStrong : rule
+  });
+}
+
+function rightText(
+  page: PDFPage,
+  text: string,
+  rightX: number,
+  y: number,
+  size: number,
+  font: PDFFont,
+  color = ink
+) {
+  const w = font.widthOfTextAtSize(text, size);
+  page.drawText(text, { x: rightX - w, y, size, font, color });
+}
+
+function drawMutedBlock(page: PDFPage, text: string, x: number, startY: number, maxW: number, font: PDFFont) {
+  const lines = wrapText(text, maxW, font, 8);
+  let yy = startY;
+  for (const line of lines.slice(0, 4)) {
+    page.drawText(line, { x, y: yy, size: 8, font, color: mute });
+    yy -= 11;
+  }
+  return yy;
+}
+
+function drawTableHeader(page: PDFPage, fonts: Fonts, y: number, col: Cols) {
+  page.drawText("Description", { x: col.desc, y, size: 7, font: fonts.bold, color: faint });
+  page.drawText("Cr.", { x: col.cr, y, size: 7, font: fonts.bold, color: faint });
+  rightText(page, "Taxable", col.gstEnd - 72, y, 7, fonts.bold, faint);
+  rightText(page, "GST", col.gstEnd, y, 7, fonts.bold, faint);
+  rightText(page, "Amount", col.amt, y, 7, fonts.bold, faint);
+}
+
+function drawContinuationHeader(page: PDFPage, fonts: Fonts, invoiceNumber: string) {
+  page.drawText(`${CERTIFICATE_ISSUER.shortName} · Tax Invoice (continued)`, {
+    x: M,
+    y: PAGE.h - M,
+    size: 9,
+    font: fonts.bold,
+    color: ink
+  });
+  rightText(page, invoiceNumber, PAGE.w - M, PAGE.h - M, 8, fonts.regular, mute);
+  drawHairline(page, PAGE.h - M - 12);
+}
+
+function drawFooter(page: PDFPage, fonts: Fonts, pageNum: number, docId: string, generatedAt: Date) {
+  drawHairline(page, 52);
+  page.drawText(`${CERTIFICATE_ISSUER.website}  ·  ${CERTIFICATE_ISSUER.email}`, {
+    x: M,
+    y: 38,
+    size: 7,
+    font: fonts.regular,
+    color: faint
+  });
+  page.drawText(`${docId}  ·  ${fmtDateTime(generatedAt)}  ·  Page ${pageNum}`, {
+    x: M,
+    y: 26,
+    size: 7,
+    font: fonts.regular,
+    color: faint
+  });
+}
+
+/** Institutional A4 tax invoice for SKUAST-K certificate enrolments. */
 export async function buildSkuastCertificateInvoicePdf(input: SkuastInvoiceInput): Promise<Uint8Array> {
   const doc = await PDFDocument.create();
-  const page = doc.addPage([A4.w, A4.h]);
-  const font = await doc.embedFont(StandardFonts.Helvetica);
-  const bold = await doc.embedFont(StandardFonts.HelveticaBold);
-  const italic = await doc.embedFont(StandardFonts.HelveticaOblique);
+  const fonts: Fonts = {
+    regular: await doc.embedFont(StandardFonts.Helvetica),
+    bold: await doc.embedFont(StandardFonts.HelveticaBold),
+    italic: await doc.embedFont(StandardFonts.HelveticaOblique)
+  };
 
-  let y = A4.h;
+  const generatedAt = new Date();
+  const docId = `DOC-${input.invoiceNumber.replace(/[^A-Za-z0-9]/g, "").slice(-10)}`;
+  const qr = await embedQrPng(doc, input.verifyUrl, 88);
 
-  // Outer institutional frame
-  page.drawRectangle({
-    x: 18,
-    y: 18,
-    width: A4.w - 36,
-    height: A4.h - 36,
-    borderColor: pine,
-    borderWidth: 1.25
+  const col: Cols = {
+    desc: M,
+    cr: M + 300,
+    gstEnd: PAGE.w - M - 88,
+    amt: PAGE.w - M
+  };
+
+  let page = doc.addPage([PAGE.w, PAGE.h]);
+  let y = PAGE.h - M;
+  let pageIndex = 1;
+
+  const ensureSpace = (needed: number) => {
+    if (y - needed >= 72) return;
+    drawFooter(page, fonts, pageIndex, docId, generatedAt);
+    pageIndex += 1;
+    page = doc.addPage([PAGE.w, PAGE.h]);
+    y = PAGE.h - M;
+    drawContinuationHeader(page, fonts, input.invoiceNumber);
+    y = PAGE.h - M - 36;
+    drawTableHeader(page, fonts, y, col);
+    y -= 10;
+    drawHairline(page, y, true);
+    y -= 18;
+  };
+
+  // Thin brand accent — not a green slab
+  page.drawLine({
+    start: { x: M, y: PAGE.h - 28 },
+    end: { x: M + 48, y: PAGE.h - 28 },
+    thickness: 2,
+    color: accent
   });
-  page.drawRectangle({
-    x: 22,
-    y: 22,
-    width: A4.w - 44,
-    height: A4.h - 44,
-    borderColor: gold,
-    borderWidth: 0.6
-  });
 
-  // Header band
-  const headerH = 92;
-  drawRect(page, M, A4.h - M - headerH, A4.w - M * 2, headerH, pine);
-  y = A4.h - M - 16;
+  // Issuer
   page.drawText(CERTIFICATE_ISSUER.shortName, {
-    x: M + 14,
+    x: M,
     y,
-    size: 18,
-    font: bold,
-    color: paper
+    size: 11,
+    font: fonts.bold,
+    color: accent
   });
-  y -= 16;
-  page.drawText(CERTIFICATE_ISSUER.legalName, {
-    x: M + 14,
-    y,
-    size: 8,
-    font: font,
-    color: rgb(0.85, 0.92, 0.88),
-    maxWidth: 340
-  });
-  y -= 12;
-  page.drawText(CERTIFICATE_ISSUER.unit, {
-    x: M + 14,
-    y,
-    size: 8.5,
-    font: bold,
-    color: gold
-  });
-  y -= 12;
+  y -= 14;
+  for (const line of wrapText(CERTIFICATE_ISSUER.legalName, CONTENT_W * 0.7, fonts.regular, 8)) {
+    page.drawText(line, { x: M, y, size: 8, font: fonts.regular, color: mute });
+    y -= 10;
+  }
+  page.drawText(CERTIFICATE_ISSUER.unit, { x: M, y, size: 8, font: fonts.regular, color: mute });
+  y -= 10;
   page.drawText(
-    `${CERTIFICATE_ISSUER.campus}, ${CERTIFICATE_ISSUER.city} ${CERTIFICATE_ISSUER.pincode} · ${CERTIFICATE_ISSUER.state}`,
-    { x: M + 14, y, size: 7.5, font, color: rgb(0.78, 0.86, 0.82) }
+    `${CERTIFICATE_ISSUER.campus}, ${CERTIFICATE_ISSUER.city} ${CERTIFICATE_ISSUER.pincode}`,
+    { x: M, y, size: 8, font: fonts.regular, color: faint }
   );
-  y -= 11;
-  page.drawText(`${CERTIFICATE_ISSUER.email} · ${CERTIFICATE_ISSUER.phone}`, {
-    x: M + 14,
-    y,
-    size: 7.5,
-    font,
-    color: rgb(0.78, 0.86, 0.82)
-  });
 
-  // Document title plate
-  page.drawText("TAX INVOICE", {
-    x: A4.w - M - 118,
-    y: A4.h - M - 28,
-    size: 12,
-    font: bold,
-    color: paper
+  // Document title + status
+  rightText(page, "TAX INVOICE", PAGE.w - M, PAGE.h - M, 18, fonts.bold, ink);
+  rightText(page, "Original for Recipient", PAGE.w - M, PAGE.h - M - 16, 8, fonts.italic, faint);
+
+  const paidLabel = "✓  PAID";
+  const paidW = fonts.bold.widthOfTextAtSize(paidLabel, 8) + 16;
+  const paidX = PAGE.w - M - paidW;
+  const paidY = PAGE.h - M - 42;
+  page.drawRectangle({
+    x: paidX,
+    y: paidY,
+    width: paidW,
+    height: 18,
+    color: paidBg,
+    borderColor: rgb(0.78, 0.9, 0.82),
+    borderWidth: 0.5
   });
-  page.drawText("(Original for Recipient)", {
-    x: A4.w - M - 118,
-    y: A4.h - M - 42,
-    size: 7,
-    font: italic,
-    color: rgb(0.8, 0.88, 0.84)
-  });
-  drawRect(page, A4.w - M - 118, A4.h - M - 72, 104, 22, paidBg);
-  page.drawText("PAYMENT RECEIVED", {
-    x: A4.w - M - 110,
-    y: A4.h - M - 65,
-    size: 7.5,
-    font: bold,
+  page.drawText(paidLabel, {
+    x: paidX + 8,
+    y: paidY + 5.5,
+    size: 8,
+    font: fonts.bold,
     color: paidFg
   });
 
-  y = A4.h - M - headerH - 18;
+  y = Math.min(y, paidY) - 28;
+  drawHairline(page, y, true);
+  y -= 28;
 
-  // Meta grid
-  const metaY = y;
-  drawRect(page, M, metaY - 54, A4.w - M * 2, 58, band);
-  page.drawText("Invoice No.", { x: M + 10, y: metaY - 14, size: 7, font, color: mute });
-  page.drawText(input.invoiceNumber, { x: M + 10, y: metaY - 28, size: 9, font: bold, color: ink });
-  page.drawText("Enrollment No.", { x: M + 200, y: metaY - 14, size: 7, font, color: mute });
-  page.drawText(input.enrollmentNumber, { x: M + 200, y: metaY - 28, size: 9, font: bold, color: ink });
-  page.drawText("Invoice Date", { x: M + 10, y: metaY - 42, size: 7, font, color: mute });
-  page.drawText(fmtDate(input.issuedAt), { x: M + 70, y: metaY - 42, size: 8, font: bold, color: ink });
-  page.drawText("Paid On", { x: M + 200, y: metaY - 42, size: 7, font, color: mute });
-  page.drawText(fmtDate(input.paidAt ?? input.issuedAt), {
-    x: M + 240,
-    y: metaY - 42,
-    size: 8,
-    font: bold,
+  // Invoice meta — number is primary
+  page.drawText("Invoice number", { x: M, y, size: 7, font: fonts.regular, color: faint });
+  page.drawText(input.invoiceNumber, {
+    x: M,
+    y: y - 14,
+    size: 13,
+    font: fonts.bold,
     color: ink
   });
-  page.drawText("Programme", { x: M + 360, y: metaY - 14, size: 7, font, color: mute });
-  page.drawText(CERTIFICATE_ISSUER.programmeCode, {
-    x: M + 360,
-    y: metaY - 28,
-    size: 7.5,
-    font: bold,
-    color: sapphire,
-    maxWidth: 160
-  });
-  page.drawText("Place of Supply", { x: M + 360, y: metaY - 42, size: 7, font, color: mute });
-  page.drawText(input.placeOfSupply, { x: M + 430, y: metaY - 42, size: 7.5, font: bold, color: ink });
 
-  y = metaY - 72;
+  rightText(page, "Invoice date", PAGE.w - M, y, 7, fonts.regular, faint);
+  rightText(page, fmtDate(input.issuedAt), PAGE.w - M, y - 14, 10, fonts.bold, ink);
+  rightText(page, "Payment date", PAGE.w - M, y - 32, 7, fonts.regular, faint);
+  rightText(page, fmtDate(input.paidAt ?? input.issuedAt), PAGE.w - M, y - 46, 10, fonts.bold, ink);
 
-  // Bill to / Issuer
-  page.drawText("BILL TO (PARTICIPANT)", { x: M, y, size: 7.5, font: bold, color: sapphire });
-  page.drawText("ISSUED BY", { x: A4.w / 2 + 8, y, size: 7.5, font: bold, color: sapphire });
-  y -= 14;
-  page.drawText(input.studentName, { x: M, y, size: 11, font: bold, color: ink });
-  page.drawText(CERTIFICATE_ISSUER.shortName, { x: A4.w / 2 + 8, y, size: 10, font: bold, color: pine });
-  y -= 13;
-  page.drawText(input.studentEmail, { x: M, y, size: 8, font, color: mute });
-  page.drawText(CERTIFICATE_ISSUER.unit, {
-    x: A4.w / 2 + 8,
-    y,
-    size: 7.5,
-    font,
-    color: mute,
-    maxWidth: 240
-  });
-  y -= 12;
-  if (input.studentPhone) {
-    page.drawText(`Phone: ${input.studentPhone}`, { x: M, y, size: 8, font, color: mute });
-  }
-  page.drawText(`${CERTIFICATE_ISSUER.campus}, ${CERTIFICATE_ISSUER.city}`, {
-    x: A4.w / 2 + 8,
-    y,
-    size: 7.5,
-    font,
-    color: mute
-  });
-  y -= 12;
-  if (input.institution) {
-    page.drawText(`Institution: ${input.institution}`, { x: M, y, size: 8, font, color: mute, maxWidth: 250 });
-  }
-  page.drawText(CERTIFICATE_ISSUER.gstNote, {
-    x: A4.w / 2 + 8,
-    y,
-    size: 6.5,
-    font: italic,
-    color: mute,
-    maxWidth: 240
-  });
-
-  y -= 22;
-  page.drawText("COMPUTATIONAL BIOLOGY SHORT COURSES — FEE RECEIPT", {
+  y -= 70;
+  page.drawText("Enrolment reference", { x: M, y, size: 7, font: fonts.regular, color: faint });
+  page.drawText(input.enrollmentNumber, {
     x: M,
-    y,
-    size: 8,
-    font: bold,
-    color: pine
+    y: y - 12,
+    size: 9,
+    font: fonts.regular,
+    color: ink
   });
-  y -= 8;
-  page.drawLine({
-    start: { x: M, y },
-    end: { x: A4.w - M, y },
-    thickness: 0.75,
-    color: rule
+  page.drawText("Programme", { x: M + 230, y, size: 7, font: fonts.regular, color: faint });
+  page.drawText(CERTIFICATE_ISSUER.programmeCode, {
+    x: M + 230,
+    y: y - 12,
+    size: 9,
+    font: fonts.regular,
+    color: ink
   });
 
-  // Table header
-  y -= 18;
-  const cols = { code: M, title: M + 58, cr: A4.w - M - 200, tax: A4.w - M - 130, amt: A4.w - M - 70 };
-  drawRect(page, M, y - 4, A4.w - M * 2, 18, pine);
-  page.drawText("Code", { x: cols.code + 4, y: y + 2, size: 7.5, font: bold, color: paper });
-  page.drawText("Course title (1 credit each)", { x: cols.title, y: y + 2, size: 7.5, font: bold, color: paper });
-  page.drawText("Cr.", { x: cols.cr, y: y + 2, size: 7.5, font: bold, color: paper });
-  page.drawText("Taxable", { x: cols.tax, y: y + 2, size: 7.5, font: bold, color: paper });
-  page.drawText("Amount", { x: cols.amt, y: y + 2, size: 7.5, font: bold, color: paper });
+  y -= 36;
+  drawHairline(page, y);
+  y -= 26;
+
+  // Bill to / Issued by
+  const half = CONTENT_W / 2;
+  page.drawText("BILL TO", { x: M, y, size: 7, font: fonts.bold, color: faint });
+  page.drawText("ISSUED BY", { x: M + half + 8, y, size: 7, font: fonts.bold, color: faint });
+  y -= 14;
+
+  page.drawText(input.studentName, { x: M, y, size: 11, font: fonts.bold, color: ink });
+  page.drawText(CERTIFICATE_ISSUER.shortName, {
+    x: M + half + 8,
+    y,
+    size: 11,
+    font: fonts.bold,
+    color: ink
+  });
+  y -= 13;
+
+  let leftY = y;
+  let rightY = y;
+  leftY = drawMutedBlock(page, input.studentEmail, M, leftY, half - 16, fonts.regular);
+  if (input.studentPhone) leftY = drawMutedBlock(page, input.studentPhone, M, leftY, half - 16, fonts.regular);
+  if (input.institution) leftY = drawMutedBlock(page, input.institution, M, leftY, half - 16, fonts.regular);
+
+  rightY = drawMutedBlock(page, CERTIFICATE_ISSUER.unit, M + half + 8, rightY, half - 16, fonts.regular);
+  rightY = drawMutedBlock(
+    page,
+    `${CERTIFICATE_ISSUER.campus}, ${CERTIFICATE_ISSUER.city} ${CERTIFICATE_ISSUER.pincode}`,
+    M + half + 8,
+    rightY,
+    half - 16,
+    fonts.regular
+  );
+  rightY = drawMutedBlock(
+    page,
+    `Place of supply: ${input.placeOfSupply}`,
+    M + half + 8,
+    rightY,
+    half - 16,
+    fonts.regular
+  );
+  rightY = drawMutedBlock(
+    page,
+    `SAC / HSN ${CERTIFICATE_ISSUER.sacHsn}`,
+    M + half + 8,
+    rightY,
+    half - 16,
+    fonts.regular
+  );
+
+  y = Math.min(leftY, rightY) - 20;
+  drawHairline(page, y);
+  y -= 22;
+
+  // Course table
+  page.drawText("Course details", { x: M, y, size: 9, font: fonts.bold, color: ink });
   y -= 16;
+  drawTableHeader(page, fonts, y, col);
+  y -= 8;
+  drawHairline(page, y, true);
+  y -= 18;
 
   for (const line of input.lines) {
-    if (y < 160) break;
-    page.drawText(line.code, { x: cols.code + 4, y, size: 7.5, font: bold, color: sapphire });
-    const titleLines = wrapText(line.title, 250, font, 8);
-    page.drawText(titleLines[0] ?? line.title, { x: cols.title, y, size: 8, font, color: ink });
-    page.drawText(String(line.credits), { x: cols.cr + 4, y, size: 8, font, color: ink });
-    page.drawText(formatInrPdf(line.taxableCents), { x: cols.tax, y, size: 7.5, font, color: mute });
-    page.drawText(formatInrPdf(line.feeInclusiveCents), { x: cols.amt, y, size: 8, font: bold, color: ink });
-    y -= 14;
-    if (titleLines.length > 1) {
-      page.drawText(titleLines[1]!, { x: cols.title, y: y + 2, size: 7, font, color: mute });
-      y -= 10;
-    }
-    page.drawLine({
-      start: { x: M, y: y + 8 },
-      end: { x: A4.w - M, y: y + 8 },
-      thickness: 0.35,
-      color: rule
-    });
-  }
+    const titleLines = wrapText(line.title, 270, fonts.regular, 9);
+    const rowH = 12 + Math.max(0, titleLines.length - 1) * 10;
+    ensureSpace(rowH + 24);
 
-  y -= 6;
-  page.drawText(`SAC / HSN ${CERTIFICATE_ISSUER.sacHsn} · Fees are inclusive of GST @ 18%`, {
-    x: M,
-    y,
-    size: 7,
-    font: italic,
-    color: mute
-  });
-
-  // Totals panel
-  const boxW = 220;
-  const boxX = A4.w - M - boxW;
-  y -= 16;
-  const totalsTop = y;
-  drawRect(page, boxX, totalsTop - 88, boxW, 92, band);
-  const row = (label: string, value: string, yy: number, strong = false) => {
-    page.drawText(label, { x: boxX + 10, y: yy, size: 8, font: strong ? bold : font, color: strong ? ink : mute });
-    const vw = bold.widthOfTextAtSize(value, strong ? 10 : 8);
-    page.drawText(value, {
-      x: boxX + boxW - 10 - vw,
-      y: yy,
-      size: strong ? 10 : 8,
-      font: strong ? bold : font,
+    page.drawText(line.code, { x: col.desc, y, size: 7, font: fonts.regular, color: faint });
+    page.drawText(titleLines[0] ?? line.title, {
+      x: col.desc,
+      y: y - 11,
+      size: 9,
+      font: fonts.regular,
       color: ink
     });
-  };
-  row("Taxable value", formatInrPdf(input.subtotalCents), totalsTop - 14);
-  row("CGST @ 9%", formatInrPdf(input.cgstCents), totalsTop - 30);
-  row("SGST @ 9%", formatInrPdf(input.sgstCents), totalsTop - 46);
-  page.drawLine({
-    start: { x: boxX + 10, y: totalsTop - 54 },
-    end: { x: boxX + boxW - 10, y: totalsTop - 54 },
-    thickness: 0.6,
-    color: rule
-  });
-  row("Grand total (incl. GST)", formatInrPdf(input.totalCents), totalsTop - 72, true);
+    for (let i = 1; i < titleLines.length; i++) {
+      page.drawText(titleLines[i]!, {
+        x: col.desc,
+        y: y - 11 - i * 10,
+        size: 8,
+        font: fonts.regular,
+        color: mute
+      });
+    }
 
-  y = totalsTop - 14;
-  page.drawText("Amount in words", { x: M, y, size: 7, font, color: mute });
-  y -= 12;
-  const words = wrapText(amountWordsInr(input.totalCents), 280, bold, 8);
-  for (const w of words) {
-    page.drawText(w, { x: M, y, size: 8, font: bold, color: ink });
-    y -= 11;
+    page.drawText(String(line.credits), {
+      x: col.cr,
+      y: y - 11,
+      size: 9,
+      font: fonts.regular,
+      color: ink
+    });
+    rightText(page, formatInrPdf(line.taxableCents), col.gstEnd - 72, y - 11, 8, fonts.regular, mute);
+    rightText(page, formatInrPdf(line.taxCents), col.gstEnd, y - 11, 8, fonts.regular, mute);
+    rightText(page, formatInrPdf(line.feeInclusiveCents), col.amt, y - 11, 9, fonts.bold, ink);
+
+    y -= rowH + 10;
+    drawHairline(page, y + 6);
+    y -= 6;
   }
 
   y -= 8;
-  page.drawText(`Total academic credits awarded: ${input.credits}`, {
-    x: M,
-    y,
-    size: 8.5,
-    font: bold,
-    color: pine
-  });
-
-  y -= 18;
-  page.drawText("Payment reference", { x: M, y, size: 7, font, color: mute });
-  y -= 11;
-  page.drawText(`Razorpay Order: ${input.razorpayOrderId || "—"}`, { x: M, y, size: 7.5, font, color: ink });
-  y -= 10;
-  page.drawText(`Razorpay Payment: ${input.razorpayPaymentId || "—"}`, { x: M, y, size: 7.5, font, color: ink });
-  y -= 10;
   page.drawText(
-    `Settlement note: ${
-      input.paymentOutcome === "gateway_success"
-        ? "Collected via payment gateway."
-        : "Enrolment fee receipt issued under programme desk authority."
-    }`,
-    { x: M, y, size: 7, font: italic, color: mute, maxWidth: 320 }
+    `Fees inclusive of GST @ 18% · ${input.credits} academic credit${input.credits === 1 ? "" : "s"}`,
+    { x: M, y, size: 7.5, font: fonts.italic, color: faint }
   );
 
-  // QR + seal
-  const qr = await embedQrPng(doc, input.verifyUrl, 96);
-  if (qr) {
-    page.drawImage(qr, { x: A4.w - M - 86, y: 88, width: 72, height: 72 });
-    page.drawText("Scan to verify", {
-      x: A4.w - M - 82,
-      y: 78,
-      size: 6.5,
-      font,
-      color: mute
+  // Totals — typography, not a box
+  ensureSpace(130);
+  y -= 28;
+  const totalsX = PAGE.w - M - 200;
+
+  const totalRow = (label: string, value: string, size = 9, strong = false) => {
+    page.drawText(label, {
+      x: totalsX,
+      y,
+      size,
+      font: strong ? fonts.bold : fonts.regular,
+      color: strong ? ink : mute
     });
+    rightText(page, value, PAGE.w - M, y, size, strong ? fonts.bold : fonts.regular, ink);
+    y -= strong ? 22 : 16;
+  };
+
+  totalRow("Subtotal (taxable)", formatInrPdf(input.subtotalCents));
+  totalRow("CGST @ 9%", formatInrPdf(input.cgstCents));
+  totalRow("SGST @ 9%", formatInrPdf(input.sgstCents));
+  y -= 4;
+  drawHairline(page, y + 8);
+  y -= 8;
+  totalRow("Grand total", formatInrPdf(input.totalCents), 14, true);
+
+  y -= 4;
+  page.drawText("Amount in words", { x: M, y, size: 7, font: fonts.regular, color: faint });
+  y -= 12;
+  for (const w of wrapText(amountWordsInr(input.totalCents), CONTENT_W * 0.55, fonts.regular, 9)) {
+    page.drawText(w, { x: M, y, size: 9, font: fonts.regular, color: ink });
+    y -= 12;
   }
 
-  const barcode = await embedBarcodePng(doc, input.invoiceNumber.replace(/\//g, "-").slice(0, 28));
-  if (barcode) {
-    page.drawImage(barcode, { x: M, y: 62, width: 160, height: 36 });
-  }
+  // Payment
+  ensureSpace(100);
+  y -= 14;
+  drawHairline(page, y);
+  y -= 22;
+  page.drawText("Payment details", { x: M, y, size: 9, font: fonts.bold, color: ink });
+  y -= 18;
 
-  page.drawText("For SKUAST-K Continuing Education Cell", {
-    x: A4.w / 2 - 40,
-    y: 118,
-    size: 7,
-    font,
+  const payCols = [
+    { label: "Gateway", value: "Razorpay" },
+    { label: "Transaction ID", value: input.razorpayPaymentId || "—" },
+    { label: "Order ID", value: input.razorpayOrderId || "—" },
+    {
+      label: "Status",
+      value: input.paymentOutcome === "gateway_success" ? "Captured" : "Settled"
+    }
+  ];
+  const payW = CONTENT_W / 4;
+  for (let i = 0; i < payCols.length; i++) {
+    const px = M + i * payW;
+    page.drawText(payCols[i]!.label.toUpperCase(), {
+      x: px,
+      y,
+      size: 6.5,
+      font: fonts.regular,
+      color: faint
+    });
+    const v = wrapText(payCols[i]!.value, payW - 8, fonts.regular, 8)[0] ?? "—";
+    page.drawText(v, { x: px, y: y - 12, size: 8, font: fonts.regular, color: ink });
+  }
+  y -= 40;
+
+  // Verification + signature
+  ensureSpace(140);
+  drawHairline(page, y);
+  y -= 22;
+  page.drawText("Digital verification", { x: M, y, size: 9, font: fonts.bold, color: ink });
+
+  const verifyTop = y - 8;
+  const qrSize = 64;
+  if (qr) {
+    page.drawImage(qr, { x: M, y: verifyTop - qrSize, width: qrSize, height: qrSize });
+  }
+  page.drawText("Scan to verify authenticity", {
+    x: M + 76,
+    y: verifyTop - 10,
+    size: 8,
+    font: fonts.regular,
     color: mute
   });
-  page.drawText("Authorised Signatory", {
-    x: A4.w / 2 - 20,
-    y: 88,
+  page.drawText("Document ID", {
+    x: M + 76,
+    y: verifyTop - 28,
+    size: 7,
+    font: fonts.regular,
+    color: faint
+  });
+  page.drawText(docId, {
+    x: M + 76,
+    y: verifyTop - 40,
     size: 8,
-    font: bold,
+    font: fonts.bold,
+    color: ink
+  });
+  page.drawText("Generated", {
+    x: M + 76,
+    y: verifyTop - 54,
+    size: 7,
+    font: fonts.regular,
+    color: faint
+  });
+  page.drawText(fmtDateTime(generatedAt), {
+    x: M + 76,
+    y: verifyTop - 66,
+    size: 8,
+    font: fonts.regular,
+    color: ink
+  });
+
+  const sigX = PAGE.w - M - 160;
+  page.drawText("For Continuing Education Cell", {
+    x: sigX,
+    y: verifyTop - 10,
+    size: 7,
+    font: fonts.regular,
+    color: faint
+  });
+  page.drawText(CERTIFICATE_ISSUER.shortName, {
+    x: sigX,
+    y: verifyTop - 22,
+    size: 8,
+    font: fonts.bold,
     color: ink
   });
   page.drawLine({
-    start: { x: A4.w / 2 - 50, y: 100 },
-    end: { x: A4.w / 2 + 70, y: 100 },
-    thickness: 0.6,
-    color: rule
+    start: { x: sigX, y: verifyTop - 52 },
+    end: { x: PAGE.w - M, y: verifyTop - 52 },
+    thickness: 0.5,
+    color: ruleStrong
+  });
+  page.drawText("Authorised Signatory", {
+    x: sigX,
+    y: verifyTop - 64,
+    size: 8,
+    font: fonts.bold,
+    color: ink
+  });
+  page.drawText("Programme Desk · Digital seal", {
+    x: sigX,
+    y: verifyTop - 76,
+    size: 7,
+    font: fonts.regular,
+    color: faint
   });
 
-  page.drawText(
-    "This is a computer-generated tax invoice for the Computational Biology short-course programme. Retain for academic and finance records.",
-    {
-      x: M,
-      y: 42,
-      size: 6.5,
-      font: italic,
-      color: mute,
-      maxWidth: A4.w - M * 2 - 100
-    }
+  y = verifyTop - qrSize - 18;
+  const disclaimer = wrapText(
+    "This is a computer-generated tax invoice. No physical signature is required. Retain for academic and finance records.",
+    CONTENT_W,
+    fonts.italic,
+    7
   );
-  page.drawText(CERTIFICATE_ISSUER.website, {
-    x: M,
-    y: 30,
-    size: 6.5,
-    font,
-    color: sapphire
-  });
+  for (const line of disclaimer) {
+    page.drawText(line, { x: M, y, size: 7, font: fonts.italic, color: faint });
+    y -= 9;
+  }
 
+  drawFooter(page, fonts, pageIndex, docId, generatedAt);
   return doc.save();
 }
