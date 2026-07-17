@@ -13,6 +13,10 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import { cn } from "@/lib/utils";
 import { signOutAction } from "@/app/(admin)/admin/(console)/actions";
 
+/** Sidebar width — keep in sync with sticky bottom bars (`md:left-52`). */
+export const ADMIN_SIDEBAR_WIDTH_CLASS = "w-52";
+export const ADMIN_SIDEBAR_OFFSET_CLASS = "md:left-52";
+
 type AdminShellProps = {
   adminEmail: string;
   adminRole: string;
@@ -29,13 +33,13 @@ function NavLinks({
   const pathname = usePathname();
 
   return (
-    <nav className="flex flex-col gap-5">
+    <nav className="flex flex-col gap-3">
       {groups.map((group) => (
         <div key={group.id}>
-          <p className="mb-1.5 px-3 text-[10px] font-medium uppercase tracking-[0.16em] text-muted-foreground/80">
+          <p className="mb-1 px-2.5 text-[10px] font-medium uppercase tracking-[0.14em] text-muted-foreground/70">
             {group.label}
           </p>
-          <div className="flex flex-col gap-0.5">
+          <div className="flex flex-col gap-px">
             {group.items.map((item) => {
               const active = pathname === item.href || pathname.startsWith(`${item.href}/`);
               const Icon = item.icon;
@@ -45,13 +49,13 @@ function NavLinks({
                   href={item.href}
                   onClick={onNavigate}
                   className={cn(
-                    "flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors",
+                    "flex items-center gap-2 rounded-md px-2.5 py-1.5 text-[13px] transition-colors",
                     active
                       ? "bg-sidebar-accent font-medium text-sidebar-accent-foreground"
                       : "text-muted-foreground hover:bg-sidebar-accent/70 hover:text-foreground"
                   )}
                 >
-                  <Icon className="size-4 shrink-0" />
+                  <Icon className="size-3.5 shrink-0 opacity-80" />
                   <span className="truncate">{item.label}</span>
                 </Link>
               );
@@ -73,30 +77,40 @@ export function AdminShell({ adminEmail, adminRole, children }: AdminShellProps)
   return (
     <div className="min-h-svh bg-background text-foreground">
       <div className="flex min-h-svh">
-        {/* Desktop sidebar */}
         {!isMobile ? (
-          <aside className="sticky top-0 hidden h-svh w-64 shrink-0 flex-col border-r border-sidebar-border bg-sidebar md:flex">
-            <div className="flex items-center gap-3 border-b border-sidebar-border px-5 py-5">
-              <Image src="/logo.png" alt="Cashmir Biotech" width={120} height={40} className="h-9 w-auto" />
+          <aside
+            className={cn(
+              "sticky top-0 hidden h-svh shrink-0 flex-col border-r border-sidebar-border bg-sidebar md:flex",
+              ADMIN_SIDEBAR_WIDTH_CLASS
+            )}
+          >
+            <div className="flex h-11 items-center border-b border-sidebar-border px-3">
+              <Image
+                src="/logo.png"
+                alt="Cashmir Biotech"
+                width={88}
+                height={28}
+                className="h-6 w-auto opacity-90"
+              />
             </div>
-            <div className="flex-1 overflow-y-auto px-3 py-4">
+            <div className="flex-1 overflow-y-auto px-2 py-3">
               <NavLinks groups={navGroups} />
             </div>
-            <div className="border-t border-sidebar-border p-4">
-              <div className="mb-3 flex items-center gap-3 px-1">
-                <Avatar className="size-8">
-                  <AvatarFallback className="bg-primary/10 text-xs font-semibold text-primary">
+            <div className="border-t border-sidebar-border p-2.5">
+              <div className="mb-2 flex items-center gap-2 px-1">
+                <Avatar className="size-7">
+                  <AvatarFallback className="bg-muted text-[10px] font-medium text-foreground">
                     {initials}
                   </AvatarFallback>
                 </Avatar>
                 <div className="min-w-0">
-                  <p className="truncate text-xs font-medium">{adminEmail}</p>
-                  <p className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">{adminRole}</p>
+                  <p className="truncate text-[11px] font-medium leading-tight">{adminEmail}</p>
+                  <p className="text-[10px] uppercase tracking-wider text-muted-foreground">{adminRole}</p>
                 </div>
               </div>
               <form action={signOutAction}>
-                <Button type="submit" variant="outline" className="w-full justify-start gap-2">
-                  <LogOut className="size-4" />
+                <Button type="submit" variant="ghost" size="sm" className="h-8 w-full justify-start gap-2 px-2 text-xs">
+                  <LogOut className="size-3.5" />
                   Sign out
                 </Button>
               </form>
@@ -105,35 +119,34 @@ export function AdminShell({ adminEmail, adminRole, children }: AdminShellProps)
         ) : null}
 
         <div className="flex min-w-0 flex-1 flex-col">
-          {/* Top bar */}
           <header className="sticky top-0 z-40 border-b border-border bg-background/95 backdrop-blur-md">
-            <div className="flex h-14 items-center justify-between gap-3 px-4 md:px-6">
+            <div className="flex h-11 items-center justify-between gap-3 px-3 md:px-5">
               <div className="flex min-w-0 items-center gap-2">
                 {isMobile ? (
                   <Sheet>
                     <SheetTrigger
                       render={
-                        <Button variant="outline" size="icon" aria-label="Open navigation">
+                        <Button variant="ghost" size="icon" className="size-8" aria-label="Open navigation">
                           <Menu className="size-4" />
                         </Button>
                       }
                     />
-                    <SheetContent side="left" className="w-72 p-0">
-                      <SheetHeader className="border-b px-5 py-4 text-left">
-                        <SheetTitle className="flex items-center gap-2">
-                          <PanelLeft className="size-4 text-primary" />
+                    <SheetContent side="left" className="w-64 p-0">
+                      <SheetHeader className="border-b px-4 py-3 text-left">
+                        <SheetTitle className="flex items-center gap-2 text-sm">
+                          <PanelLeft className="size-3.5 text-muted-foreground" />
                           Console
                         </SheetTitle>
                       </SheetHeader>
-                      <div className="px-3 py-4">
+                      <div className="px-2 py-3">
                         <NavLinks groups={navGroups} />
                       </div>
                       <Separator />
-                      <div className="p-4">
-                        <p className="mb-3 truncate text-xs text-muted-foreground">{adminEmail}</p>
+                      <div className="p-3">
+                        <p className="mb-2 truncate text-[11px] text-muted-foreground">{adminEmail}</p>
                         <form action={signOutAction}>
-                          <Button type="submit" variant="outline" className="w-full justify-start gap-2">
-                            <LogOut className="size-4" />
+                          <Button type="submit" variant="outline" size="sm" className="w-full justify-start gap-2">
+                            <LogOut className="size-3.5" />
                             Sign out
                           </Button>
                         </form>
@@ -142,37 +155,32 @@ export function AdminShell({ adminEmail, adminRole, children }: AdminShellProps)
                   </Sheet>
                 ) : null}
                 {isMobile ? (
-                  <Image src="/logo.png" alt="Cashmir Biotech" width={100} height={32} className="h-8 w-auto" />
+                  <Image src="/logo.png" alt="Cashmir Biotech" width={80} height={26} className="h-5 w-auto" />
                 ) : (
-                  <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-muted-foreground">
-                    Operations Console
-                  </p>
+                  <p className="text-[11px] font-medium tracking-wide text-muted-foreground">Ops</p>
                 )}
               </div>
               <div className="flex items-center gap-2">
                 <Link
                   href="/"
                   target="_blank"
-                  className="hidden text-xs text-muted-foreground transition-colors hover:text-foreground sm:inline"
+                  className="hidden text-[11px] text-muted-foreground transition-colors hover:text-foreground sm:inline"
                 >
-                  View site →
+                  Storefront →
                 </Link>
                 {isMobile ? (
-                  <Avatar className="size-8">
-                    <AvatarFallback className="bg-primary/10 text-xs font-semibold text-primary">
-                      {initials}
-                    </AvatarFallback>
+                  <Avatar className="size-7">
+                    <AvatarFallback className="bg-muted text-[10px] font-medium">{initials}</AvatarFallback>
                   </Avatar>
                 ) : null}
               </div>
             </div>
           </header>
 
-          <main className={cn("flex-1 px-4 py-6 md:px-8 md:py-8", isMobile ? "pb-24" : "")}>
+          <main className={cn("flex-1 px-3 py-4 md:px-6 md:py-5", isMobile ? "pb-24" : "")}>
             <div className={cn("mx-auto w-full", wideContent ? "max-w-7xl" : "max-w-6xl")}>{children}</div>
           </main>
 
-          {/* Mobile bottom nav */}
           {isMobile ? (
             <nav
               className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-background/95 backdrop-blur-md"
@@ -188,17 +196,17 @@ export function AdminShell({ adminEmail, adminRole, children }: AdminShellProps)
                       key={item.href}
                       href={item.href}
                       className={cn(
-                        "flex min-w-0 flex-col items-center gap-0.5 px-1 py-2.5 text-[10px] font-medium",
-                        active ? "text-primary" : "text-muted-foreground"
+                        "flex min-w-0 flex-col items-center gap-0.5 px-1 py-2 text-[10px] font-medium",
+                        active ? "text-foreground" : "text-muted-foreground"
                       )}
                     >
                       <span
                         className={cn(
-                          "flex size-8 items-center justify-center rounded-xl",
-                          active ? "bg-primary/10" : "bg-transparent"
+                          "flex size-7 items-center justify-center rounded-lg",
+                          active ? "bg-muted" : "bg-transparent"
                         )}
                       >
-                        <Icon className="size-4" />
+                        <Icon className="size-3.5" />
                       </span>
                       <span className="truncate">{item.shortLabel ?? item.label}</span>
                     </Link>

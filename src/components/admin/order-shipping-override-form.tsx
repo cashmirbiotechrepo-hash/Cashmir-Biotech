@@ -1,12 +1,9 @@
 "use client";
 
 import { updateOrderShippingAction } from "@/app/(admin)/admin/(console)/actions";
-import {
-  AdminField,
-  FormStatus,
-  SaveButton,
-  useAdminForm
-} from "@/components/admin/admin-form";
+import { FormStatus, SaveButton, useAdminForm } from "@/components/admin/admin-form";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 
 export function OrderShippingOverrideForm({
   order
@@ -32,25 +29,28 @@ export function OrderShippingOverrideForm({
   }
 
   return (
-    <form onSubmit={onSubmit} className="grid gap-3">
+    <form onSubmit={onSubmit} className="flex flex-wrap items-end gap-2">
       <input type="hidden" name="id" value={order.id} />
-      <AdminField
-        label="Shipping (₹)"
-        name="shippingInr"
-        type="number"
-        defaultValue={String(Math.round(order.shippingCents / 100))}
-      />
-      <p className="text-xs text-muted-foreground">
-        {unpaid
-          ? order.razorpayOrderId
-            ? "Changing this clears the pending Razorpay payment intent so the customer must pay the new total."
-            : "Overrides the calculated fee for this order only. Store defaults still apply to new checkouts."
-          : "Updates bookkeeping totals only. The amount already charged on Razorpay does not change — refund separately if needed."}
-      </p>
-      <div className="flex flex-wrap items-center gap-3">
-        <SaveButton pending={pending} label="Update shipping" />
-        <FormStatus state={state} />
+      <div className="min-w-[7rem] space-y-1">
+        <Label htmlFor="shippingInr" className="text-[11px] font-medium text-muted-foreground">
+          Shipping (₹)
+        </Label>
+        <Input
+          id="shippingInr"
+          name="shippingInr"
+          type="number"
+          defaultValue={String(Math.round(order.shippingCents / 100))}
+          required
+          className="h-8"
+        />
       </div>
+      <SaveButton pending={pending} label="Update" />
+      <FormStatus state={state} />
+      {unpaid && order.razorpayOrderId ? (
+        <p className="basis-full text-[10px] text-muted-foreground">
+          Clears pending Razorpay intent for the new total.
+        </p>
+      ) : null}
     </form>
   );
 }
