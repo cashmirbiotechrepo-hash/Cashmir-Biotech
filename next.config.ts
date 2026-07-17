@@ -7,8 +7,7 @@ const nextConfig: NextConfig = {
   serverExternalPackages: ["pino", "thread-stream"],
   outputFileTracingRoot: path.join(process.cwd(), "./"),
   experimental: {
-    // Workaround for Next 15.5.x Amplify/Linux crash:
-    // HookWebpackError: WebpackError is not a constructor (minify-webpack-plugin)
+    // Avoid Next 15.5.x minify plugin crash on some Linux CI hosts.
     serverMinification: false,
     optimizePackageImports: ["lucide-react", "framer-motion", "@radix-ui/react-icons", "@radix-ui/react-popover"]
   },
@@ -20,17 +19,30 @@ const nextConfig: NextConfig = {
   }
 };
 
+// Amplify Hosting sets these. Skip Sentry's webpack injection there — it pulls a
+// separate webpack copy that clashes with Next's bundled webpack
+// ("WebpackError is not a constructor" / FlightClientEntryPlugin crashes).
+const isAmplifyBuild = Boolean(
+  process.env.AMPLIFY_NEXT_PLAIN_CONFIG ||
+    process.env.AWS_APP_ID ||
+    process.env.AWS_BRANCH ||
+    process.env.AWS_EXECUTION_ENV
+);
+
 const hasSentryAuth = Boolean(process.env.SENTRY_AUTH_TOKEN);
 
-export default withSentryConfig(nextConfig, {
-  silent: true,
-  telemetry: false,
-  // Avoid injecting a second webpack toolchain on Amplify builds without Sentry upload auth.
-  webpack: {
-    disableSentryConfig: !hasSentryAuth
-  },
-  sourcemaps: {
-    disable: !hasSentryAuth
-  },
-  widenClientFileUpload: false
-});
+const config = isAmplifyBuild
+  ? nextConfig
+  : withSentryConfig(nextConfig, {
+      silent: true,
+      telemetry: false,
+      webpack: {
+        disableSentryConfig: !hasSentryAuth
+      },
+      sourcemaps: {
+        disable: !hasSentryAuth
+      },
+      widenClientFileUpload: false
+    });
+
+export default config;
