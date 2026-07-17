@@ -66,7 +66,7 @@ function productSections(items: OrderMailItem[]): Section[] {
   return items.slice(0, 3).map((item) => ({
     type: "product" as const,
     name: item.productName,
-    meta: [item.sizeLabel, "Patent-backed", "Batch verified"].filter(Boolean).join(" · "),
+    meta: item.sizeLabel || undefined,
     imageUrl: absoluteAssetUrl(item.imageUrl ?? undefined),
     qty: item.quantity
   }));
@@ -98,7 +98,7 @@ function orderSummarySections(input: {
   ];
 }
 
-/** Premium shipping notification — from Cashmir Biotech Orders */
+/** Shipping notification — short transactional layout */
 export function buildOrderShippedMail(input: {
   customerName?: string | null;
   orderNumber: string;
@@ -126,24 +126,19 @@ export function buildOrderShippedMail(input: {
   const first = input.items[0]?.productName ?? "Your order";
   const shipRows: Array<{ label: string; value: string }> = [];
   if (input.carrier) shipRows.push({ label: "Carrier", value: input.carrier });
-  if (input.trackingNumber) shipRows.push({ label: "Tracking number", value: input.trackingNumber });
-  shipRows.push({ label: "Estimated delivery", value: estimateDeliveryWindow() });
+  if (input.trackingNumber) shipRows.push({ label: "Tracking", value: input.trackingNumber });
+  shipRows.push({ label: "Est. delivery", value: estimateDeliveryWindow() });
 
-  const secondary = [
-    { label: "View order", href: orderUrl },
-    { label: "Customer Portal", href: `${base}/portal/login` },
-    { label: "Contact support", href: `${base}/contact` }
-  ];
+  const secondary = [{ label: "View order", href: orderUrl }];
   if (input.invoicePdfUrl) {
-    secondary.unshift({ label: "Download invoice", href: absoluteAssetUrl(input.invoicePdfUrl)! });
+    secondary.push({ label: "Invoice", href: absoluteAssetUrl(input.invoicePdfUrl)! });
   }
 
   const sections: Section[] = [
     {
       type: "hero",
-      eyebrow: "Orders & shipping",
       title: "Shipment confirmed",
-      subtitle: `${first} is on its way. Your formula has left our facility — quality verified, packed, and handed to our logistics partner.`
+      subtitle: `${first} is on its way · ${input.orderNumber}`
     },
     {
       type: "steps",
@@ -156,18 +151,7 @@ export function buildOrderShippedMail(input: {
       ]
     },
     ...productSections(input.items),
-    {
-      type: "text",
-      body: `Order ${input.orderNumber}${input.customerName ? `\nHi ${input.customerName}` : ""}`
-    },
-    { type: "card", title: "Shipment", rows: shipRows },
-    {
-      type: "cta",
-      label: primaryCta.label,
-      href: primaryCta.href,
-      secondary
-    },
-    ...orderSummarySections(input)
+    { type: "card", title: "Delivery", rows: shipRows }
   ];
 
   const shipTo = addressLines(input.shippingAddress, input.customerName);
@@ -175,24 +159,21 @@ export function buildOrderShippedMail(input: {
     sections.push({ type: "address", title: "Shipping to", lines: shipTo });
   }
 
-  sections.push({
-    type: "checklist",
-    title: "Quality assurance",
-    items: [
-      "Batch verified",
-      "Patent-backed formulation",
-      "GMP manufacturing",
-      "Laboratory release approved"
-    ]
-  });
+  sections.push(
+    {
+      type: "cta",
+      label: primaryCta.label,
+      href: primaryCta.href,
+      secondary
+    },
+    ...orderSummarySections(input)
+  );
 
   return buildBrandedMail({
     fromDisplay: "Cashmir Biotech Orders",
     subject: "Your order has shipped",
     preheader: `${first} is on its way · ${input.orderNumber}`,
-    sections,
-    legalNote:
-      "This email was sent regarding your Cashmir Biotech order. Invoice and documents are available in your Customer Portal."
+    sections
   });
 }
 
@@ -214,9 +195,8 @@ export function buildOrderConfirmedMail(input: {
   const sections: Section[] = [
     {
       type: "hero",
-      eyebrow: "Orders",
       title: "Order confirmed",
-      subtitle: `Thank you${input.customerName ? `, ${input.customerName}` : ""}. We've received payment for ${first} and will notify you when it ships.`
+      subtitle: `Thank you${input.customerName ? `, ${input.customerName}` : ""}. Payment received for ${first} · ${input.orderNumber}`
     },
     {
       type: "steps",
@@ -229,7 +209,6 @@ export function buildOrderConfirmedMail(input: {
       ]
     },
     ...productSections(input.items),
-    { type: "text", body: `Order ${input.orderNumber}` },
     ...orderSummarySections(input)
   ];
 
@@ -238,33 +217,17 @@ export function buildOrderConfirmedMail(input: {
     sections.push({ type: "address", title: "Shipping to", lines: shipTo });
   }
 
-  sections.push(
-    {
-      type: "cta",
-      label: "View order",
-      href: orderUrl,
-      secondary: [
-        { label: "Open Customer Portal", href: `${base}/portal/login` },
-        { label: "Contact support", href: `${base}/contact` }
-      ]
-    },
-    {
-      type: "checklist",
-      title: "What happens next",
-      items: [
-        "We verify batch and prepare your formulation",
-        "You'll receive tracking when it ships",
-        "Invoices and CoAs live in your Customer Portal"
-      ]
-    }
-  );
+  sections.push({
+    type: "cta",
+    label: "View order",
+    href: orderUrl
+  });
 
   return buildBrandedMail({
     fromDisplay: "Cashmir Biotech Orders",
     subject: "Order confirmed",
     preheader: `Thank you — ${input.orderNumber} is confirmed`,
-    sections,
-    legalNote: "This email confirms your Cashmir Biotech purchase. Keep it for your records."
+    sections
   });
 }
 
@@ -283,17 +246,16 @@ export function buildRefundMail(input: {
   return buildBrandedMail({
     fromDisplay: "Cashmir Biotech Orders",
     subject: "Refund processed",
-    preheader: `₹${(input.amountCents / 100).toFixed(0)} refund for ${input.orderNumber}`,
+    preheader: `${formatInr(input.amountCents)} refund for ${input.orderNumber}`,
     sections: [
       {
         type: "hero",
-        eyebrow: "Orders",
         title: "Refund processed",
-        subtitle: `A refund of ${formatInr(input.amountCents)} for order ${input.orderNumber} has been initiated. Funds typically return in 5–7 business days.`
+        subtitle: `${formatInr(input.amountCents)} for order ${input.orderNumber}. Funds typically return in 5–7 business days.`
       },
       {
         type: "card",
-        title: "Refund details",
+        title: "Details",
         rows: [
           { label: "Order", value: input.orderNumber },
           { label: "Amount", value: formatInr(input.amountCents) },
@@ -303,11 +265,9 @@ export function buildRefundMail(input: {
       {
         type: "cta",
         label: "View order",
-        href: orderUrl,
-        secondary: [{ label: "Contact support", href: `${base}/contact` }]
+        href: orderUrl
       }
-    ],
-    legalNote: "This email was sent regarding a refund on your Cashmir Biotech order."
+    ]
   });
 }
 
@@ -323,19 +283,13 @@ export function buildOrgInviteMail(input: {
     sections: [
       {
         type: "hero",
-        eyebrow: "Organisation",
         title: "You're invited",
-        subtitle: `Join ${input.orgName} as ${input.role} on the Cashmir Biotech Customer Portal.`
+        subtitle: `Join ${input.orgName} as ${input.role}. This invite expires in 7 days.`
       },
       {
         type: "cta",
         label: "Accept invite",
-        href: input.acceptUrl,
-        secondary: [{ label: "Contact support", href: `${emailSiteUrl()}/contact` }]
-      },
-      {
-        type: "text",
-        body: "This invite expires in 7 days. If you did not expect this message, you can safely ignore it."
+        href: input.acceptUrl
       }
     ]
   });
@@ -354,9 +308,8 @@ export function buildLowStockMail(input: {
     sections: [
       {
         type: "hero",
-        eyebrow: "Inventory alert",
         title: "Low stock",
-        subtitle: `${input.productName} has reached or fallen below the configured threshold.`
+        subtitle: `${input.productName} is at or below the threshold.`
       },
       {
         type: "card",
@@ -389,14 +342,13 @@ export function buildSupportTicketMail(input: {
     sections: [
       {
         type: "hero",
-        eyebrow: "Customer Portal",
         title: "New support message",
         subtitle: `From ${input.fromEmail}`
       },
       { type: "text", body: input.body },
       {
         type: "cta",
-        label: "Open support console",
+        label: "Open support",
         href: `${emailSiteUrl()}/admin/support`
       }
     ]
@@ -417,9 +369,8 @@ export function buildContactLeadMail(input: {
     sections: [
       {
         type: "hero",
-        eyebrow: "Website enquiry",
         title: "New contact message",
-        subtitle: `${input.name} wrote from the Cashmir Biotech website.`
+        subtitle: `${input.name} wrote from the website.`
       },
       {
         type: "card",
@@ -434,7 +385,7 @@ export function buildContactLeadMail(input: {
       { type: "text", body: input.message },
       {
         type: "cta",
-        label: "Reply by email",
+        label: "Reply",
         href: `mailto:${encodeURIComponent(input.email)}`
       }
     ]

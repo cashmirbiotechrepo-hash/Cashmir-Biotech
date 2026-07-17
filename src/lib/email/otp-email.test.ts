@@ -7,7 +7,7 @@ describe("otp-email", () => {
     expect(maskEmail("moalim@gmail.com")).toBe("mo***@gmail.com");
   });
 
-  it("builds branded portal login email", () => {
+  it("builds a short portal login email with prominent code", () => {
     const mail = buildOtpEmail({
       kind: "portal_login",
       code: "537245",
@@ -15,17 +15,19 @@ describe("otp-email", () => {
     });
     expect(mail.fromDisplay).toContain("Customer Portal");
     expect(mail.html).toContain("537 245");
-    expect(mail.html).toContain("Valid for");
-    expect(mail.html).toContain("10 minutes");
-    expect(mail.html).toContain("Continue to Customer Portal");
-    expect(mail.text).toContain("CASHMIR BIOTECH");
-    expect(mail.subject).toMatch(/Customer Portal/i);
+    expect(mail.html).toContain("Valid for 10 minutes");
+    expect(mail.html).toContain("Open Customer Portal");
+    expect(mail.html).toContain('width="48"');
+    expect(mail.html).not.toContain("Order history");
+    expect(mail.html).not.toContain("ONE TIME");
+    expect(mail.text).toContain("Cashmir Biotech");
+    expect(mail.subject).toMatch(/verification code/i);
   });
 
   it("builds admin and order lookup variants", () => {
     const admin = buildOtpEmail({ kind: "admin_2fa", code: "111222", email: "admin@cashmirbiotech.com" });
     expect(admin.fromDisplay).toContain("Security");
-    expect(admin.html).toContain("Operations Console");
+    expect(admin.html).toContain("Open Operations Console");
 
     const lookup = buildOtpEmail({
       kind: "order_lookup",
@@ -34,6 +36,6 @@ describe("otp-email", () => {
       orderNumber: "CB-123456"
     });
     expect(lookup.subject).toContain("CB-123456");
-    expect(lookup.html).toContain("Order Lookup");
+    expect(lookup.html).toContain("Open order lookup");
   });
 });

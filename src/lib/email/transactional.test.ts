@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { buildOrderShippedMail, buildOrderConfirmedMail } from "./transactional";
 
 describe("transactional emails", () => {
-  it("builds shipped mail with Orders from-display and short subject", () => {
+  it("builds a short shipped mail", () => {
     const mail = buildOrderShippedMail({
       customerName: "Moalim",
       orderNumber: "CB-TEST-1",
@@ -34,8 +34,11 @@ describe("transactional emails", () => {
     expect(mail.html).toContain("Shipment confirmed");
     expect(mail.html).toContain("Track shipment");
     expect(mail.html).toContain("1228928738");
-    expect(mail.html).toContain("Quality assurance");
+    expect(mail.html).toContain("Shipped");
+    expect(mail.html).not.toContain("Quality assurance");
+    expect(mail.html).not.toContain("Patent-backed");
     expect(mail.html).not.toContain("Cashmir Biotech Security");
+    expect(mail.html).toContain('width="48"');
   });
 
   it("builds confirmation mail", () => {
@@ -48,5 +51,6 @@ describe("transactional emails", () => {
     });
     expect(mail.subject).toBe("Order confirmed");
     expect(mail.fromDisplay).toBe("Cashmir Biotech Orders");
+    expect(mail.html).not.toContain("What happens next");
   });
 });
