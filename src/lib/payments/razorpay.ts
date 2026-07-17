@@ -119,7 +119,7 @@ export async function assertCapturedPayment(input: {
     if (json.order_id !== input.razorpayOrderId) {
       return { ok: false, error: "Payment does not match this order." };
     }
-    if (json.status !== "captured" && json.status !== "authorized") {
+    if (json.status !== "captured") {
       return { ok: false, error: `Payment status is ${json.status}.` };
     }
     if (Number(json.amount) !== input.amountCents) {

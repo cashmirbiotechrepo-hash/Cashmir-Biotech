@@ -5,9 +5,9 @@ import { requireAdminSession } from "@/lib/auth";
 import { hasAdminRole, OPERATIONS_ROLES } from "@/lib/admin/rbac";
 import { db } from "@/lib/db";
 import { writeAuditLog } from "@/modules/admin/services/audit.service";
-import { restoreStockForOrder } from "@/modules/admin/services/inventory.service";
-import { ensureInvoiceForOrder, recordOrderEvent } from "@/modules/shop/services/order-ops.service";
+import { ensureInvoiceForOrder } from "@/modules/shop/services/order-ops.service";
 import { createRazorpayRefund } from "@/lib/payments/razorpay";
+import { applyOrderRefund } from "@/modules/shop/services/refund.service";
 import type { ActionState } from "./actions";
 
 export async function ensureInvoiceForOrderAction(formData: FormData): Promise<ActionState> {
@@ -102,39 +102,28 @@ export async function refundOrderAction(formData: FormData): Promise<ActionState
       }
     });
 
-    const newRefunded = (order.refundedCents ?? 0) + amountCents;
-    const fullyRefunded = newRefunded >= order.totalCents;
+    const fullyRefundedPreview = (order.refundedCents ?? 0) + amountCents >= order.totalCents;
 
-    if (restock && fullyRefunded && order.stockDeducted) {
-      await restoreStockForOrder({
-        orderId: order.id,
-        lines: order.items.map((i) => ({
-          productId: i.productId,
-          quantity: i.quantity,
-          productName: i.productName
-        })),
-        changeType: "order_returned",
-        createdBy: String(admin.email)
-      });
+    const applied = await applyOrderRefund({
+      orderId: order.id,
+      razorpayRefundId: refund.id,
+      amountCents,
+      source: "admin",
+      restock: restock && fullyRefundedPreview,
+      actorEmail: String(admin.email),
+      reason,
+      eventType: "refund_issued"
+    });
+
+    if (!applied.ok) {
+      return { error: "Refund was created at Razorpay but could not be recorded. Contact support." };
     }
 
     await db.order.update({
       where: { id: order.id },
       data: {
-        refundedCents: newRefunded,
-        status: fullyRefunded ? "refunded" : "partially_refunded",
-        stockDeducted: restock && fullyRefunded ? false : order.stockDeducted,
         adminNotes: `${order.adminNotes}\n[Refund ${refund.id} ₹${(amountCents / 100).toFixed(2)}] ${reason}`.trim()
       }
-    });
-
-    await recordOrderEvent({
-      orderId: order.id,
-      type: "refund_issued",
-      title: fullyRefunded ? "Full refund issued" : "Partial refund issued",
-      detail: `${refund.id} · ₹${(amountCents / 100).toFixed(2)} · ${reason}`,
-      actorEmail: String(admin.email),
-      metadata: { refundId: refund.id, amountCents, refundedCents: newRefunded, restock, fullyRefunded }
     });
 
     await writeAuditLog({
@@ -142,10 +131,18 @@ export async function refundOrderAction(formData: FormData): Promise<ActionState
       action: "update",
       entityType: "order",
       entityId: order.id,
-      diff: { refundId: refund.id, amountCents, refundedCents: newRefunded, reason, restock, fullyRefunded }
+      diff: {
+        refundId: refund.id,
+        amountCents,
+        refundedCents: applied.newRefundedCents,
+        reason,
+        restock,
+        fullyRefunded: applied.fullyRefunded,
+        duplicate: applied.duplicate
+      }
     });
 
-    if (order.customerEmail) {
+    if (order.customerEmail && applied.applied) {
       const { buildRefundMail } = await import("@/lib/email/transactional");
       const { sendTransactionalMail } = await import("@/lib/admin/mail");
       const mail = buildRefundMail({
@@ -162,7 +159,7 @@ export async function refundOrderAction(formData: FormData): Promise<ActionState
     revalidatePath("/admin/orders");
     return {
       ok: true,
-      message: fullyRefunded
+      message: applied.fullyRefunded
         ? `Full refund ${refund.id} issued.`
         : `Partial refund ${refund.id} of ₹${(amountCents / 100).toFixed(2)} issued.`
     };

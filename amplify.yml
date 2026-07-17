@@ -20,7 +20,9 @@ frontend:
             echo "Normalized DATABASE_URL (%26 → &)"
           fi
         - node scripts/ensure-shipping-settings.cjs
-        - node scripts/ensure-certificate-enrollment.cjs
+        # D-01 FIX: Apply pending migrations to production DB on every deploy.
+        # Without this, schema changes (new columns, tables) are not applied.
+        - npx prisma migrate deploy
         - node scripts/write-amplify-runtime-env.cjs
         - npm run build
   artifacts:

@@ -23,12 +23,30 @@ Resources:
           ApiKeyName: Authorization
           ApiKeyValue: !Sub "Bearer ${CronSecret}"
 
+  ProcessOutboxApiDestination:
+    Type: AWS::Events::ApiDestination
+    Properties:
+      Name: cashmir-process-outbox
+      ConnectionArn: !GetAtt CronConnection.Arn
+      InvocationEndpoint: !Sub "${SiteBaseUrl}/api/cron/process-outbox"
+      HttpMethod: GET
+      InvocationRateLimitPerSecond: 1
+
   ReleaseStaleApiDestination:
     Type: AWS::Events::ApiDestination
     Properties:
       Name: cashmir-release-stale-orders
       ConnectionArn: !GetAtt CronConnection.Arn
       InvocationEndpoint: !Sub "${SiteBaseUrl}/api/cron/release-stale-orders"
+      HttpMethod: GET
+      InvocationRateLimitPerSecond: 1
+
+  ReconcilePaymentsApiDestination:
+    Type: AWS::Events::ApiDestination
+    Properties:
+      Name: cashmir-reconcile-payments
+      ConnectionArn: !GetAtt CronConnection.Arn
+      InvocationEndpoint: !Sub "${SiteBaseUrl}/api/cron/reconcile-payments"
       HttpMethod: GET
       InvocationRateLimitPerSecond: 1
 
@@ -60,8 +78,25 @@ Resources:
                 Action:
                   - events:InvokeApiDestination
                 Resource:
+                  - !GetAtt ProcessOutboxApiDestination.Arn
                   - !GetAtt ReleaseStaleApiDestination.Arn
+                  - !GetAtt ReconcilePaymentsApiDestination.Arn
                   - !GetAtt CleanupSessionsApiDestination.Arn
+
+  ProcessOutboxSchedule:
+    Type: AWS::Scheduler::Schedule
+    Properties:
+      Name: cashmir-process-outbox
+      Description: Every 2 minutes — post-payment outbox (email, invoice, portal attach)
+      FlexibleTimeWindow:
+        Mode: "OFF"
+      ScheduleExpression: rate(2 minutes)
+      State: ENABLED
+      Target:
+        Arn: !GetAtt ProcessOutboxApiDestination.Arn
+        RoleArn: !GetAtt SchedulerApiRole.Arn
+        RetryPolicy:
+          MaximumRetryAttempts: 2
 
   ReleaseStaleSchedule:
     Type: AWS::Scheduler::Schedule
@@ -74,6 +109,22 @@ Resources:
       State: ENABLED
       Target:
         Arn: !GetAtt ReleaseStaleApiDestination.Arn
+        RoleArn: !GetAtt SchedulerApiRole.Arn
+        RetryPolicy:
+          MaximumRetryAttempts: 2
+
+  ReconcilePaymentsSchedule:
+    Type: AWS::Scheduler::Schedule
+    Properties:
+      Name: cashmir-reconcile-payments
+      Description: Every 6 hours — heal orphan Razorpay payments
+      FlexibleTimeWindow:
+        Mode: "OFF"
+      ScheduleExpression: cron(0 */6 * * ? *)
+      ScheduleExpressionTimezone: UTC
+      State: ENABLED
+      Target:
+        Arn: !GetAtt ReconcilePaymentsApiDestination.Arn
         RoleArn: !GetAtt SchedulerApiRole.Arn
         RetryPolicy:
           MaximumRetryAttempts: 2
@@ -95,7 +146,11 @@ Resources:
           MaximumRetryAttempts: 2
 
 Outputs:
+  ProcessOutboxDestination:
+    Value: !GetAtt ProcessOutboxApiDestination.Arn
   ReleaseStaleDestination:
     Value: !GetAtt ReleaseStaleApiDestination.Arn
+  ReconcilePaymentsDestination:
+    Value: !GetAtt ReconcilePaymentsApiDestination.Arn
   CleanupSessionsDestination:
     Value: !GetAtt CleanupSessionsApiDestination.Arn

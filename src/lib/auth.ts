@@ -16,7 +16,7 @@ import { AdminAuthService } from "@/lib/admin/auth-service";
 
 export const authCookieName = ADMIN_SESSION_COOKIE;
 
-const SESSION_COOKIE_MAX_AGE = 7 * 24 * 60 * 60; // match 7d access JWT
+const SESSION_COOKIE_MAX_AGE = 15 * 60; // match 15m access JWT
 const REFRESH_COOKIE_MAX_AGE = 30 * 24 * 60 * 60;
 
 export type AdminSession = AdminTokenPayload & {
@@ -45,7 +45,18 @@ async function readAndVerifyCookie(): Promise<AdminSession | null> {
     if (!session || session.isRevoked || session.expiresAt < new Date()) return null;
   }
 
-  return payload as AdminSession;
+  const user = await db.adminUser.findUnique({
+    where: { id: payload.id },
+    select: { active: true, email: true, role: true }
+  });
+  if (!user?.active) return null;
+
+  return {
+    ...(payload as AdminSession),
+    email: user.email,
+    role: user.role,
+    id: payload.id
+  };
 }
 
 export async function verifyAdminSession(token: string) {

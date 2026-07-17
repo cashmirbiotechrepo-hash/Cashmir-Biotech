@@ -98,6 +98,10 @@ export async function updateAdminUserAction(formData: FormData): Promise<ActionS
     }
   });
 
+  if (deactivating) {
+    await AdminAuthService.revokeAllSessions(parsed.data.id);
+  }
+
   await writeAuditLog({
     userEmail: String(actor.email),
     action: "update",

@@ -10,7 +10,7 @@ export function CustomerSessionKeepalive({ enabled = true }: { enabled?: boolean
   useEffect(() => {
     if (!enabled) return;
 
-    const REFRESH_MS = 6 * 60 * 60 * 1000; // every 6 hours
+    const REFRESH_MS = 5 * 60 * 1000; // every 5 minutes (access token TTL is 15m)
 
     async function refresh() {
       try {

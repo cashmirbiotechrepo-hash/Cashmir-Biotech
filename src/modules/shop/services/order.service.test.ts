@@ -8,7 +8,7 @@ describe("payment verify policy", () => {
       path.join(process.cwd(), "src/app/api/payment/verify/route.ts"),
       "utf8"
     );
-    expect(source).toContain("Never markOrderFailed");
+    // Verify route should NOT call markOrderFailed — invalid sig just returns 400.
     expect(source).not.toMatch(/markOrderFailed\s*\(/);
   });
 });
@@ -30,8 +30,9 @@ describe("coupon burn timing", () => {
       path.join(process.cwd(), "src/modules/shop/services/order.service.ts"),
       "utf8"
     );
+    // Coupon validation defers burn until payment; raw SQL bump in markOrderPaid.
     expect(source).toMatch(/do NOT burn usedCount until payment/);
-    expect(source).toMatch(/usedCount:\s*\{\s*increment:\s*1\s*\}/);
+    expect(source).toMatch(/usedCount.*usedCount.*\+.*1/);
   });
 });
 

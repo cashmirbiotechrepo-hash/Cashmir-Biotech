@@ -1,5 +1,5 @@
 AWSTemplateFormatVersion: "2010-09-09"
-Description: Cashmir Biotech RDS PostgreSQL for Amplify (ap-south-1). Public access for first deploy.
+Description: Cashmir Biotech RDS PostgreSQL for Amplify (ap-south-1). Private subnet access only.
 
 Parameters:
   DbInstanceId:
@@ -17,23 +17,32 @@ Parameters:
     MinLength: 16
   InstanceClass:
     Type: String
-    Default: db.t4g.micro
-    AllowedValues: [db.t4g.micro, db.t3.micro, db.t4g.small]
+    Default: db.t4g.small
+    AllowedValues: [db.t4g.micro, db.t3.micro, db.t4g.small, db.t4g.medium]
   SubnetIds:
     Type: List<AWS::EC2::Subnet::Id>
-    Description: At least two subnet IDs from the default VPC
+    Description: At least two subnet IDs (private subnets recommended)
+  VpcCidr:
+    Type: String
+    Default: "10.0.0.0/8"
+    Description: VPC CIDR for DB access (restrict to your VPC range)
+  MultiAZ:
+    Type: String
+    Default: "false"
+    AllowedValues: ["true", "false"]
+    Description: Enable Multi-AZ for high availability
 
 Resources:
   DbSecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:
-      GroupDescription: Cashmir Biotech PostgreSQL (TEMP public for Amplify)
+      GroupDescription: Cashmir Biotech PostgreSQL (VPC-only access)
       SecurityGroupIngress:
         - IpProtocol: tcp
           FromPort: 5432
           ToPort: 5432
-          CidrIp: 0.0.0.0/0
-          Description: TEMP open Postgres — tighten after go-live
+          CidrIp: !Ref VpcCidr
+          Description: PostgreSQL access from VPC only — I-01 fix
 
   DbSubnetGroup:
     Type: AWS::RDS::DBSubnetGroup
@@ -55,14 +64,16 @@ Resources:
       StorageType: gp3
       MasterUsername: !Ref MasterUsername
       MasterUserPassword: !Ref MasterUserPassword
-      PubliclyAccessible: true
+      PubliclyAccessible: false
       VPCSecurityGroups:
         - !GetAtt DbSecurityGroup.GroupId
       DBSubnetGroupName: !Ref DbSubnetGroup
       BackupRetentionPeriod: 7
       PreferredBackupWindow: "18:30-19:00"
       PreferredMaintenanceWindow: "sun:19:00-sun:20:00"
-      DeletionProtection: false
+      DeletionProtection: true
+      StorageEncrypted: true
+      MultiAZ: !Ref MultiAZ
       EnableCloudwatchLogsExports:
         - postgresql
 

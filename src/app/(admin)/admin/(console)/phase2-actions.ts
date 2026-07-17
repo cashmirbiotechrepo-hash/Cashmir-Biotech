@@ -335,6 +335,9 @@ export async function toggleCouponAction(formData: FormData): Promise<void> {
 
 export async function saveExpenseAction(formData: FormData): Promise<ActionState> {
   const admin = await requireAdminSession();
+  if (!hasAdminRole(admin.role, OPERATIONS_ROLES)) {
+    return { error: "You do not have permission to manage finance." };
+  }
   const raw = fields(formData);
   const parsed = expenseSchema.safeParse(raw);
   if (!parsed.success) {
@@ -390,6 +393,9 @@ export async function deleteExpenseAction(formData: FormData): Promise<void> {
 
 export async function createInvoiceAction(formData: FormData): Promise<ActionState> {
   const admin = await requireAdminSession();
+  if (!hasAdminRole(admin.role, OPERATIONS_ROLES)) {
+    return { error: "You do not have permission to manage finance." };
+  }
   const parsed = invoiceFromOrderSchema.safeParse(fields(formData));
   if (!parsed.success) {
     return { error: parsed.error.issues[0]?.message ?? "Invalid invoice request." };
@@ -404,7 +410,8 @@ export async function createInvoiceAction(formData: FormData): Promise<ActionSta
     const subtotal = order.subtotalCents || order.totalCents;
     const tax = order.taxCents || Math.round(subtotal * 0.18);
     const total = order.totalCents || subtotal + tax;
-    const half = Math.round(tax / 2);
+    const { splitGstCents } = await import("@/lib/gst");
+    const gstSplit = splitGstCents(tax, parsed.data.placeOfSupply);
 
     const invoice = await db.invoice.create({
       data: {
@@ -416,10 +423,10 @@ export async function createInvoiceAction(formData: FormData): Promise<ActionSta
         gstDetails: {
           gstin: parsed.data.gstin ?? "",
           placeOfSupply: parsed.data.placeOfSupply,
-          taxType: "intra",
-          cgstCents: half,
-          sgstCents: half,
-          igstCents: 0,
+          taxType: gstSplit.taxType,
+          cgstCents: gstSplit.cgstCents,
+          sgstCents: gstSplit.sgstCents,
+          igstCents: gstSplit.igstCents,
           lineItems: order.items.map((item) => ({
             description: item.productName,
             qty: item.quantity,
@@ -446,6 +453,9 @@ export async function createInvoiceAction(formData: FormData): Promise<ActionSta
 
 export async function saveCampaignAction(formData: FormData): Promise<ActionState> {
   const admin = await requireAdminSession();
+  if (!hasAdminRole(admin.role, OPERATIONS_ROLES)) {
+    return { error: "You do not have permission to manage campaigns." };
+  }
   const parsed = campaignSchema.safeParse(fields(formData));
   if (!parsed.success) {
     return { error: parsed.error.issues[0]?.message ?? "Check campaign fields." };
@@ -472,6 +482,7 @@ export async function saveCampaignAction(formData: FormData): Promise<ActionStat
 
 export async function sendCampaignAction(formData: FormData): Promise<void> {
   const admin = await requireAdminSession();
+  if (!hasAdminRole(admin.role, OPERATIONS_ROLES)) return;
   const id = String(formData.get("id") ?? "");
   if (!id) return;
 

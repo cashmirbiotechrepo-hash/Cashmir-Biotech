@@ -1,8 +1,16 @@
 {
   "crons": [
     {
+      "path": "/api/cron/process-outbox",
+      "schedule": "*/2 * * * *"
+    },
+    {
       "path": "/api/cron/release-stale-orders",
       "schedule": "*/20 * * * *"
+    },
+    {
+      "path": "/api/cron/reconcile-payments",
+      "schedule": "0 */6 * * *"
     },
     {
       "path": "/api/cron/cleanup-sessions",

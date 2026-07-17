@@ -6,7 +6,7 @@ import { env } from "@/config/env.server";
 import { JWT_AUDIENCE, JWT_ISSUER } from "@/config/auth.constants";
 import { logger } from "@/lib/logger";
 
-const ACCESS_TOKEN_EXPIRY = "7d";
+const ACCESS_TOKEN_EXPIRY = "15m";
 const REFRESH_TOKEN_EXPIRY = "30d";
 const REFRESH_TOKEN_EXPIRY_MS = 30 * 24 * 60 * 60 * 1000;
 

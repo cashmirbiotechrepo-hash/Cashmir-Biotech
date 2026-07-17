@@ -59,7 +59,19 @@ export async function POST(req: NextRequest) {
     const ext = isPdf ? "pdf" : detectedImage!;
     const fileName = `${randomUUID()}.${ext}`;
     let url: string;
-    const contentType = isPdf ? "application/pdf" : file.type || `image/${ext}`;
+    const contentType = isPdf
+      ? "application/pdf"
+      : ext === "jpg"
+        ? "image/jpeg"
+        : ext === "png"
+          ? "image/png"
+          : ext === "gif"
+            ? "image/gif"
+            : ext === "webp"
+              ? "image/webp"
+              : ext === "avif"
+                ? "image/avif"
+                : `image/${ext}`;
 
     // CRIT-05: If Vercel Blob is configured (or in serverless production), use Vercel Blob storage.
     if (process.env.BLOB_READ_WRITE_TOKEN) {

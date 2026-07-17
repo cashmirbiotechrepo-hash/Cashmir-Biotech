@@ -196,6 +196,8 @@ model Order {
   invoices        Invoice[]
   paymentEvents   PaymentEvent[]
   events          OrderEvent[]
+  tasks           OrderTask[]
+  refunds         OrderRefund[]
   customer        Customer?   @relation(fields: [customerId], references: [id], onDelete: SetNull)
 
   @@index([status, createdAt])
@@ -249,16 +251,51 @@ model OrderItemLotAllocation {
 }
 
 model PaymentEvent {
-  id             String   @id @default(cuid())
+  id             String    @id @default(cuid())
   eventType      String
-  providerEventId String  @unique
+  providerEventId String   @unique
   orderId        String?
-  signatureValid Boolean  @default(false)
+  signatureValid Boolean   @default(false)
   payload        Json?
-  createdAt      DateTime @default(now())
-  order          Order?   @relation(fields: [orderId], references: [id], onDelete: SetNull)
+  /// Set after fulfillment succeeds — NULL means recorded but incomplete (re-driveable).
+  processedAt    DateTime?
+  createdAt      DateTime  @default(now())
+  order          Order?    @relation(fields: [orderId], references: [id], onDelete: SetNull)
 
   @@index([orderId])
+}
+
+/// One row per Razorpay refund entity — prevents double-counting across webhook events and admin actions.
+model OrderRefund {
+  id               String   @id @default(cuid())
+  orderId          String
+  razorpayRefundId String   @unique
+  amountCents      Int
+  source           String   /// admin, webhook
+  stockRestored    Boolean  @default(false)
+  createdAt        DateTime @default(now())
+  order            Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([orderId])
+}
+
+/// Database-backed outbox for async post-payment side-effects (P-03).
+/// Webhook acks fast after durable payment receipt; cron polls this table for PDF/email/customer work.
+model OrderTask {
+  id        String   @id @default(cuid())
+  orderId   String
+  type      String   /// post_payment, send_email, generate_invoice, etc.
+  status    String   @default("pending") /// pending, processing, completed, failed, dead_letter
+  attempts  Int      @default(0)
+  lastError String   @default("")
+  payload   Json?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  order     Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([status, createdAt])
+  @@index([orderId])
+  @@unique([orderId, type])
 }
 
 enum InventoryChangeType {
@@ -713,38 +750,4 @@ model CustomerAddress {
   updatedAt  DateTime @updatedAt
 
   @@index([customerId])
-}
-
-/// Unlisted computational-biology short-course enrollments (/certificate). Not linked from main nav.
-model CertificateEnrollment {
-  id                 String    @id @default(cuid())
-  enrollmentNumber   String    @unique
-  accessToken        String    @unique
-  invoiceNumber      String    @unique
-  status             String    @default("pending")
-  studentName        String
-  studentEmail       String
-  studentPhone       String    @default("")
-  institution        String    @default("")
-  placeOfSupply      String    @default("Jammu and Kashmir")
-  courseIds          Json
-  courseLines        Json
-  credits            Int
-  /// Taxable value (ex-GST) in paise
-  subtotalCents      Int
-  taxCents           Int
-  totalCents         Int
-  /// Inclusive fee is GST-inclusive; breakdown stored for invoice
-  gstDetails         Json
-  razorpayOrderId    String?
-  razorpayPaymentId  String?
-  paymentOutcome     String    @default("pending")
-  paidAt             DateTime?
-  createdAt          DateTime  @default(now())
-  updatedAt          DateTime  @updatedAt
-
-  @@index([status])
-  @@index([studentEmail])
-  @@index([razorpayOrderId])
-  @@index([createdAt])
 }

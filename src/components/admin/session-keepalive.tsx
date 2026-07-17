@@ -8,7 +8,7 @@ import { useEffect } from "react";
  */
 export function AdminSessionKeepalive() {
   useEffect(() => {
-    const REFRESH_MS = 60 * 60 * 1000; // every hour (access token lasts 7 days; keep sliding)
+    const REFRESH_MS = 5 * 60 * 1000; // every 5 minutes (access token TTL is 15m)
 
     async function refresh() {
       try {

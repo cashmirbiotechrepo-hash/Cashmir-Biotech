@@ -7,15 +7,27 @@ export const loginSchema = z.object({
   password: z.string().min(1).max(200)
 });
 
-/** Allows only site-relative paths or http(s) URLs — blocks javascript:, data: and other dangerous schemes. */
+/** Allows only site-relative paths or http(s) URLs — blocks javascript:, data:, and protocol-relative //. */
 const safeUrl = z
   .string()
   .trim()
   .min(1)
   .max(2000)
-  .refine((v) => v.startsWith("/") || v.startsWith("http://") || v.startsWith("https://"), {
-    message: "Must be a site-relative path or an http(s) URL"
-  });
+  .refine(
+    (v) => {
+      if (v.startsWith("//")) return false;
+      if (v.startsWith("/")) {
+        return /^\/[A-Za-z0-9._~/-]*$/.test(v) && !v.includes("//");
+      }
+      try {
+        const u = new URL(v);
+        return u.protocol === "http:" || u.protocol === "https:";
+      } catch {
+        return false;
+      }
+    },
+    { message: "Must be a site-relative path or an http(s) URL" }
+  );
 
 export const homepageSettingsSchema = z.object({
   heroTitle: nonEmpty.max(500),

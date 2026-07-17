@@ -1,0 +1,2 @@
+-- CertificateEnrollment table retained for historical audit/tax records.
+-- Model removed from Prisma schema only; no DDL changes.

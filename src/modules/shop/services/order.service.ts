@@ -335,6 +335,11 @@ function orderLines(items: { productId: string | null; quantity: number; product
 /**
  * Called after payment is verified (Razorpay webhook / return) or when dev checkout skips payment.
  * Safe to call multiple times (idempotent). Concurrent verify+webhook is single-flight via atomic claim.
+ *
+ * P-02 FIX: Two-phase approach.
+ *   Phase A (synchronous, fast): Atomic claim → stock deduct → coupon burn → status=paid
+ *   Phase B (async via outbox): Customer attach, invoice PDF, confirmation email
+ * Webhook can ack 200 as soon as Phase A completes (~100–500ms).
  */
 export async function markOrderPaid(input: {
   orderId: string;
@@ -342,6 +347,8 @@ export async function markOrderPaid(input: {
   source: string;
 }): Promise<{ ok: boolean; confirmationToken?: string; alreadyPaid?: boolean }> {
   const paymentId = (input.razorpayPaymentId ?? "").trim();
+
+  // ── Phase A: Durable payment receipt ─────────────────────────────────────
 
   // Atomic claim: only one concurrent caller transitions pending/payment_failed → paid.
   const claimed = await db.$queryRaw<Array<{ id: string; confirmationToken: string }>>`
@@ -366,7 +373,13 @@ export async function markOrderPaid(input: {
   if (claimed.length === 0) {
     const existing = await db.order.findUnique({
       where: { id: input.orderId },
-      select: { status: true, confirmationToken: true, razorpayPaymentId: true }
+      select: {
+        status: true,
+        confirmationToken: true,
+        razorpayPaymentId: true,
+        stockDeducted: true,
+        stockReserved: true
+      }
     });
     if (
       existing &&
@@ -383,6 +396,43 @@ export async function markOrderPaid(input: {
           })
           .catch(() => undefined);
       }
+
+      // Re-drive inventory if a prior attempt left paid-without-deduct.
+      if (!existing.stockDeducted && existing.status === "paid") {
+        const order = await db.order.findUnique({
+          where: { id: input.orderId },
+          include: { items: true }
+        });
+        if (!order) return { ok: false };
+        const lines = orderLines(order.items);
+        try {
+          if (!order.stockReserved) {
+            const res = await reserveStockForOrder({ orderId: order.id, lines });
+            if (!res.ok) {
+              logger.error({ orderId: order.id, err: res.error }, "redrive stock reservation failed");
+              return { ok: false, confirmationToken: order.confirmationToken };
+            }
+            await db.order.update({ where: { id: order.id }, data: { stockReserved: true } });
+          }
+          await deductStockForOrder({
+            orderId: order.id,
+            lines,
+            releaseReserved: true,
+            createdBy: `payment:${input.source}:redrive`
+          });
+          await db.order.update({
+            where: { id: order.id },
+            data: { stockDeducted: true, stockReserved: false }
+          });
+        } catch (err) {
+          logger.error({ orderId: input.orderId, err }, "redrive stock deduct failed");
+          return { ok: false, confirmationToken: existing.confirmationToken };
+        }
+      }
+
+      const { enqueuePostPaymentTask } = await import("@/modules/shop/services/outbox.service");
+      await enqueuePostPaymentTask(input.orderId);
+
       return { ok: true, confirmationToken: existing.confirmationToken, alreadyPaid: true };
     }
     logger.error(
@@ -444,156 +494,12 @@ export async function markOrderPaid(input: {
     }
   }
 
-  // Customer Portal: create/update Customer and attach this order.
-  if (order.customerEmail) {
-    try {
-      const {
-        ensureCustomerFromCheckout,
-        attachOrderToCustomer,
-        linkGuestOrdersToCustomer
-      } = await import("@/lib/customer/auth");
-      const customerId = await ensureCustomerFromCheckout({
-        email: order.customerEmail,
-        name: order.customerName,
-        phone: order.customerPhone
-      });
-      if (customerId) {
-        await attachOrderToCustomer(order.id, customerId);
-        const verified = await db.customer.findUnique({
-          where: { id: customerId },
-          select: { emailVerifiedAt: true }
-        });
-        if (verified?.emailVerifiedAt) {
-          await linkGuestOrdersToCustomer(customerId, order.customerEmail);
-        }
-      }
-    } catch (err) {
-      logger.error({ err, orderId: order.id, event: "customer_attach_failed" }, "failed to attach order to customer");
-    }
-  }
+  // ── Phase B: Enqueue async side-effects (P-03) ───────────────────────────
+  // Customer attach, invoice PDF, confirmation email are deferred to the outbox.
+  // This keeps the webhook/verify response fast (~100–500ms).
 
-  const { runPaidOrderAutomation, ensureInvoiceForOrder, recordOrderEvent } = await import(
-    "@/modules/shop/services/order-ops.service"
-  );
-
-  await recordOrderEvent({
-    orderId: order.id,
-    type: "payment_confirmed",
-    title: "Payment confirmed",
-    detail: paymentId ? `Razorpay ${paymentId}` : `via ${input.source}`
-  });
-
-  await runPaidOrderAutomation(order.id, input.source).catch((err) => {
-    logger.error({ err, orderId: order.id }, "paid order automation failed");
-  });
-
-  // Ensure invoice exists even if automation partially failed.
-  const inv = await ensureInvoiceForOrder(order.id).catch(() => null);
-  if (inv?.invoiceId) {
-    const site = process.env.NEXT_PUBLIC_SITE_URL ?? "";
-    const tokenUrl = `${site}/api/order/${order.orderNumber}/invoice.pdf?t=${order.confirmationToken}`;
-    const invoice = await db.invoice.findUnique({ where: { id: inv.invoiceId } });
-    if (invoice) {
-      const gst = (invoice.gstDetails ?? {}) as {
-        gstin?: string;
-        cgstCents?: number;
-        sgstCents?: number;
-        placeOfSupply?: string;
-        lineItems?: Array<{ description: string; qty: number; amountCents: number }>;
-      };
-      const { persistInvoicePdfFile } = await import("@/modules/shop/services/invoice-persist.service");
-      const persisted = await persistInvoicePdfFile(invoice.id, invoice.invoiceNumber, {
-        invoiceNumber: invoice.invoiceNumber,
-        issuedAt: invoice.issuedAt,
-        orderNumber: order.orderNumber,
-        customerName: order.customerName,
-        customerEmail: order.customerEmail,
-        customerPhone: order.customerPhone,
-        shippingAddress: (order.shippingAddress ?? {}) as {
-          fullName?: string;
-          phone?: string;
-          line1?: string;
-          line2?: string;
-          city?: string;
-          state?: string;
-          postalCode?: string;
-        },
-        lines:
-          gst.lineItems?.length
-            ? gst.lineItems
-            : (
-                await db.orderItem.findMany({ where: { orderId: order.id } })
-              ).map((item) => ({
-                description: item.productName,
-                qty: item.quantity,
-                amountCents: item.quantity * item.unitPriceCents,
-                unitPriceCents: item.unitPriceCents,
-                lot: item.lotCodes || undefined
-              })),
-        subtotalCents: invoice.subtotalCents,
-        taxCents: invoice.taxCents,
-        totalCents: invoice.totalCents,
-        shippingCents: order.shippingCents,
-        discountCents: order.discountCents ?? 0,
-        gstin: gst.gstin,
-        cgstCents: gst.cgstCents,
-        sgstCents: gst.sgstCents,
-        placeOfSupply: gst.placeOfSupply,
-        paymentStatus: "paid",
-        paymentMethod: order.razorpayPaymentId?.startsWith("test_skip_") ? "Test checkout" : "Razorpay",
-        razorpayPaymentId: order.razorpayPaymentId || null,
-        razorpayOrderId: order.razorpayOrderId,
-        paidAt: new Date(),
-        confirmationToken: order.confirmationToken
-      });
-      if (!persisted) {
-        await db.invoice.update({ where: { id: inv.invoiceId }, data: { pdfUrl: tokenUrl } }).catch(() => undefined);
-      }
-    }
-  }
-
-  if (order.customerEmail) {
-    try {
-      const full = await db.order.findUnique({
-        where: { id: order.id },
-        include: {
-          items: { include: { product: { select: { imageUrl: true, sizeLabel: true } } } }
-        }
-      });
-      if (full) {
-        const { buildOrderConfirmedMail } = await import("@/lib/email/transactional");
-        const { sendTransactionalMail } = await import("@/lib/admin/mail");
-        const addr = (full.shippingAddress ?? null) as {
-          fullName?: string;
-          line1?: string;
-          line2?: string;
-          city?: string;
-          state?: string;
-          postalCode?: string;
-          phone?: string;
-        } | null;
-        const mail = buildOrderConfirmedMail({
-          customerName: full.customerName,
-          orderNumber: full.orderNumber,
-          confirmationToken: full.confirmationToken,
-          items: full.items.map((i) => ({
-            productName: i.productName,
-            quantity: i.quantity,
-            unitPriceCents: i.unitPriceCents,
-            imageUrl: i.product?.imageUrl,
-            sizeLabel: i.product?.sizeLabel
-          })),
-          shippingAddress: addr,
-          shippingCents: full.shippingCents,
-          discountCents: full.discountCents ?? 0,
-          totalCents: full.totalCents
-        });
-        await sendTransactionalMail({ to: order.customerEmail, mail });
-      }
-    } catch (err) {
-      logger.error({ err, orderId: order.id, event: "order_confirmed_email_failed" }, "confirmation email failed");
-    }
-  }
+  const { enqueuePostPaymentTask } = await import("@/modules/shop/services/outbox.service");
+  await enqueuePostPaymentTask(order.id);
 
   return { ok: true, confirmationToken: order.confirmationToken };
 }

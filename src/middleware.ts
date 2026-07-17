@@ -11,8 +11,7 @@ import {
   getOrderLookupRatelimit,
   getPaymentVerifyRatelimit,
   getPortalOtpRatelimit,
-  getToolsRatelimit,
-  getWebhookRatelimit
+  getToolsRatelimit
 } from "@/lib/rate-limit-edge";
 
 const HONEYPOT = ["/wp-admin", "/.env", "/.git", "/phpmyadmin", "/wp-login.php"];
@@ -151,23 +150,20 @@ export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const fullUrl = request.nextUrl.href;
 
+  // W-01 FIX: Exempt webhook endpoints from origin checks and rate limiting.
+  // Webhooks are authenticated by HMAC signature, not by browser origin or IP.
+  // Applying IP rate limits to webhooks can cause Razorpay to disable the endpoint
+  // during retry storms after outages.
+  if (pathname.startsWith("/api/webhooks/")) {
+    return nextWithNonce(request, nonce);
+  }
+
   if (isSuspiciousUrl(fullUrl)) {
     return deny(request, nonce, 403);
   }
 
   if (request.method === "OPTIONS" && pathname.startsWith("/api/tools/")) {
     return deny(request, nonce, 200);
-  }
-
-  if (pathname.startsWith("/api/webhooks/")) {
-    const rl = getWebhookRatelimit();
-    if (rl) {
-      const ip = clientIpFromRequest(request);
-      const { success } = await rl.limit(ip);
-      if (!success) {
-        return deny(request, nonce, 429, { ok: false, error: "Too many webhook requests." });
-      }
-    }
   }
 
   if (pathname === "/api/newsletter" && request.method === "POST") {
@@ -288,7 +284,6 @@ export async function middleware(request: NextRequest) {
       pathname === "/api/payment/verify" ||
       pathname === "/api/newsletter" ||
       pathname === "/api/contact" ||
-      pathname.startsWith("/api/certificate/") ||
       pathname.startsWith("/api/order/") ||
       pathname.startsWith("/api/portal/") ||
       pathname.startsWith("/api/tools/")) &&

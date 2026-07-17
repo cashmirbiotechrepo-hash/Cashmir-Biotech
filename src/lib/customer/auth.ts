@@ -16,8 +16,8 @@ import { logger } from "@/lib/logger";
 
 const SESSION_DAYS = 90;
 /** Long-lived access so customers stay signed in across visits; revoke still clears DB session. */
-const ACCESS_TOKEN_EXPIRY = "7d";
-const ACCESS_COOKIE_MAX_AGE = 7 * 24 * 60 * 60; // 7 days in seconds
+const ACCESS_TOKEN_EXPIRY = "15m";
+const ACCESS_COOKIE_MAX_AGE = 15 * 60; // 15 minutes in seconds
 
 const REFRESH_COOKIE_MAX_AGE = 90 * 24 * 60 * 60; // 90 days in seconds
 const OTP_EXPIRY_MS = 10 * 60 * 1000;
@@ -388,6 +388,12 @@ export async function getCurrentCustomer(): Promise<CustomerSessionPayload | nul
     const session = await db.customerSession.findUnique({ where: { id: payload.sessionId } });
     if (!session || session.isRevoked || session.expiresAt < new Date()) return null;
 
+    const customer = await db.customer.findUnique({
+      where: { id: payload.id },
+      select: { active: true, email: true, name: true, emailVerifiedAt: true }
+    });
+    if (!customer?.active) return null;
+
     await db.customerSession.update({
       where: { id: session.id },
       data: { lastUsedAt: new Date() }
@@ -395,10 +401,10 @@ export async function getCurrentCustomer(): Promise<CustomerSessionPayload | nul
 
     return {
       id: payload.id,
-      email: payload.email,
-      name: typeof payload.name === "string" ? payload.name : null,
+      email: customer.email,
+      name: customer.name,
       sessionId: payload.sessionId,
-      emailVerified: Boolean(payload.emailVerified)
+      emailVerified: Boolean(customer.emailVerifiedAt)
     };
   } catch {
     return null;

@@ -73,6 +73,42 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: false, error: "Please check your cart and address details." }, { status: 422 });
   }
 
+  // P-08 / M-02 FIX: Checkout idempotency.
+  // If client sends Idempotency-Key header, check for existing pending order with same key.
+  // Prevents double-click creating two pending orders + two Razorpay orders.
+  const idempotencyKey = request.headers.get("idempotency-key")?.trim();
+  if (idempotencyKey) {
+    const existingOrder = await db.order.findFirst({
+      where: {
+        adminNotes: { contains: `[idem:${idempotencyKey}]` },
+        status: { in: ["pending", "paid"] }
+      },
+      select: {
+        id: true,
+        orderNumber: true,
+        confirmationToken: true,
+        razorpayOrderId: true,
+        totalCents: true,
+        status: true
+      }
+    });
+    if (existingOrder?.razorpayOrderId) {
+      const priced = await priceCart(parsed.data.items, parsed.data.couponCode);
+      return NextResponse.json({
+        ok: true,
+        orderId: existingOrder.id,
+        orderNumber: existingOrder.orderNumber,
+        confirmationToken: existingOrder.confirmationToken,
+        razorpayOrderId: existingOrder.razorpayOrderId,
+        amountCents: existingOrder.totalCents,
+        currency: "INR",
+        keyId: razorpayPublicKey(),
+        idempotent: true,
+        cart: priced.ok ? priced.cart : undefined
+      });
+    }
+  }
+
   const priced = await priceCart(parsed.data.items, parsed.data.couponCode);
   if (!priced.ok) {
     return NextResponse.json({ ok: false, error: priced.error }, { status: 409 });
@@ -81,6 +117,18 @@ export async function POST(request: Request) {
   const created = await createPendingOrder({ cart: priced.cart, address: parsed.data.address });
   if (!created.ok) {
     return NextResponse.json({ ok: false, error: created.error }, { status: 409 });
+  }
+
+  // Stamp idempotency key on the order for future lookups.
+  if (idempotencyKey) {
+    await db.order
+      .update({
+        where: { id: created.orderId },
+        data: {
+          adminNotes: { set: `[idem:${idempotencyKey}]` }
+        }
+      })
+      .catch(() => undefined);
   }
 
   if (skipPayment) {

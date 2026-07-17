@@ -2,6 +2,7 @@ import "server-only";
 import type { Order, OrderEvent, OrderItem, Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
 import { logger } from "@/lib/logger";
+import { splitGstCents } from "@/lib/gst";
 import { nextInvoiceNumber } from "@/modules/admin/services/phase2.service";
 
 export type OrderEventInput = {
@@ -62,8 +63,9 @@ export async function ensureInvoiceForOrder(orderId: string): Promise<{
   const subtotal = order.subtotalCents || order.totalCents;
   const tax = order.taxCents || 0;
   const total = order.totalCents || subtotal + tax;
-  const half = Math.round(tax / 2);
   const addr = (order.shippingAddress ?? {}) as { state?: string };
+  const placeOfSupply = addr.state ?? "Jammu and Kashmir";
+  const gstSplit = splitGstCents(tax, placeOfSupply);
 
   try {
     const invoice = await db.invoice.create({
@@ -75,11 +77,11 @@ export async function ensureInvoiceForOrder(orderId: string): Promise<{
         totalCents: total,
         gstDetails: {
           gstin: process.env.COMPANY_GSTIN ?? "",
-          placeOfSupply: addr.state ?? "Jammu and Kashmir",
-          taxType: "intra",
-          cgstCents: half,
-          sgstCents: half,
-          igstCents: 0,
+          placeOfSupply,
+          taxType: gstSplit.taxType,
+          cgstCents: gstSplit.cgstCents,
+          sgstCents: gstSplit.sgstCents,
+          igstCents: gstSplit.igstCents,
           hsn: "21069099",
           lineItems: order.items.map((item) => ({
             description: item.productName,

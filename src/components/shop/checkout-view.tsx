@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -89,17 +89,43 @@ declare global {
   }
 }
 
+let razorpayLoadPromise: Promise<boolean> | null = null;
+
 function loadRazorpay(): Promise<boolean> {
-  return new Promise((resolve) => {
-    if (typeof window === "undefined") return resolve(false);
-    if (window.Razorpay) return resolve(true);
+  if (typeof window === "undefined") return Promise.resolve(false);
+  if (window.Razorpay) return Promise.resolve(true);
+  if (document.querySelector(`script[src="${RZP_SCRIPT}"]`)) {
+    razorpayLoadPromise ??= new Promise((resolve) => {
+      const check = () => (window.Razorpay ? resolve(true) : window.setTimeout(check, 50));
+      check();
+    });
+    return razorpayLoadPromise;
+  }
+
+  razorpayLoadPromise = new Promise((resolve) => {
     const script = document.createElement("script");
     script.src = RZP_SCRIPT;
     script.onload = () => resolve(true);
     script.onerror = () => resolve(false);
     document.body.appendChild(script);
   });
+  return razorpayLoadPromise;
 }
+
+type ServerCartQuote = {
+  subtotalCents: number;
+  taxCents: number;
+  shippingCents: number;
+  totalCents: number;
+  discountCents?: number;
+  lines: Array<{
+    productId: string;
+    productName: string;
+    quantity: number;
+    unitPriceCents: number;
+    lineTotalCents: number;
+  }>;
+};
 
 type FormState = {
   fullName: string;
@@ -212,8 +238,14 @@ export function CheckoutView({
   flatShippingInr?: number;
   freeShippingThresholdInr?: number;
 }) {
-  const { items, ready, subtotalInr, clear } = useCart();
+  const { items, ready, subtotalInr, clear, priceWarning } = useCart();
   const router = useRouter();
+  const mountedRef = useRef(true);
+  const submitLockRef = useRef(false);
+  const idempotencyKeyRef = useRef(
+    typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : String(Date.now())
+  );
+  const [quote, setQuote] = useState<ServerCartQuote | null>(null);
   const [form, setForm] = useState<FormState>(() => ({
     ...EMPTY,
     email: prefillEmail
@@ -228,13 +260,51 @@ export function CheckoutView({
   const shipsBy = useMemo(() => shipsByLabel(), []);
 
   useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
+
+  useEffect(() => {
     if (ready && items.length === 0 && !submitting) {
       router.replace("/cart");
     }
   }, [ready, items.length, submitting, router]);
 
-  const shipping = subtotalInr >= freeShippingThresholdInr ? 0 : flatShippingInr;
-  const total = subtotalInr + shipping;
+  useEffect(() => {
+    if (!ready || items.length === 0) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch("/api/cart/price", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            items: items.map((i) => ({ productId: i.productId, quantity: i.quantity }))
+          })
+        });
+        const data = await res.json();
+        if (!cancelled && res.ok && data.ok && data.cart) {
+          setQuote(data.cart as ServerCartQuote);
+        }
+      } catch {
+        // checkout POST will re-price before payment
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [ready, items]);
+
+  const shipping = quote
+    ? quote.shippingCents / 100
+    : subtotalInr >= freeShippingThresholdInr
+      ? 0
+      : flatShippingInr;
+  const subtotalDisplay = quote ? quote.subtotalCents / 100 : subtotalInr;
+  const discountDisplay = quote?.discountCents ? quote.discountCents / 100 : 0;
+  const total = quote ? quote.totalCents / 100 : subtotalInr + shipping;
 
   const contactDone = validateKeys(form, ["email", "phone"]);
   const addressDone = validateKeys(form, [
@@ -340,14 +410,18 @@ export function CheckoutView({
       focusFirstError(errs);
       return;
     }
-    if (submitting) return;
+    if (submitting || submitLockRef.current) return;
+    submitLockRef.current = true;
     setSubmitting(true);
     setError(null);
 
     try {
       const res = await fetch("/api/checkout", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          "Idempotency-Key": idempotencyKeyRef.current
+        },
         body: JSON.stringify({
           items: items.map((i) => ({ productId: i.productId, quantity: i.quantity })),
           address: form
@@ -355,9 +429,16 @@ export function CheckoutView({
       });
       const data = await res.json();
       if (!res.ok || !data.ok) {
-        setError(data.error ?? "Checkout failed. Please try again.");
-        setSubmitting(false);
+        if (mountedRef.current) {
+          setError(data.error ?? "Checkout failed. Please try again.");
+          setSubmitting(false);
+        }
+        submitLockRef.current = false;
         return;
+      }
+
+      if (data.cart) {
+        setQuote(data.cart as ServerCartQuote);
       }
 
       if (data.skipPayment && data.orderNumber) {
@@ -369,8 +450,11 @@ export function CheckoutView({
 
       const loaded = await loadRazorpay();
       if (!loaded || !window.Razorpay) {
-        setError("Could not load the payment gateway. Check your connection and retry.");
-        setSubmitting(false);
+        if (mountedRef.current) {
+          setError("Could not load the payment gateway. Check your connection and retry.");
+          setSubmitting(false);
+        }
+        submitLockRef.current = false;
         return;
       }
 
@@ -399,6 +483,7 @@ export function CheckoutView({
               })
             });
             const verifyData = await verifyRes.json();
+            if (!mountedRef.current) return;
             if (verifyRes.ok && verifyData.ok) {
               clear();
               const t = verifyData.confirmationToken
@@ -410,23 +495,31 @@ export function CheckoutView({
                 "Payment could not be verified. If money was deducted, contact us with your order number."
               );
               setSubmitting(false);
+              submitLockRef.current = false;
             }
           } catch {
+            if (!mountedRef.current) return;
             setError("Something went wrong verifying your payment. Please contact us.");
             setSubmitting(false);
+            submitLockRef.current = false;
           }
         },
         modal: {
           ondismiss: () => {
+            if (!mountedRef.current) return;
             setSubmitting(false);
+            submitLockRef.current = false;
             setError("Payment was cancelled. Your formula is saved — you can try again.");
           }
         }
       });
       rzp.open();
     } catch {
-      setError("Network error. Please try again.");
-      setSubmitting(false);
+      if (mountedRef.current) {
+        setError("Network error. Please try again.");
+        setSubmitting(false);
+      }
+      submitLockRef.current = false;
     }
   }
 
@@ -809,9 +902,15 @@ export function CheckoutView({
               <div className="flex justify-between">
                 <dt className="text-ink-mute">Subtotal</dt>
                 <dd className="tabular-nums">
-                  <Money value={subtotalInr} />
+                  <Money value={subtotalDisplay} />
                 </dd>
               </div>
+              {discountDisplay > 0 ? (
+                <div className="flex justify-between text-gold">
+                  <dt>Discount</dt>
+                  <dd className="tabular-nums">−<Money value={discountDisplay} /></dd>
+                </div>
+              ) : null}
               <div className="flex justify-between">
                 <dt className="text-ink-mute">Shipping</dt>
                 <dd className="tabular-nums">

@@ -59,7 +59,11 @@ export function PortalLoginForm({ initialEmail = "" }: { initialEmail?: string }
         setError(data.error ?? "Invalid code.");
         return;
       }
-      router.push(next.startsWith("/") ? next : "/portal");
+      const dest =
+        next.startsWith("/portal") && !next.startsWith("//") && !next.includes("\\")
+          ? next
+          : "/portal";
+      router.push(dest);
       router.refresh();
     });
   }
