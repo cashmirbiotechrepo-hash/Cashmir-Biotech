@@ -220,9 +220,9 @@ export async function middleware(request: NextRequest) {
     if (pathname === "/api/portal/auth/otp/request") {
       const globalRl = getGlobalOtpRatelimit();
       if (globalRl) {
-        const { success } = await globalRl.limit("global");
+        const { success } = await globalRl.limit("global_otp_egress");
         if (!success) {
-          return deny(request, nonce, 429, { ok: false, error: "System busy. Too many OTP requests right now. Please wait a minute." });
+          return deny(request, nonce, 429, { ok: false, error: "Service busy." });
         }
       }
     }

@@ -41,8 +41,28 @@ function resolveEventId(
   return null;
 }
 
+const MAX_WEBHOOK_BYTES = 8192;
+
 export async function POST(request: Request) {
+  // Reject oversized bodies before HMAC work — payment webhooks are tiny (audit MED-02).
+  const contentLength = Number(request.headers.get("content-length") ?? 0);
+  if (Number.isFinite(contentLength) && contentLength > MAX_WEBHOOK_BYTES) {
+    logger.warn(
+      { event: "razorpay_webhook_too_large", contentLength },
+      "rejected razorpay webhook exceeding size limit"
+    );
+    return NextResponse.json({ ok: false, error: "payload_too_large" }, { status: 413 });
+  }
+
   const raw = await request.text();
+  if (raw.length > MAX_WEBHOOK_BYTES) {
+    logger.warn(
+      { event: "razorpay_webhook_too_large", bytes: raw.length },
+      "rejected razorpay webhook exceeding size limit"
+    );
+    return NextResponse.json({ ok: false, error: "payload_too_large" }, { status: 413 });
+  }
+
   const signature = request.headers.get("x-razorpay-signature");
 
   if (!verifyWebhookSignature(raw, signature)) {

@@ -22,13 +22,60 @@ export const CODON_TABLE: Record<string, string> = {
   GGT: "G", GGC: "G", GGA: "G", GGG: "G"
 };
 
-export function translate(seq: string, frame = 0): string {
-  const s = cleanSequence(seq).replace(/U/g, "T").slice(frame);
-  let protein = "";
-  for (let i = 0; i + 3 <= s.length; i += 3) {
-    protein += CODON_TABLE[s.slice(i, i + 3)] ?? "X";
+/** Pack ACGT base charCode into 0..3; unknown → -1. */
+function baseIndex(code: number): number {
+  // A=65, C=67, G=71, T=84 (and a/c/g/t lowercase)
+  switch (code) {
+    case 65:
+    case 97:
+      return 0;
+    case 67:
+    case 99:
+      return 1;
+    case 71:
+    case 103:
+      return 2;
+    case 84:
+    case 116:
+    case 85: // U
+    case 117:
+      return 3;
+    default:
+      return -1;
   }
-  return protein;
+}
+
+/** Packed codon → amino acid table (4^3 = 64 slots). Built once from CODON_TABLE. */
+const PACKED_CODONS: string[] = (() => {
+  const table = new Array<string>(64).fill("X");
+  const bases = ["A", "C", "G", "T"] as const;
+  for (let i = 0; i < 4; i++) {
+    for (let j = 0; j < 4; j++) {
+      for (let k = 0; k < 4; k++) {
+        const codon = `${bases[i]}${bases[j]}${bases[k]}`;
+        table[(i << 4) | (j << 2) | k] = CODON_TABLE[codon] ?? "X";
+      }
+    }
+  }
+  return table;
+})();
+
+function aminoAcidAt(seq: string, i: number): string {
+  const a = baseIndex(seq.charCodeAt(i));
+  const b = baseIndex(seq.charCodeAt(i + 1));
+  const c = baseIndex(seq.charCodeAt(i + 2));
+  if (a < 0 || b < 0 || c < 0) return "X";
+  return PACKED_CODONS[(a << 4) | (b << 2) | c]!;
+}
+
+export function translate(seq: string, frame = 0): string {
+  const s = cleanSequence(seq).replace(/U/g, "T");
+  const start = frame;
+  const parts: string[] = [];
+  for (let i = start; i + 3 <= s.length; i += 3) {
+    parts.push(aminoAcidAt(s, i));
+  }
+  return parts.join("");
 }
 
 export type FrameTranslation = { frame: number; strand: "+" | "-"; protein: string };
@@ -62,11 +109,11 @@ export function findOrfs(seq: string, minAminoAcids = 30): Orf[] {
     for (let frame = 0; frame < 3; frame++) {
       let i = frame;
       while (i + 3 <= s.length) {
-        if (s.slice(i, i + 3) === "ATG") {
+        if (s.charCodeAt(i) === 65 && s.charCodeAt(i + 1) === 84 && s.charCodeAt(i + 2) === 71) {
           let j = i;
           let protein = "";
           while (j + 3 <= s.length) {
-            const aa = CODON_TABLE[s.slice(j, j + 3)] ?? "X";
+            const aa = aminoAcidAt(s, j);
             if (aa === "*") {
               if (protein.length >= minAminoAcids) {
                 orfs.push({

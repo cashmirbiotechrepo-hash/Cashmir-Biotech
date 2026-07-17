@@ -33,7 +33,9 @@ export type RotateRefreshResult =
   | { status: "rotated"; accessToken: string; refreshToken: string }
   /** Another concurrent request already rotated this token — session is still healthy. */
   | { status: "raced" }
-  | { status: "invalid" };
+  | { status: "invalid" }
+  /** Transient infra failure — caller must NOT clear cookies / force logout. */
+  | { status: "unavailable" };
 
 export class AdminTokenService {
   static async createAccessToken(payload: Omit<AdminTokenPayload, "type">): Promise<string> {
@@ -86,10 +88,11 @@ export class AdminTokenService {
   }
 
   static async rotateRefreshToken(oldToken: string): Promise<RotateRefreshResult> {
-    try {
-      const payload = await this.verifyToken(oldToken, "refresh");
-      if (!payload?.sessionId) return { status: "invalid" };
+    // JWT verification errors are invalid tokens; DB failures must not force logout (audit MED-01).
+    const payload = await this.verifyToken(oldToken, "refresh");
+    if (!payload?.sessionId) return { status: "invalid" };
 
+    try {
       const oldTokenHash = createHash("sha256").update(oldToken).digest("hex");
       const stored = await db.adminRefreshToken.findUnique({ where: { tokenHash: oldTokenHash } });
       if (!stored) return { status: "invalid" };
@@ -116,15 +119,13 @@ export class AdminTokenService {
       const newExpiresAt = slidingExpiry > maxAbsoluteExpiry ? maxAbsoluteExpiry : slidingExpiry;
       if (newExpiresAt <= new Date()) return { status: "invalid" };
 
-      await db.adminSession
-        .update({
-          where: { id: session.id },
-          data: {
-            lastUsedAt: new Date(),
-            expiresAt: newExpiresAt
-          }
-        })
-        .catch(() => undefined);
+      await db.adminSession.update({
+        where: { id: session.id },
+        data: {
+          lastUsedAt: new Date(),
+          expiresAt: newExpiresAt
+        }
+      });
 
       const user = await db.adminUser.findFirst({
         where: { id: session.userId, active: true }
@@ -142,8 +143,8 @@ export class AdminTokenService {
       const { token: refreshToken } = await this.createRefreshToken(session.id);
       return { status: "rotated", accessToken, refreshToken };
     } catch (err) {
-      logger.error({ err, event: "refresh_rotate_failed" }, "refresh rotation failed");
-      return { status: "invalid" };
+      logger.error({ err, event: "refresh_rotate_unavailable" }, "refresh rotation unavailable");
+      return { status: "unavailable" };
     }
   }
 

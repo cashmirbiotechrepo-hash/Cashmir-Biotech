@@ -1,4 +1,5 @@
 import "server-only";
+import { gzipSync } from "zlib";
 
 /**
  * Escape a CSV cell and neutralize spreadsheet formula injection.
@@ -26,13 +27,10 @@ export function toCsv(header: string[], rows: unknown[][]): string {
   return lines.join("\n");
 }
 
-import { gzipSync } from "zlib";
-
-/** Wrap CSV text in a downloadable Response. */
+/** Wrap a fully-buffered CSV string in a gzipped downloadable Response. */
 export function csvResponse(csv: string, filename: string): Response {
   const stamped = filename.replace("{date}", new Date().toISOString().slice(0, 10));
-  // PROJECT OMEGA / TOP-100 #20 FIX: Enforce explicit compression headers on large CSV exports
-  const compressed = gzipSync(Buffer.from(csv, 'utf-8'));
+  const compressed = gzipSync(Buffer.from(csv, "utf-8"));
   return new Response(compressed, {
     headers: {
       "Content-Type": "text/csv; charset=utf-8",
@@ -41,4 +39,55 @@ export function csvResponse(csv: string, filename: string): Response {
       "Cache-Control": "no-store"
     }
   });
+}
+
+/**
+ * Stream a CSV download without loading the full dataset into memory.
+ * Prefer this for admin exports that can grow unbounded over time.
+ */
+export function streamCsvResponse(
+  filename: string,
+  header: string[],
+  rows: AsyncIterable<unknown[]>
+): Response {
+  const stamped = filename.replace("{date}", new Date().toISOString().slice(0, 10));
+  const encoder = new TextEncoder();
+
+  const stream = new ReadableStream<Uint8Array>({
+    async start(controller) {
+      try {
+        controller.enqueue(encoder.encode(`${header.map(csvCell).join(",")}\n`));
+        for await (const row of rows) {
+          controller.enqueue(encoder.encode(`${row.map(csvCell).join(",")}\n`));
+        }
+        controller.close();
+      } catch (err) {
+        controller.error(err);
+      }
+    }
+  });
+
+  return new Response(stream, {
+    headers: {
+      "Content-Type": "text/csv; charset=utf-8",
+      "Content-Disposition": `attachment; filename="${stamped}"`,
+      "Cache-Control": "no-store",
+      "X-Content-Type-Options": "nosniff"
+    }
+  });
+}
+
+/** Cursor-paginated Prisma findMany helper used by streaming CSV exporters. */
+export async function* cursorPages<T extends { id: string }>(
+  fetchPage: (args: { cursor?: string; take: number }) => Promise<T[]>,
+  pageSize = 1000
+): AsyncGenerator<T> {
+  let cursor: string | undefined;
+  for (;;) {
+    const page = await fetchPage({ cursor, take: pageSize });
+    if (page.length === 0) return;
+    for (const row of page) yield row;
+    if (page.length < pageSize) return;
+    cursor = page[page.length - 1]!.id;
+  }
 }

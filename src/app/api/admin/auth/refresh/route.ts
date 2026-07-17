@@ -19,6 +19,14 @@ export async function POST() {
     return NextResponse.json({ data: { ok: true } }, { headers: { "Cache-Control": "no-store" } });
   }
 
+  if (rotated.status === "unavailable") {
+    // Transient DB blip — keep cookies so keepalive can retry without forced logout.
+    return NextResponse.json(
+      { error: { code: "unavailable", message: "Temporarily unavailable." } },
+      { status: 503, headers: { "Cache-Control": "no-store" } }
+    );
+  }
+
   if (rotated.status === "invalid") {
     cookieStore.delete(ADMIN_REFRESH_COOKIE);
     return NextResponse.json({ error: { code: "invalid_refresh", message: "Session expired." } }, { status: 401 });

@@ -21,6 +21,10 @@ export async function POST(request: Request) {
   if (rotated.status === "raced") {
     return NextResponse.json({ ok: true });
   }
+  if (rotated.status === "unavailable") {
+    // Transient DB blip — keep cookies so the client can retry without a forced logout.
+    return NextResponse.json({ ok: false, error: "Temporarily unavailable" }, { status: 503 });
+  }
   if (rotated.status !== "rotated") {
     await clearCustomerSessionCookies().catch(() => undefined);
     return NextResponse.json({ ok: false, error: "Session expired" }, { status: 401 });

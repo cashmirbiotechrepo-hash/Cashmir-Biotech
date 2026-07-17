@@ -1,23 +1,30 @@
 import { requireAdminRole } from "@/lib/admin/api";
-import { csvResponse, toCsv } from "@/lib/admin/csv";
+import { cursorPages, streamCsvResponse } from "@/lib/admin/csv";
 import { db } from "@/lib/db";
 
 export async function GET() {
   const { error } = await requireAdminRole(["owner", "admin"]);
   if (error) return error;
 
-  const subscribers = await db.subscriber.findMany({ orderBy: { createdAt: "desc" } });
+  const header = ["email", "source", "status", "joinedAt", "unsubscribedAt"];
 
-  const csv = toCsv(
-    ["email", "source", "status", "joinedAt", "unsubscribedAt"],
-    subscribers.map((s) => [
-      s.email,
-      s.source,
-      s.status,
-      s.createdAt.toISOString(),
-      s.unsubscribedAt?.toISOString() ?? ""
-    ])
-  );
+  async function* rows() {
+    for await (const s of cursorPages((args) =>
+      db.subscriber.findMany({
+        ...(args.cursor ? { cursor: { id: args.cursor }, skip: 1 } : {}),
+        take: args.take,
+        orderBy: { id: "desc" }
+      })
+    )) {
+      yield [
+        s.email,
+        s.source,
+        s.status,
+        s.createdAt.toISOString(),
+        s.unsubscribedAt?.toISOString() ?? ""
+      ];
+    }
+  }
 
-  return csvResponse(csv, "subscribers-{date}.csv");
+  return streamCsvResponse("subscribers-{date}.csv", header, rows());
 }

@@ -371,20 +371,33 @@ export async function clearCustomerSessionCookies() {
 export type CustomerRotateRefreshResult =
   | { status: "rotated"; accessToken: string; refreshToken: string }
   | { status: "raced" }
-  | { status: "invalid" };
+  | { status: "invalid" }
+  /** Transient infra failure — caller must NOT clear cookies / force logout. */
+  | { status: "unavailable" };
 
-/** Rotates customer refresh token — returns discriminated status (rotated, raced, or invalid). */
+/** Rotates customer refresh token — returns discriminated status (rotated, raced, invalid, or unavailable). */
 export async function rotateCustomerRefresh(encryptedRefreshCookie: string): Promise<CustomerRotateRefreshResult> {
   let jwt: string;
-  try { jwt = await decryptToken(encryptedRefreshCookie); } catch { return { status: "invalid" }; }
-
   try {
-    const { payload } = await jwtVerify(jwt, jwtSecret(), {
+    jwt = await decryptToken(encryptedRefreshCookie);
+  } catch {
+    return { status: "invalid" };
+  }
+
+  let payload: Awaited<ReturnType<typeof jwtVerify>>["payload"];
+  try {
+    ({ payload } = await jwtVerify(jwt, jwtSecret(), {
       issuer: JWT_ISSUER,
       audience: CUSTOMER_JWT_AUDIENCE
-    });
-    if (payload.type !== "customer_refresh" || typeof payload.sessionId !== "string") return { status: "invalid" };
+    }));
+  } catch {
+    return { status: "invalid" };
+  }
+  if (payload.type !== "customer_refresh" || typeof payload.sessionId !== "string") {
+    return { status: "invalid" };
+  }
 
+  try {
     // CRIT-02 FIX: Lookup refresh token hash in db for reuse detection and single-use rotation.
     const tokenHash = createHash("sha256").update(jwt).digest("hex");
     const stored = await db.customerRefreshToken.findUnique({ where: { tokenHash } });
@@ -432,15 +445,13 @@ export async function rotateCustomerRefresh(encryptedRefreshCookie: string): Pro
     const newExpiresAt = slidingExpiry > maxAbsoluteExpiry ? maxAbsoluteExpiry : slidingExpiry;
     if (newExpiresAt <= new Date()) return { status: "invalid" };
 
-    await db.customerSession
-      .update({
-        where: { id: session.id },
-        data: {
-          lastUsedAt: new Date(),
-          expiresAt: newExpiresAt
-        }
-      })
-      .catch(() => undefined);
+    await db.customerSession.update({
+      where: { id: session.id },
+      data: {
+        lastUsedAt: new Date(),
+        expiresAt: newExpiresAt
+      }
+    });
 
     const customer = await db.customer.findUnique({ where: { id: session.customerId } });
     if (!customer || !customer.active) return { status: "invalid" };
@@ -454,8 +465,10 @@ export async function rotateCustomerRefresh(encryptedRefreshCookie: string): Pro
     });
     const refreshToken = await mintCustomerRefreshToken(session.id);
     return { status: "rotated", accessToken, refreshToken };
-  } catch {
-    return { status: "invalid" };
+  } catch (err) {
+    // Database / infra blips must not look like an invalid session (audit MED-01).
+    logger.error({ err, event: "customer_refresh_rotate_unavailable" }, "customer refresh rotation unavailable");
+    return { status: "unavailable" };
   }
 }
 
