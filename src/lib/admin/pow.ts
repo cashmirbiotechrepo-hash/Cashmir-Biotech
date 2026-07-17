@@ -68,7 +68,7 @@ async function markChallengeUsed(challenge: string): Promise<boolean> {
       const wasSet = await redis.set(key, "1", { nx: true, ex: ttlSeconds });
       return wasSet === "OK";
     }
-  } catch (err) {
+  } catch {
     if (process.env.NODE_ENV === "production") {
       return false;
     }

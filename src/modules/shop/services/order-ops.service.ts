@@ -4,7 +4,7 @@ import { db } from "@/lib/db";
 import { logger } from "@/lib/logger";
 import { DEFAULT_HSN_CODE, DEFAULT_PLACE_OF_SUPPLY } from "@/lib/constants";
 import { splitGstCents } from "@/lib/gst";
-import { nextInvoiceNumber, nextInvoiceNumberAtomic } from "@/modules/admin/services/phase2.service";
+import { nextInvoiceNumberAtomic } from "@/modules/admin/services/phase2.service";
 
 export type OrderEventInput = {
   orderId: string;
@@ -108,14 +108,18 @@ export async function ensureInvoiceForOrder(orderId: string): Promise<{
       });
 
       return { created: true, invoiceId: invoice.id, invoiceNumber: invoice.invoiceNumber };
-    } catch (err: any) {
+    } catch (err: unknown) {
       // Check if another concurrent thread just created the invoice for this exact orderId
       const raced = await db.invoice.findUnique({ where: { orderId } });
       if (raced) {
         return { created: false, invoiceId: raced.id, invoiceNumber: raced.invoiceNumber };
       }
 
-      if (attempt === MAX_ATTEMPTS || err?.code !== "P2002") {
+      const errorCode =
+        typeof err === "object" && err !== null && "code" in err
+          ? (err as { code?: unknown }).code
+          : undefined;
+      if (attempt === MAX_ATTEMPTS || errorCode !== "P2002") {
         throw err;
       }
       logger.warn({ orderId, attempt }, "[ensureInvoiceForOrder] Sequence collision detected; retrying with fresh sequence...");

@@ -27,6 +27,8 @@ export class AdminPasswordService {
   }
 
   static needsPepperUpgrade(password: string, hashValue: string): boolean {
+    void password;
+    void hashValue;
     return false;
   }
 

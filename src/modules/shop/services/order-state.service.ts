@@ -77,7 +77,7 @@ export async function fulfillOrderAtomic(orderId: string, source: string): Promi
       });
     });
     return { ok: true, confirmationToken: order.confirmationToken };
-  } catch (err: any) {
+  } catch (err: unknown) {
     logger.error({ orderId: order.id, err }, "atomic fulfillment (stock deduct + coupon burn) failed");
     return { ok: false, confirmationToken: order.confirmationToken };
   }

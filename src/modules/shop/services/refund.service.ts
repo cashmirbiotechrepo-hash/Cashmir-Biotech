@@ -53,7 +53,6 @@ export async function applyOrderRefund(input: ApplyOrderRefundInput): Promise<Ap
   }
 
   let applied = false;
-  let duplicate = false;
   let fullyRefunded = false;
   let newRefundedCents = 0;
   let restocked = false;
@@ -153,6 +152,15 @@ export async function applyOrderRefund(input: ApplyOrderRefundInput): Promise<Ap
     );
 
     if (!outcome.ok) return outcome;
+    if ("duplicate" in outcome && outcome.duplicate) {
+      return {
+        ok: true,
+        applied: false,
+        duplicate: true,
+        fullyRefunded: outcome.fullyRefunded,
+        newRefundedCents: outcome.newRefundedCents
+      };
+    }
     fullyRefunded = outcome.fullyRefunded;
     newRefundedCents = outcome.newRefundedCents;
   } catch (err) {
@@ -193,21 +201,11 @@ export async function applyOrderRefund(input: ApplyOrderRefundInput): Promise<Ap
       newRefundedCents,
       fullyRefunded,
       source: input.source,
-      duplicate,
+      duplicate: false,
       restocked
     },
     "refund applied"
   );
-
-  if (duplicate) {
-    return {
-      ok: true,
-      applied: false,
-      duplicate: true,
-      fullyRefunded,
-      newRefundedCents
-    };
-  }
 
   return {
     ok: true,

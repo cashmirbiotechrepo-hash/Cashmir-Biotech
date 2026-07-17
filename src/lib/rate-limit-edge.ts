@@ -45,7 +45,8 @@ class InMemoryStore {
         }
       }, 0);
       if (typeof cleanupTimer === "object" && cleanupTimer && "unref" in cleanupTimer) {
-        (cleanupTimer as any).unref();
+        const timer = cleanupTimer as { unref?: () => void };
+        timer.unref?.();
       }
     }
 
