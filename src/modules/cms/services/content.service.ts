@@ -63,7 +63,7 @@ export async function upsertShippingSettings(input: {
   flatShippingInr: number;
   freeShippingThresholdInr: number;
 }) {
-  return db.siteSettings.upsert({
+  const result = await db.siteSettings.upsert({
     where: { id: 1 },
     update: {
       flatShippingInr: input.flatShippingInr,
@@ -86,6 +86,9 @@ export async function upsertShippingSettings(input: {
       freeShippingThresholdInr: input.freeShippingThresholdInr
     }
   });
+  const { invalidateShippingRatesCache } = await import("@/modules/shop/services/pricing.service");
+  invalidateShippingRatesCache();
+  return result;
 }
 
 export async function getShippingSettings() {

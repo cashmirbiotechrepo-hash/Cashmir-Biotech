@@ -43,15 +43,20 @@ export async function savePortalAddress(
   }
 
   if (parsed.data.isDefault) {
-    await db.customerAddress.updateMany({
-      where: { customerId: customer.id },
-      data: { isDefault: false }
+    await db.$transaction(async (tx) => {
+      await tx.customerAddress.updateMany({
+        where: { customerId: customer.id },
+        data: { isDefault: false }
+      });
+      await tx.customerAddress.create({
+        data: { customerId: customer.id, ...parsed.data }
+      });
+    });
+  } else {
+    await db.customerAddress.create({
+      data: { customerId: customer.id, ...parsed.data }
     });
   }
-
-  await db.customerAddress.create({
-    data: { customerId: customer.id, ...parsed.data }
-  });
 
   revalidatePath("/portal/addresses");
   return { ok: true };

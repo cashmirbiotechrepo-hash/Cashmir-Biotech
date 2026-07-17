@@ -28,6 +28,37 @@ const OTP_EXPIRY_MS = 10 * 60 * 1000;
 const OTP_COOLDOWN_MS = 60 * 1000;
 const MAX_OTP_ATTEMPTS = 5;
 
+/** Dev-only fallback when Upstash is unset — serializes OTP bursts in a single process. */
+const devOtpLocks = new Map<string, number>();
+
+async function getOtpRedis() {
+  const url = process.env.UPSTASH_REDIS_REST_URL;
+  const token = process.env.UPSTASH_REDIS_REST_TOKEN;
+  if (!url || !token) return null;
+  const { Redis } = await import("@upstash/redis");
+  return new Redis({ url, token });
+}
+
+/**
+ * Acquire a short-lived per-email lock so concurrent OTP requests cannot all
+ * pass the cooldown check and spam SMTP (audit HIGH — burst cooldown bypass).
+ * Returns false when another request already holds the lock.
+ */
+async function acquireOtpRequestLock(email: string): Promise<boolean> {
+  const key = `otp_lock:${email}`;
+  const ttlSec = Math.max(1, Math.ceil(OTP_COOLDOWN_MS / 1000));
+  const redis = await getOtpRedis();
+  if (redis) {
+    const locked = await redis.set(key, "1", { nx: true, ex: ttlSec });
+    return Boolean(locked);
+  }
+  const now = Date.now();
+  const existing = devOtpLocks.get(email);
+  if (existing && existing > now) return false;
+  devOtpLocks.set(email, now + OTP_COOLDOWN_MS);
+  return true;
+}
+
 function jwtSecret() {
   return new TextEncoder().encode(env.CUSTOMER_JWT_SECRET ?? env.JWT_SECRET);
 }
@@ -120,6 +151,13 @@ export async function requestPortalOtp(emailRaw: string): Promise<{ ok: true } |
   if (process.env.VERCEL_ENV === "preview" && !smtpReady) {
     logger.error({ event: "portal_otp_smtp_missing_preview" }, "SMTP missing on preview");
     return { ok: false, error: "Login email could not be sent. Please try again later." };
+  }
+
+  // Serialize concurrent bursts before the DB cooldown check — otherwise all
+  // parallel requests observe "no recent OTP" and each sends mail.
+  const lockAcquired = await acquireOtpRequestLock(email);
+  if (!lockAcquired) {
+    return { ok: true };
   }
 
   // Uniform cooldown for every email (known or unknown) — closes OTP enumeration (H5).

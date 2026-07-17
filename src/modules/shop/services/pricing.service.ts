@@ -31,8 +31,17 @@ function envShippingFallback(): ShippingRates {
 /**
  * Store-wide delivery defaults from SiteSettings (admin), with env fallback.
  * Used by cart pricing, checkout UI, and product copy.
+ * Cached briefly so cart/checkout traffic does not hammer SiteSettings on every price.
  */
+let cachedShippingRates: ShippingRates | null = null;
+let shippingRatesCacheExpiresAt = 0;
+const SHIPPING_RATES_TTL_MS = 60_000;
+
 export async function getShippingRates(): Promise<ShippingRates> {
+  if (cachedShippingRates && Date.now() < shippingRatesCacheExpiresAt) {
+    return cachedShippingRates;
+  }
+
   try {
     const settings = await db.siteSettings.findUnique({
       where: { id: 1 },
@@ -41,17 +50,29 @@ export async function getShippingRates(): Promise<ShippingRates> {
     if (settings) {
       const flatShippingInr = clampInr(settings.flatShippingInr, 60);
       const freeShippingThresholdInr = clampInr(settings.freeShippingThresholdInr, 999);
-      return {
+      const rates: ShippingRates = {
         flatShippingInr,
         freeShippingThresholdInr,
         freeThresholdCents: freeShippingThresholdInr * 100,
         flatShippingCents: flatShippingInr * 100
       };
+      cachedShippingRates = rates;
+      shippingRatesCacheExpiresAt = Date.now() + SHIPPING_RATES_TTL_MS;
+      return rates;
     }
   } catch (error) {
     logger.warn({ err: error, event: "shipping_rates_fallback" }, "using env shipping defaults");
   }
-  return envShippingFallback();
+  const fallback = envShippingFallback();
+  cachedShippingRates = fallback;
+  shippingRatesCacheExpiresAt = Date.now() + SHIPPING_RATES_TTL_MS;
+  return fallback;
+}
+
+/** Drop the in-process shipping cache (e.g. after admin updates SiteSettings). */
+export function invalidateShippingRatesCache() {
+  cachedShippingRates = null;
+  shippingRatesCacheExpiresAt = 0;
 }
 
 /** MRP prices are GST-inclusive, so tax is not added on top. */

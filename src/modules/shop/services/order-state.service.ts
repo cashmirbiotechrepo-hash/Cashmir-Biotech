@@ -36,11 +36,12 @@ export async function fulfillOrderAtomic(orderId: string, source: string): Promi
   // 2. Execute atomic transaction wrapping coupon burn AND stock deduction AND boolean tracking flags
   try {
     await db.$transaction(async (tx) => {
-      // PROJECT OMEGA / CRIT-03 FIX: Re-fetch order state inside transaction closure to prevent double-deduction on stale outer scope
-      const lockedOrder = await tx.order.findUnique({
-        where: { id: order.id },
-        select: { stockDeducted: true }
-      });
+      // Pessimistic row lock — Read Committed alone allows two concurrent fulfillments
+      // to both observe stockDeducted=false and double-deduct inventory.
+      const lockedOrderList = await tx.$queryRaw<Array<{ stockDeducted: boolean }>>`
+        SELECT "stockDeducted" FROM "Order" WHERE id = ${order.id} FOR UPDATE
+      `;
+      const lockedOrder = lockedOrderList[0];
       if (!lockedOrder || lockedOrder.stockDeducted) {
         return;
       }
