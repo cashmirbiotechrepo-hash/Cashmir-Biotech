@@ -9,6 +9,12 @@ import { logger } from "@/lib/logger";
 const ACCESS_TOKEN_EXPIRY = "15m";
 const REFRESH_TOKEN_EXPIRY = "30d";
 const REFRESH_TOKEN_EXPIRY_MS = 30 * 24 * 60 * 60 * 1000;
+/**
+ * Concurrent refreshes (two tabs, mount + visibilitychange) can present the same
+ * refresh token. If the token was rotated within this window, treat it as a
+ * benign race instead of a stolen-token replay.
+ */
+const ROTATION_GRACE_MS = 30 * 1000;
 
 function jwtSecret() {
   return new TextEncoder().encode(env.JWT_SECRET);
@@ -22,6 +28,12 @@ export type AdminTokenPayload = JWTPayload & {
   sessionId?: string;
   type?: "access" | "refresh";
 };
+
+export type RotateRefreshResult =
+  | { status: "rotated"; accessToken: string; refreshToken: string }
+  /** Another concurrent request already rotated this token — session is still healthy. */
+  | { status: "raced" }
+  | { status: "invalid" };
 
 export class AdminTokenService {
   static async createAccessToken(payload: Omit<AdminTokenPayload, "type">): Promise<string> {
@@ -73,37 +85,30 @@ export class AdminTokenService {
     }
   }
 
-  static async rotateRefreshToken(
-    oldToken: string
-  ): Promise<{ accessToken: string; refreshToken: string } | null> {
+  static async rotateRefreshToken(oldToken: string): Promise<RotateRefreshResult> {
     try {
       const payload = await this.verifyToken(oldToken, "refresh");
-      if (!payload?.sessionId) return null;
+      if (!payload?.sessionId) return { status: "invalid" };
 
       const oldTokenHash = createHash("sha256").update(oldToken).digest("hex");
       const stored = await db.adminRefreshToken.findUnique({ where: { tokenHash: oldTokenHash } });
-      if (!stored) return null;
+      if (!stored) return { status: "invalid" };
 
-      if (stored.revoked) {
-        logger.warn({ event: "refresh_token_reuse", sessionId: stored.sessionId }, "token reuse detected");
-        await db.adminSession.updateMany({
-          where: { id: stored.sessionId },
-          data: { isRevoked: true }
-        });
-        await db.adminRefreshToken.updateMany({
-          where: { sessionId: stored.sessionId },
+      if (!stored.revoked) {
+        // Atomic claim — only one concurrent request wins the rotation.
+        const claimed = await db.adminRefreshToken.updateMany({
+          where: { id: stored.id, revoked: false },
           data: { revoked: true }
         });
-        return null;
+        if (claimed.count === 0) {
+          return this.classifyRevokedToken(stored.sessionId);
+        }
+      } else {
+        return this.classifyRevokedToken(stored.sessionId);
       }
 
-      await db.adminRefreshToken.update({
-        where: { id: stored.id },
-        data: { revoked: true }
-      });
-
       const session = await db.adminSession.findUnique({ where: { id: payload.sessionId } });
-      if (!session || session.isRevoked || session.expiresAt < new Date()) return null;
+      if (!session || session.isRevoked || session.expiresAt < new Date()) return { status: "invalid" };
 
       await db.adminSession
         .update({
@@ -118,7 +123,7 @@ export class AdminTokenService {
       const user = await db.adminUser.findFirst({
         where: { id: session.userId, active: true }
       });
-      if (!user) return null;
+      if (!user) return { status: "invalid" };
 
       const accessToken = await this.createAccessToken({
         sub: user.id,
@@ -129,10 +134,38 @@ export class AdminTokenService {
         sessionId: session.id
       });
       const { token: refreshToken } = await this.createRefreshToken(session.id);
-      return { accessToken, refreshToken };
+      return { status: "rotated", accessToken, refreshToken };
     } catch (err) {
       logger.error({ err, event: "refresh_rotate_failed" }, "refresh rotation failed");
-      return null;
+      return { status: "invalid" };
     }
+  }
+
+  /**
+   * A revoked token was presented. If it was rotated moments ago this is almost
+   * certainly a concurrent-refresh race (second tab, mount + visibilitychange),
+   * not a replay attack — leave the session alone. Outside the grace window,
+   * treat it as reuse and revoke the whole session.
+   */
+  private static async classifyRevokedToken(sessionId: string): Promise<RotateRefreshResult> {
+    const newest = await db.adminRefreshToken.findFirst({
+      where: { sessionId },
+      orderBy: { createdAt: "desc" },
+      select: { createdAt: true }
+    });
+    if (newest && Date.now() - newest.createdAt.getTime() < ROTATION_GRACE_MS) {
+      return { status: "raced" };
+    }
+
+    logger.warn({ event: "refresh_token_reuse", sessionId }, "token reuse detected");
+    await db.adminSession.updateMany({
+      where: { id: sessionId },
+      data: { isRevoked: true }
+    });
+    await db.adminRefreshToken.updateMany({
+      where: { sessionId },
+      data: { revoked: true }
+    });
+    return { status: "invalid" };
   }
 }

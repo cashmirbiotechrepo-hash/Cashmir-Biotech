@@ -9,10 +9,16 @@ import { useEffect } from "react";
 export function AdminSessionKeepalive() {
   useEffect(() => {
     const REFRESH_MS = 5 * 60 * 1000; // every 5 minutes (access token TTL is 15m)
+    const MIN_GAP_MS = 30 * 1000; // don't hammer refresh on rapid visibility flips
     let redirected = false;
+    let inFlight = false;
+    let lastRefreshAt = 0;
 
     async function refresh() {
-      if (redirected) return;
+      if (redirected || inFlight) return;
+      if (Date.now() - lastRefreshAt < MIN_GAP_MS) return;
+      inFlight = true;
+      lastRefreshAt = Date.now();
       try {
         const res = await fetch("/api/admin/auth/refresh", {
           method: "POST",
@@ -36,6 +42,8 @@ export function AdminSessionKeepalive() {
         }
       } catch {
         // Network blip — next interval will retry
+      } finally {
+        inFlight = false;
       }
     }
 

@@ -29,11 +29,10 @@ export default async function AdminLoginPage({
 }) {
   const params = await searchParams;
 
-  // Break the dashboard ↔ login?expired=1 loop: clear cookies before auto-redirect.
-  if (params.expired === "1") {
-    const { clearAdminSessionCookies } = await import("@/lib/auth");
-    await clearAdminSessionCookies();
-  } else {
+  // Break the dashboard ↔ login?expired=1 loop: skip the auto-redirect when the
+  // session was just expired. Cookies are cleared by the logout route the
+  // keepalive calls before redirecting here (Server Components cannot modify cookies).
+  if (params.expired !== "1") {
     const admin = await getCurrentAdmin();
     if (admin) redirect("/admin/dashboard");
   }

@@ -12,7 +12,14 @@ export async function POST() {
   }
 
   const rotated = await AdminTokenService.rotateRefreshToken(refreshToken);
-  if (!rotated) {
+
+  if (rotated.status === "raced") {
+    // A concurrent request already rotated this token and set fresh cookies.
+    // Do not touch cookies here or we would clobber the winner's Set-Cookie.
+    return NextResponse.json({ data: { ok: true } }, { headers: { "Cache-Control": "no-store" } });
+  }
+
+  if (rotated.status === "invalid") {
     cookieStore.delete(ADMIN_REFRESH_COOKIE);
     return NextResponse.json({ error: { code: "invalid_refresh", message: "Session expired." } }, { status: 401 });
   }
