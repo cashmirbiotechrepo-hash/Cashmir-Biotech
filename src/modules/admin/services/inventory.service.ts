@@ -236,14 +236,16 @@ export async function deductStockForOrder(input: {
   lines: StockLine[];
   releaseReserved?: boolean;
   createdBy?: string | null;
+  tx?: Tx;
 }) {
   const { allocateLotsForFulfillment } = await import("@/modules/admin/services/inventory-lots.service");
-  const trackable = await filterTrackable(input.lines);
-  const orderItems = await db.orderItem.findMany({ where: { orderId: input.orderId } });
+  const client = input.tx ?? db;
+  const trackable = await filterTrackable(input.lines, client);
+  const orderItems = await client.orderItem.findMany({ where: { orderId: input.orderId } });
 
   for (const line of trackable) {
-    const snapshot = await ensureInventory(line.productId);
-    const result = await db.$transaction(async (tx) => {
+    const snapshot = await ensureInventory(line.productId, client);
+    const deduct = async (tx: Tx) => {
       const matching = orderItems.filter((i) => i.productId === line.productId);
       let qtyLeft = line.quantity;
       for (const item of matching) {
@@ -263,7 +265,9 @@ export async function deductStockForOrder(input: {
         createdBy: input.createdBy,
         reservedDelta: input.releaseReserved ? -line.quantity : 0
       });
-    });
+    };
+
+    const result = input.tx ? await deduct(input.tx) : await db.$transaction(async (tx) => deduct(tx));
     await alertLowStock(result, line.productName ?? "Product");
   }
 }

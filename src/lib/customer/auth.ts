@@ -368,22 +368,27 @@ export async function clearCustomerSessionCookies() {
   jar.delete({ name: CUSTOMER_REFRESH_COOKIE, path: "/api/portal/auth/refresh" });
 }
 
-/** Rotates customer refresh token — returns new access + refresh tokens or null. */
-export async function rotateCustomerRefresh(encryptedRefreshCookie: string): Promise<{ accessToken: string; refreshToken: string } | null> {
+export type CustomerRotateRefreshResult =
+  | { status: "rotated"; accessToken: string; refreshToken: string }
+  | { status: "raced" }
+  | { status: "invalid" };
+
+/** Rotates customer refresh token — returns discriminated status (rotated, raced, or invalid). */
+export async function rotateCustomerRefresh(encryptedRefreshCookie: string): Promise<CustomerRotateRefreshResult> {
   let jwt: string;
-  try { jwt = await decryptToken(encryptedRefreshCookie); } catch { return null; }
+  try { jwt = await decryptToken(encryptedRefreshCookie); } catch { return { status: "invalid" }; }
 
   try {
     const { payload } = await jwtVerify(jwt, jwtSecret(), {
       issuer: JWT_ISSUER,
       audience: CUSTOMER_JWT_AUDIENCE
     });
-    if (payload.type !== "customer_refresh" || typeof payload.sessionId !== "string") return null;
+    if (payload.type !== "customer_refresh" || typeof payload.sessionId !== "string") return { status: "invalid" };
 
     // CRIT-02 FIX: Lookup refresh token hash in db for reuse detection and single-use rotation.
     const tokenHash = createHash("sha256").update(jwt).digest("hex");
     const stored = await db.customerRefreshToken.findUnique({ where: { tokenHash } });
-    if (!stored) return null;
+    if (!stored) return { status: "invalid" };
 
     if (stored.revoked) {
       const newest = await db.customerRefreshToken.findFirst({
@@ -393,7 +398,7 @@ export async function rotateCustomerRefresh(encryptedRefreshCookie: string): Pro
       });
       if (newest && Date.now() - newest.createdAt.getTime() < 10000) {
         // Concurrent refresh race inside 10s window — do not false-trigger full session revocation
-        return null;
+        return { status: "raced" };
       }
 
       // Token reuse detected outside grace window! Revoke the entire customer session immediately.
@@ -406,7 +411,7 @@ export async function rotateCustomerRefresh(encryptedRefreshCookie: string): Pro
         where: { sessionId: stored.sessionId },
         data: { revoked: true }
       });
-      return null;
+      return { status: "invalid" };
     }
 
     // Atomic claim — only one concurrent request wins rotation.
@@ -414,16 +419,16 @@ export async function rotateCustomerRefresh(encryptedRefreshCookie: string): Pro
       where: { id: stored.id, revoked: false },
       data: { revoked: true }
     });
-    if (claimed.count === 0) return null;
+    if (claimed.count === 0) return { status: "raced" };
 
     const session = await db.customerSession.findUnique({ where: { id: payload.sessionId } });
-    if (!session || session.isRevoked || session.expiresAt < new Date()) return null;
+    if (!session || session.isRevoked || session.expiresAt < new Date()) return { status: "invalid" };
 
     // Sliding expiry — stay logged in while the account is used, hard-capped at SESSION_DAYS from creation
     const maxAbsoluteExpiry = new Date(session.createdAt.getTime() + SESSION_DAYS * 24 * 60 * 60 * 1000);
     const slidingExpiry = new Date(Date.now() + SESSION_DAYS * 24 * 60 * 60 * 1000);
     const newExpiresAt = slidingExpiry > maxAbsoluteExpiry ? maxAbsoluteExpiry : slidingExpiry;
-    if (newExpiresAt <= new Date()) return null;
+    if (newExpiresAt <= new Date()) return { status: "invalid" };
 
     await db.customerSession
       .update({
@@ -436,7 +441,7 @@ export async function rotateCustomerRefresh(encryptedRefreshCookie: string): Pro
       .catch(() => undefined);
 
     const customer = await db.customer.findUnique({ where: { id: session.customerId } });
-    if (!customer || !customer.active) return null;
+    if (!customer || !customer.active) return { status: "invalid" };
 
     const accessToken = await mintCustomerAccessToken({
       id: customer.id,
@@ -446,9 +451,9 @@ export async function rotateCustomerRefresh(encryptedRefreshCookie: string): Pro
       emailVerified: Boolean(customer.emailVerifiedAt)
     });
     const refreshToken = await mintCustomerRefreshToken(session.id);
-    return { accessToken, refreshToken };
+    return { status: "rotated", accessToken, refreshToken };
   } catch {
-    return null;
+    return { status: "invalid" };
   }
 }
 

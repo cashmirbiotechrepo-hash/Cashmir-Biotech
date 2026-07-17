@@ -31,16 +31,21 @@ class InMemoryStore {
     hits.push(now);
     this.windows.set(key, hits);
 
-    // Throttled, bounded cleanup of stale keys to prevent event loop blocking
+    // Throttled, non-blocking asynchronous cleanup of stale keys to prevent event loop blocking
     if (this.windows.size > 5_000 && now - this.lastCleanup > 30_000) {
       this.lastCleanup = now;
-      let cleaned = 0;
-      for (const [k, v] of this.windows) {
-        if (v.every((t) => t < cutoff)) {
-          this.windows.delete(k);
-          cleaned++;
-          if (cleaned >= 1000) break;
+      const cleanupTimer = setTimeout(() => {
+        let cleaned = 0;
+        for (const [k, v] of this.windows) {
+          if (v.every((t) => t < cutoff)) {
+            this.windows.delete(k);
+            cleaned++;
+            if (cleaned >= 1000) break;
+          }
         }
+      }, 0);
+      if (typeof cleanupTimer === "object" && cleanupTimer && "unref" in cleanupTimer) {
+        (cleanupTimer as any).unref();
       }
     }
 
@@ -163,6 +168,11 @@ export function getCheckoutRatelimit(): Ratelimit {
 /** Rate limit portal OTP request/verify — 10 per minute per IP. */
 export function getPortalOtpRatelimit(): Ratelimit {
   return createRateLimiter({ prefix: "portal_otp", limit: 10, window: "1 m" });
+}
+
+/** Global application-wide portal OTP request rate limiter — 200 per minute across all requests (email bombing / SMTP saturation prevention). */
+export function getGlobalOtpRatelimit(): Ratelimit {
+  return createRateLimiter({ prefix: "global_portal_otp", limit: 200, window: "1 m" });
 }
 
 /** Rate limit webhook ingress — 100 per minute per IP. (HIGH-13) */

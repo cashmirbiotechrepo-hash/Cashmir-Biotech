@@ -1,4 +1,5 @@
 import { createHmac, createHash, randomBytes, timingSafeEqual } from "crypto";
+import { z } from "zod";
 
 /* ---------------------------------------------------------------------------
  * CRIT-03 FIX: PoW challenge tracking moved to Upstash Redis.
@@ -16,6 +17,21 @@ const POW_CONFIG = {
   minDifficulty: 3,
   maxDifficulty: 6
 };
+
+export const powDifficultySchema = z
+  .number()
+  .int()
+  .min(POW_CONFIG.minDifficulty)
+  .max(POW_CONFIG.maxDifficulty)
+  .default(POW_CONFIG.difficulty);
+
+export const powPayloadSchema = z.object({
+  challenge: z.string().regex(/^[a-f0-9]{64}$/i),
+  nonce: z.number().int().nonnegative(),
+  timestamp: z.number().int().positive(),
+  signature: z.string().min(1),
+  difficulty: powDifficultySchema
+});
 
 function powSecret() {
   return (
@@ -100,8 +116,8 @@ export async function generatePoWChallenge(customDifficulty?: number): Promise<C
 
   const challenge = randomBytes(32).toString("hex");
   const timestamp = Date.now();
-  let difficulty = customDifficulty ?? POW_CONFIG.difficulty;
-  difficulty = Math.max(POW_CONFIG.minDifficulty, Math.min(POW_CONFIG.maxDifficulty, difficulty));
+  const parsedDiff = powDifficultySchema.safeParse(customDifficulty ?? POW_CONFIG.difficulty);
+  const difficulty = parsedDiff.success ? parsedDiff.data : POW_CONFIG.difficulty;
   const dataToSign = `${challenge}:${timestamp}:${difficulty}`;
   const secret = powSecret();
   if (!secret) throw new Error("POW_SECRET is required in production.");
@@ -120,40 +136,33 @@ export async function verifyPoW(payload: PoWPayload): Promise<boolean> {
     if (nonce === -1 && signature === "SKIP_DEV") return true;
   }
 
-  if (!challenge || nonce === undefined || nonce === null || !timestamp || !signature) return false;
-  if (typeof challenge !== "string" || typeof nonce !== "number" || typeof timestamp !== "number") {
-    return false;
-  }
-  if (!/^[a-f0-9]{64}$/i.test(challenge)) return false;
-  if (!Number.isInteger(nonce) || nonce < 0) return false;
+  const parsed = powPayloadSchema.safeParse({ challenge, nonce, timestamp, signature, difficulty });
+  if (!parsed.success) return false;
 
   const now = Date.now();
-  if (timestamp > now + POW_CONFIG.maxClockSkewMs) return false;
-  if (now - timestamp > POW_CONFIG.validityWindowMs) return false;
+  if (parsed.data.timestamp > now + POW_CONFIG.maxClockSkewMs) return false;
+  if (now - parsed.data.timestamp > POW_CONFIG.validityWindowMs) return false;
 
-  const expectedDifficulty = Math.max(
-    POW_CONFIG.minDifficulty,
-    Math.min(POW_CONFIG.maxDifficulty, difficulty ?? POW_CONFIG.difficulty)
-  );
+  const expectedDifficulty = parsed.data.difficulty;
 
   const secret = powSecret();
   if (!secret) return false;
 
-  const dataToSign = `${challenge}:${timestamp}:${expectedDifficulty}`;
+  const dataToSign = `${parsed.data.challenge}:${parsed.data.timestamp}:${expectedDifficulty}`;
   const expectedSignature = createHmac("sha256", secret).update(dataToSign).digest("hex");
   try {
-    const a = Buffer.from(signature, "hex");
+    const a = Buffer.from(parsed.data.signature, "hex");
     const b = Buffer.from(expectedSignature, "hex");
     if (a.length !== b.length || !timingSafeEqual(a, b)) return false;
   } catch {
     return false;
   }
 
-  const hash = createHash("sha256").update(`${challenge}${nonce}`).digest("hex");
+  const hash = createHash("sha256").update(`${parsed.data.challenge}${parsed.data.nonce}`).digest("hex");
   if (!hash.startsWith("0".repeat(expectedDifficulty))) return false;
 
   // Single-use: mark challenge as used via Redis (or dev in-memory)
-  const isFirstUse = await markChallengeUsed(challenge);
+  const isFirstUse = await markChallengeUsed(parsed.data.challenge);
   if (!isFirstUse) return false;
 
   return true;

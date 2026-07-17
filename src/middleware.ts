@@ -11,6 +11,7 @@ import {
   getOrderLookupRatelimit,
   getPaymentVerifyRatelimit,
   getPortalOtpRatelimit,
+  getGlobalOtpRatelimit,
   getPowChallengeRatelimit,
   getToolsRatelimit
 } from "@/lib/rate-limit-edge";
@@ -216,6 +217,16 @@ export async function middleware(request: NextRequest) {
     (pathname === "/api/portal/auth/otp/request" || pathname === "/api/portal/auth/otp/verify") &&
     request.method === "POST"
   ) {
+    if (pathname === "/api/portal/auth/otp/request") {
+      const globalRl = getGlobalOtpRatelimit();
+      if (globalRl) {
+        const { success } = await globalRl.limit("global");
+        if (!success) {
+          return deny(request, nonce, 429, { ok: false, error: "System busy. Too many OTP requests right now. Please wait a minute." });
+        }
+      }
+    }
+
     const rl = getPortalOtpRatelimit();
     if (rl) {
       const ip = clientIpFromRequest(request);

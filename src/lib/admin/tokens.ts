@@ -14,7 +14,7 @@ const REFRESH_TOKEN_EXPIRY_MS = 30 * 24 * 60 * 60 * 1000;
  * refresh token. If the token was rotated within this window, treat it as a
  * benign race instead of a stolen-token replay.
  */
-const ROTATION_GRACE_MS = 0;
+const ROTATION_GRACE_MS = 10000;
 
 function jwtSecret() {
   return new TextEncoder().encode(env.JWT_SECRET);

@@ -362,6 +362,68 @@ function orderLines(items: { productId: string | null; quantity: number; product
  *   Phase B (async via outbox): Customer attach, invoice PDF, confirmation email
  * Webhook can ack 200 as soon as Phase A completes (~100–500ms).
  */
+async function fulfillOrderAtomic(orderId: string, source: string): Promise<{ ok: boolean; confirmationToken?: string }> {
+  const order = await db.order.findUnique({
+    where: { id: orderId },
+    include: { items: true }
+  });
+  if (!order) return { ok: false };
+
+  const lines = orderLines(order.items);
+
+  // 1. Ensure stock is reserved before deductive fulfillment if not yet reserved
+  if (!order.stockDeducted && !order.stockReserved) {
+    const res = await reserveStockForOrder({ orderId: order.id, lines });
+    if (!res.ok) {
+      logger.error({ orderId: order.id, err: res.error }, "paid order but stock reservation failed");
+      return { ok: false, confirmationToken: order.confirmationToken };
+    }
+    await db.order.update({ where: { id: order.id }, data: { stockReserved: true } });
+  }
+
+  // 2. Execute atomic transaction wrapping coupon burn AND stock deduction AND boolean tracking flags
+  try {
+    await db.$transaction(async (tx) => {
+      if (order.couponCode && !order.stockDeducted) {
+        const burned = await tx.$executeRaw`
+          UPDATE "Coupon"
+          SET "usedCount" = "usedCount" + 1, "updatedAt" = now()
+          WHERE code = ${order.couponCode}
+            AND ("maxUses" IS NULL OR "usedCount" < "maxUses")
+        `;
+        if (burned === 0) {
+          // ITERATION 4 / HIGH-02 FIX: Do not throw PROMO_LIMIT_BREACHED or reject fulfillment when funds are already captured.
+          // Flag the order with security notes and proceed with status = 'paid' and stock deduction.
+          await tx.order.update({
+            where: { id: order.id },
+            data: {
+              adminNotes: "[SECURITY] Promotion threshold breached during concurrent payment. Review required."
+            }
+          });
+        }
+      }
+
+      if (!order.stockDeducted) {
+        await deductStockForOrder({
+          orderId: order.id,
+          lines,
+          releaseReserved: true,
+          createdBy: `payment:${source}`,
+          tx
+        });
+        await tx.order.update({
+          where: { id: order.id },
+          data: { stockDeducted: true, stockReserved: false }
+        });
+      }
+    });
+    return { ok: true, confirmationToken: order.confirmationToken };
+  } catch (err: any) {
+    logger.error({ orderId: order.id, err }, "atomic fulfillment (stock deduct + coupon burn) failed");
+    return { ok: false, confirmationToken: order.confirmationToken };
+  }
+}
+
 export async function markOrderPaid(input: {
   orderId: string;
   razorpayPaymentId?: string;
@@ -418,51 +480,17 @@ export async function markOrderPaid(input: {
           .catch(() => undefined);
       }
 
-      // Re-drive inventory if a prior attempt left paid-without-deduct.
+      // Re-drive inventory and coupon burning if a prior attempt left paid-without-deduct.
       if (!existing.stockDeducted && existing.status === "paid") {
-        // Atomic claim: ensure no concurrent retry thread double-deducts inventory
-        const claimedRedrive = await db.$executeRaw`
-          UPDATE "Order"
-          SET "stockDeducted" = true, "stockReserved" = false, "updatedAt" = now()
-          WHERE id = ${input.orderId} AND "stockDeducted" = false
-        `;
-        if (claimedRedrive === 0) {
-          const { enqueuePostPaymentTask } = await import("@/modules/shop/services/outbox.service");
-          await enqueuePostPaymentTask(input.orderId);
-          return { ok: true, confirmationToken: existing.confirmationToken, alreadyPaid: true };
-        }
-
-        const order = await db.order.findUnique({
-          where: { id: input.orderId },
-          include: { items: true }
-        });
-        if (!order) return { ok: false };
-        const lines = orderLines(order.items);
-        try {
-          if (!order.stockReserved) {
-            const res = await reserveStockForOrder({ orderId: order.id, lines });
-            if (!res.ok) {
-              logger.error({ orderId: order.id, err: res.error }, "redrive stock reservation failed");
-              await db.order.update({ where: { id: order.id }, data: { stockDeducted: false } });
-              return { ok: false, confirmationToken: order.confirmationToken };
-            }
-            await db.order.update({ where: { id: order.id }, data: { stockReserved: true } });
-          }
-          await deductStockForOrder({
-            orderId: order.id,
-            lines,
-            releaseReserved: true,
-            createdBy: `payment:${input.source}:redrive`
-          });
-        } catch (err) {
-          logger.error({ orderId: input.orderId, err }, "redrive stock deduct failed");
-          await db.order.update({ where: { id: input.orderId }, data: { stockDeducted: false } });
+        const redriveRes = await fulfillOrderAtomic(input.orderId, `${input.source}:redrive`);
+        if (!redriveRes.ok) {
           return { ok: false, confirmationToken: existing.confirmationToken };
         }
+        // ITERATION 4 / HIGH-03 FIX: Only enqueue post-payment task when redriving an incomplete fulfillment,
+        // rather than unconditionally on every webhook retry for an already-paid order.
+        const { enqueuePostPaymentTask } = await import("@/modules/shop/services/outbox.service");
+        await enqueuePostPaymentTask(input.orderId);
       }
-
-      const { enqueuePostPaymentTask } = await import("@/modules/shop/services/outbox.service");
-      await enqueuePostPaymentTask(input.orderId);
 
       return { ok: true, confirmationToken: existing.confirmationToken, alreadyPaid: true };
     }
@@ -473,64 +501,9 @@ export async function markOrderPaid(input: {
     return { ok: false };
   }
 
-  const order = await db.order.findUnique({
-    where: { id: input.orderId },
-    include: { items: true }
-  });
-  if (!order) return { ok: false };
-
-  const lines = orderLines(order.items);
-  let deducted = order.stockDeducted;
-
-  if (!deducted) {
-    if (!order.stockReserved) {
-      const res = await reserveStockForOrder({ orderId: order.id, lines });
-      if (!res.ok) {
-        logger.error({ orderId: order.id, err: res.error }, "paid order but stock reservation failed");
-        return { ok: false, confirmationToken: order.confirmationToken };
-      }
-      await db.order.update({ where: { id: order.id }, data: { stockReserved: true } });
-    }
-    try {
-      await deductStockForOrder({
-        orderId: order.id,
-        lines,
-        releaseReserved: true,
-        createdBy: `payment:${input.source}`
-      });
-      deducted = true;
-      await db.order.update({
-        where: { id: order.id },
-        data: { stockDeducted: true, stockReserved: false }
-      });
-    } catch (err) {
-      logger.error({ orderId: order.id, err }, "deducting reserved stock failed after payment");
-      return { ok: false, confirmationToken: order.confirmationToken };
-    }
-  }
-
-  // Burn coupon under maxUses — concurrent burns cannot exceed the cap.
-  if (order.couponCode) {
-    const burned = await db.$executeRaw`
-      UPDATE "Coupon"
-      SET "usedCount" = "usedCount" + 1, "updatedAt" = now()
-      WHERE code = ${order.couponCode}
-        AND ("maxUses" IS NULL OR "usedCount" < "maxUses")
-    `;
-    if (burned === 0) {
-      logger.error(
-        { orderId: order.id, coupon: order.couponCode },
-        "Coupon maxUses reached at payment — holding order for compliance review"
-      );
-      await db.order.update({
-        where: { id: order.id },
-        data: {
-          status: "pending",
-          adminNotes: "[SECURITY] Coupon maxUses breached at payment. Order held for compliance review and full collection."
-        }
-      });
-      return { ok: false, confirmationToken: order.confirmationToken };
-    }
+  const fulfillmentRes = await fulfillOrderAtomic(input.orderId, input.source);
+  if (!fulfillmentRes.ok) {
+    return { ok: false, confirmationToken: fulfillmentRes.confirmationToken };
   }
 
   // ── Phase B: Enqueue async side-effects (P-03) ───────────────────────────
@@ -538,9 +511,9 @@ export async function markOrderPaid(input: {
   // This keeps the webhook/verify response fast (~100–500ms).
 
   const { enqueuePostPaymentTask } = await import("@/modules/shop/services/outbox.service");
-  await enqueuePostPaymentTask(order.id);
+  await enqueuePostPaymentTask(input.orderId);
 
-  return { ok: true, confirmationToken: order.confirmationToken };
+  return { ok: true, confirmationToken: fulfillmentRes.confirmationToken };
 }
 
 async function releaseCouponHold(couponCode: string | null | undefined) {

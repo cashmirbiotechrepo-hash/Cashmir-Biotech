@@ -18,7 +18,10 @@ export async function POST(request: Request) {
   }
 
   const rotated = await rotateCustomerRefresh(raw);
-  if (!rotated) {
+  if (rotated.status === "raced") {
+    return NextResponse.json({ ok: true });
+  }
+  if (rotated.status !== "rotated") {
     await clearCustomerSessionCookies().catch(() => undefined);
     return NextResponse.json({ ok: false, error: "Session expired" }, { status: 401 });
   }

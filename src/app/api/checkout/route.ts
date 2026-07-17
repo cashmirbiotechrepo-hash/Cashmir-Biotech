@@ -43,10 +43,10 @@ const FINAL_ORDER_STATUSES = ["paid", "processing", "shipped", "delivered", "ref
 function readIdempotencyKey(request: Request) {
   const key = request.headers.get("idempotency-key")?.trim();
   if (!key) return null;
-  if (key.length <= 120) return key;
-  // If key exceeds 120 chars, combine prefix with SHA-256 hash so it never truncates away uniqueness
+  if (key.length <= 80) return key;
+  // If key exceeds 80 chars, combine prefix with SHA-256 hash so it never exceeds 100 char upstream proxy limits
   const hash = createHash("sha256").update(key).digest("hex");
-  return `${key.slice(0, 50)}:${hash}`;
+  return `${key.slice(0, 30)}:${hash}`;
 }
 
 function cartFromOrder(order: {
@@ -92,7 +92,6 @@ async function responseForExistingOrder(input: {
       alreadyPaid: true,
       orderId: order.id,
       orderNumber: order.orderNumber,
-      confirmationToken: order.confirmationToken,
       amountCents: order.totalCents,
       currency: "INR",
       cart: cartFromOrder(order)
@@ -113,14 +112,10 @@ async function responseForExistingOrder(input: {
     });
   }
 
-  // HIGH-05 FIX: Return only gateway continuation headers and confirmation tokens.
-  // Stripping customer: { name, email, phone } prevents an attacker with an idempotency key
-  // from exfiltrating sensitive customer PII.
   return NextResponse.json({
     ok: true,
     orderId: order.id,
     orderNumber: order.orderNumber,
-    confirmationToken: order.confirmationToken,
     razorpayOrderId,
     amountCents: order.totalCents,
     currency: "INR",
