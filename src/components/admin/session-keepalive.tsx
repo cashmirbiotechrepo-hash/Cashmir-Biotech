@@ -9,8 +9,10 @@ import { useEffect } from "react";
 export function AdminSessionKeepalive() {
   useEffect(() => {
     const REFRESH_MS = 5 * 60 * 1000; // every 5 minutes (access token TTL is 15m)
+    let redirected = false;
 
     async function refresh() {
+      if (redirected) return;
       try {
         const res = await fetch("/api/admin/auth/refresh", {
           method: "POST",
@@ -18,9 +20,18 @@ export function AdminSessionKeepalive() {
           cache: "no-store"
         });
         if (res.status === 401) {
-          // Only bounce if we're already inside the console
-          if (window.location.pathname.startsWith("/admin") && !window.location.pathname.startsWith("/admin/login")) {
-            window.location.href = "/admin/login?expired=1";
+          if (
+            window.location.pathname.startsWith("/admin") &&
+            !window.location.pathname.startsWith("/admin/login")
+          ) {
+            redirected = true;
+            // Clear cookies so login does not bounce back on a still-valid access token.
+            await fetch("/api/admin/auth/logout", {
+              method: "POST",
+              credentials: "include",
+              cache: "no-store"
+            }).catch(() => undefined);
+            window.location.replace("/admin/login?expired=1");
           }
         }
       } catch {

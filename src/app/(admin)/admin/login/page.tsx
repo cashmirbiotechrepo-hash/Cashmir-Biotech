@@ -27,10 +27,17 @@ export default async function AdminLoginPage({
 }: {
   searchParams: Promise<{ next?: string; rateLimited?: string; expired?: string }>;
 }) {
-  const admin = await getCurrentAdmin();
-  if (admin) redirect("/admin/dashboard");
-
   const params = await searchParams;
+
+  // Break the dashboard ↔ login?expired=1 loop: clear cookies before auto-redirect.
+  if (params.expired === "1") {
+    const { clearAdminSessionCookies } = await import("@/lib/auth");
+    await clearAdminSessionCookies();
+  } else {
+    const admin = await getCurrentAdmin();
+    if (admin) redirect("/admin/dashboard");
+  }
+
   const next = params.next?.startsWith("/admin") ? params.next : "/admin/dashboard";
   const localDev = showLocalDevChip();
 

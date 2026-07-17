@@ -310,7 +310,8 @@ export async function setCustomerSessionCookies(accessToken: string, refreshToke
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
       sameSite: "lax",
-      path: "/api/portal/auth/refresh",
+      // __Host- cookies require Path=/ — a scoped path is rejected by browsers.
+      path: "/",
       maxAge: REFRESH_COOKIE_MAX_AGE
     });
   }
@@ -319,6 +320,7 @@ export async function setCustomerSessionCookies(accessToken: string, refreshToke
 export async function clearCustomerSessionCookies() {
   const jar = await cookies();
   jar.delete(CUSTOMER_SESSION_COOKIE);
+  jar.delete(CUSTOMER_REFRESH_COOKIE);
   jar.delete({ name: CUSTOMER_REFRESH_COOKIE, path: "/api/portal/auth/refresh" });
 }
 

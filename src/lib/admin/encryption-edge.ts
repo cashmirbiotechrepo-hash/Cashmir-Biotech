@@ -1,9 +1,10 @@
-import "server-only";
 import { compactDecrypt } from "jose";
+import { applyBakedAmplifyEnv } from "@/lib/apply-baked-env-shared";
 
 const DEV_ENCRYPTION_KEY = "dev-encryption-key-32-chars-lo!!";
 
 function encryptionKeyBytes(): Uint8Array | null {
+  applyBakedAmplifyEnv();
   const fromEnv = process.env.ENCRYPTION_KEY;
   // Never fall back to the known-dev key in production — fail closed.
   const keyString =

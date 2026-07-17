@@ -1,5 +1,6 @@
 import { jwtVerify } from "jose";
 import { CUSTOMER_JWT_AUDIENCE, JWT_AUDIENCE, JWT_ISSUER } from "@/config/auth.constants";
+import { applyBakedAmplifyEnv } from "@/lib/apply-baked-env-shared";
 import { decryptTokenEdge } from "@/lib/admin/encryption-edge";
 import { isSessionRevokedEdge } from "@/lib/session-revoke-edge";
 
@@ -24,6 +25,7 @@ export type EdgeCustomerPayload = {
  * Decrypts JWE cookie → verifies HS256 JWT (access token only).
  */
 export async function verifyAdminSessionToken(encrypted: string): Promise<EdgeAdminPayload | null> {
+  applyBakedAmplifyEnv();
   const key = process.env.JWT_SECRET;
   if (!key || key.length < 32) return null;
 
@@ -51,6 +53,7 @@ export async function verifyAdminSessionToken(encrypted: string): Promise<EdgeAd
  * Decrypts JWE cookie → verifies HS256 JWT (customer access token only).
  */
 export async function verifyCustomerSessionToken(encrypted: string): Promise<EdgeCustomerPayload | null> {
+  applyBakedAmplifyEnv();
   // Prefer dedicated portal secret when set (falls back to JWT_SECRET for migration).
   const key = process.env.CUSTOMER_JWT_SECRET || process.env.JWT_SECRET;
   if (!key || key.length < 32) return null;

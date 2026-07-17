@@ -123,7 +123,8 @@ export async function setAdminSessionCookies(accessToken: string, refreshToken?:
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
       sameSite: "strict",
-      path: "/api/admin/auth/refresh",
+      // __Host- cookies require Path=/ — a scoped path is rejected by browsers.
+      path: "/",
       maxAge: REFRESH_COOKIE_MAX_AGE
     });
   }
@@ -132,6 +133,8 @@ export async function setAdminSessionCookies(accessToken: string, refreshToken?:
 export async function clearAdminSessionCookies() {
   const cookieStore = await cookies();
   cookieStore.delete(ADMIN_SESSION_COOKIE);
+  cookieStore.delete(ADMIN_REFRESH_COOKIE);
+  // Clear any legacy scoped-path refresh cookies from earlier deploys.
   cookieStore.delete({ name: ADMIN_REFRESH_COOKIE, path: "/api/admin/auth/refresh" });
 }
 
