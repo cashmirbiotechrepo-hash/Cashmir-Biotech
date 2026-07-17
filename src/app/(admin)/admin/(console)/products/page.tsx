@@ -40,7 +40,16 @@ export default async function AdminProductsPage({
       where,
       orderBy: { createdAt: "desc" },
       skip: (page - 1) * PAGE_SIZE,
-      take: PAGE_SIZE
+      take: PAGE_SIZE,
+      include: {
+        inventory: {
+          select: {
+            quantityOnHand: true,
+            quantityReserved: true,
+            lowStockThreshold: true
+          }
+        }
+      }
     }),
     db.product.count({ where }),
     db.product.findMany({ distinct: ["category"], select: { category: true }, orderBy: { category: "asc" } })
@@ -50,7 +59,7 @@ export default async function AdminProductsPage({
     <>
       <AdminPageHeader
         title="Products"
-        description="Manage catalog items, pricing, and inventory thresholds."
+        description="Catalog workspace — keep the list open, edit details beside it, adjust stock inline."
       />
 
       <AdminListToolbar

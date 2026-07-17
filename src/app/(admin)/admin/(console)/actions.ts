@@ -242,6 +242,48 @@ export async function deleteProductAction(formData: FormData): Promise<ActionSta
   }
 }
 
+/** Quick stock adjust from the products list — does not require the full editor form. */
+export async function updateProductStockAction(formData: FormData): Promise<ActionState> {
+  const admin = await requireAdminSession();
+  const id = String(formData.get("id") ?? "").trim();
+  const stockQty = Number(formData.get("stockQty"));
+  if (!id) return { error: "Missing product id." };
+  if (!Number.isInteger(stockQty) || stockQty < 0) return { error: "Stock must be a whole number ≥ 0." };
+
+  try {
+    const product = await db.product.findUnique({
+      where: { id },
+      select: { id: true, name: true, sku: true, lowStockThreshold: true, hasInventoryTracking: true }
+    });
+    if (!product) return { error: "Product not found." };
+
+    await db.product.update({ where: { id }, data: { stockQty } });
+    if (product.hasInventoryTracking) {
+      await reconcileFromProductForm({
+        productId: id,
+        sku: product.sku,
+        newOnHand: stockQty,
+        threshold: product.lowStockThreshold,
+        createdBy: String(admin.email)
+      });
+    }
+    await writeAuditLog({
+      userEmail: String(admin.email),
+      action: "update",
+      entityType: "product",
+      entityId: id,
+      diff: { stockQty }
+    });
+    revalidatePath("/admin/products");
+    revalidatePath("/admin/inventory");
+    revalidatePath("/products");
+    return { ok: true, message: `Stock for “${product.name}” set to ${stockQty}.` };
+  } catch (error) {
+    logger.error({ err: error, event: "product_stock_update_failed" }, "failed to update product stock");
+    return { error: "Couldn't update stock." };
+  }
+}
+
 export async function savePatentAction(formData: FormData): Promise<ActionState> {
   const admin = await requireAdminSession();
   const parsed = patentUpdateSchema.safeParse(fields(formData));
