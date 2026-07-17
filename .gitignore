@@ -39,7 +39,9 @@ playwright/.cache/
 
 # AWS deploy secrets / generated connection strings
 deploy/aws/out/
-src/generated/amplify-runtime-env.json
+# Overwritten on Amplify builds; committed stub must stay empty `{}`.
+# Do not commit real secrets into this file.
+# src/generated/amplify-runtime-env.json
 
 # admin uploads (user-generated, served from /public/uploads)
 /public/uploads

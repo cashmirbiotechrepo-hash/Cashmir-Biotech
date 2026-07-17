@@ -28,6 +28,11 @@ frontend:
         - node scripts/ensure-shipping-settings.cjs
         - echo "=== prisma migrate deploy ==="
         - npx prisma migrate deploy
+        # Amplify SSR Lambda often has empty process.env — snapshot build env
+        # into a JSON module that Next bundles into the server runtime.
+        - echo "=== write amplify runtime env ==="
+        - export FORCE_WRITE_AMPLIFY_ENV=1
+        - node scripts/write-amplify-runtime-env.cjs
         - echo "=== next build ==="
         # Force plain Next config (no Sentry webpack plugin) on Amplify.
         - export AMPLIFY_NEXT_PLAIN_CONFIG=1

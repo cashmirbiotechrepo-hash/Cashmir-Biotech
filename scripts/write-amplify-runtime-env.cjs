@@ -2,9 +2,22 @@
  * Amplify SSR compute often does not receive console env vars at runtime.
  * This script runs during amplify.yml build (when env IS available) and writes
  * a JSON file that the server bundle can load on every cold start.
+ *
+ * Only writes when AWS_APP_ID / AWS_BRANCH / FORCE_WRITE_AMPLIFY_ENV is set so
+ * local/CI never accidentally overwrite the committed empty stub with secrets.
  */
 const { writeFileSync, mkdirSync } = require("node:fs");
 const { resolve } = require("node:path");
+
+const onAmplify = Boolean(
+  process.env.AWS_APP_ID || process.env.AWS_BRANCH || process.env.FORCE_WRITE_AMPLIFY_ENV === "1"
+);
+if (!onAmplify) {
+  console.log(
+    "[write-amplify-runtime-env] Skipping — not on Amplify (set FORCE_WRITE_AMPLIFY_ENV=1 to override)."
+  );
+  process.exit(0);
+}
 
 const KEYS = [
   "DATABASE_URL",
@@ -34,7 +47,11 @@ const KEYS = [
   "SMTP_FROM",
   "UPSTASH_REDIS_REST_URL",
   "UPSTASH_REDIS_REST_TOKEN",
-  "INVENTORY_ALERT_EMAIL"
+  "INVENTORY_ALERT_EMAIL",
+  "CUSTOMER_JWT_SECRET",
+  "BLOB_READ_WRITE_TOKEN",
+  "SENTRY_DSN",
+  "NEXT_PUBLIC_SENTRY_DSN"
 ];
 
 const out = {};
