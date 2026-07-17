@@ -105,7 +105,7 @@ export async function setAdminSessionCookies(accessToken: string, refreshToken?:
   cookieStore.set(ADMIN_SESSION_COOKIE, encrypted, {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
-    sameSite: "lax",
+    sameSite: "strict",
     path: "/",
     maxAge: SESSION_COOKIE_MAX_AGE
   });

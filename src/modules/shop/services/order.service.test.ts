@@ -26,13 +26,17 @@ describe("invoice PDF route", () => {
 
 describe("coupon burn timing", () => {
   it("increments usedCount on paid path only", () => {
-    const source = readFileSync(
-      path.join(process.cwd(), "src/modules/shop/services/order.service.ts"),
+    const checkoutSource = readFileSync(
+      path.join(process.cwd(), "src/modules/shop/services/checkout.service.ts"),
+      "utf8"
+    );
+    const stateSource = readFileSync(
+      path.join(process.cwd(), "src/modules/shop/services/order-state.service.ts"),
       "utf8"
     );
     // Coupon validation defers burn until payment; raw SQL bump in markOrderPaid.
-    expect(source).toMatch(/do NOT burn usedCount until payment/);
-    expect(source).toMatch(/usedCount.*usedCount.*\+.*1/);
+    expect(checkoutSource).toMatch(/do NOT burn usedCount until payment/);
+    expect(stateSource).toMatch(/usedCount.*usedCount.*\+.*1/);
   });
 });
 

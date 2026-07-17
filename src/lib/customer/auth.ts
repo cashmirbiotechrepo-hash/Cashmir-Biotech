@@ -403,13 +403,15 @@ export async function rotateCustomerRefresh(encryptedRefreshCookie: string): Pro
 
       // Token reuse detected outside grace window! Revoke the entire customer session immediately.
       logger.warn({ event: "customer_refresh_token_reuse", sessionId: stored.sessionId }, "customer refresh token reuse detected");
-      await db.customerSession.updateMany({
-        where: { id: stored.sessionId },
-        data: { isRevoked: true }
-      });
-      await db.customerRefreshToken.updateMany({
-        where: { sessionId: stored.sessionId },
-        data: { revoked: true }
+      await db.$transaction(async (tx) => {
+        await tx.customerSession.updateMany({
+          where: { id: stored.sessionId },
+          data: { isRevoked: true }
+        });
+        await tx.customerRefreshToken.updateMany({
+          where: { sessionId: stored.sessionId },
+          data: { revoked: true }
+        });
       });
       return { status: "invalid" };
     }

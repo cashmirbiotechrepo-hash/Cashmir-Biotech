@@ -200,6 +200,16 @@ export function getPowChallengeRatelimit(): Ratelimit {
   return createRateLimiter({ prefix: "pow_challenge", limit: 30, window: "1 m" });
 }
 
+/** Rate limit contact form submissions — 3 per minute per IP (SMTP saturation protection). */
+export function getContactRatelimit(): Ratelimit {
+  return createRateLimiter({ prefix: "contact", limit: 3, window: "1 m" });
+}
+
+/** Rate limit portal support ticket submissions — 5 per minute per IP. */
+export function getSupportTicketRatelimit(): Ratelimit {
+  return createRateLimiter({ prefix: "support", limit: 5, window: "1 m" });
+}
+
 /**
  * Resolve client IP for rate limiting.
  * Prefer platform-trusted headers (Cloudflare / proxies) over the leftmost

@@ -2,8 +2,9 @@ import "server-only";
 import type { Order, OrderEvent, OrderItem, Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
 import { logger } from "@/lib/logger";
+import { DEFAULT_HSN_CODE, DEFAULT_PLACE_OF_SUPPLY } from "@/lib/constants";
 import { splitGstCents } from "@/lib/gst";
-import { nextInvoiceNumber } from "@/modules/admin/services/phase2.service";
+import { nextInvoiceNumber, nextInvoiceNumberAtomic } from "@/modules/admin/services/phase2.service";
 
 export type OrderEventInput = {
   orderId: string;
@@ -42,7 +43,7 @@ export function batchLabelForOrder(orderNumber: string, createdAt: Date) {
 /**
  * Creates a GST invoice for a paid order if one does not already exist.
  * Idempotent — safe to call from markOrderPaid and admin actions.
- * Uses unique orderId to prevent dual-invoice races.
+ * Uses atomic sequence generation and unique orderId to prevent dual-invoice races.
  */
 export async function ensureInvoiceForOrder(orderId: string): Promise<{
   created: boolean;
@@ -64,53 +65,64 @@ export async function ensureInvoiceForOrder(orderId: string): Promise<{
   const tax = order.taxCents || 0;
   const total = order.totalCents || subtotal + tax;
   const addr = (order.shippingAddress ?? {}) as { state?: string };
-  const placeOfSupply = addr.state ?? "Jammu and Kashmir";
+  const placeOfSupply = addr.state ?? DEFAULT_PLACE_OF_SUPPLY;
   const gstSplit = splitGstCents(tax, placeOfSupply);
 
-  try {
-    const invoice = await db.invoice.create({
-      data: {
-        invoiceNumber: await nextInvoiceNumber(),
-        orderId: order.id,
-        subtotalCents: subtotal,
-        taxCents: tax,
-        totalCents: total,
-        gstDetails: {
-          gstin: process.env.COMPANY_GSTIN ?? "",
-          placeOfSupply,
-          taxType: gstSplit.taxType,
-          cgstCents: gstSplit.cgstCents,
-          sgstCents: gstSplit.sgstCents,
-          igstCents: gstSplit.igstCents,
-          hsn: "21069099",
-          lineItems: order.items.map((item) => ({
-            description: item.productName,
-            qty: item.quantity,
-            rateCents: item.unitPriceCents,
-            amountCents: item.quantity * item.unitPriceCents,
-            hsn: "21069099"
-          }))
+  const MAX_ATTEMPTS = 3;
+  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+    try {
+      const invoiceNumber = await nextInvoiceNumberAtomic();
+
+      const invoice = await db.invoice.create({
+        data: {
+          invoiceNumber,
+          orderId: order.id,
+          subtotalCents: subtotal,
+          taxCents: tax,
+          totalCents: total,
+          gstDetails: {
+            gstin: process.env.COMPANY_GSTIN ?? "",
+            placeOfSupply,
+            taxType: gstSplit.taxType,
+            cgstCents: gstSplit.cgstCents,
+            sgstCents: gstSplit.sgstCents,
+            igstCents: gstSplit.igstCents,
+            hsn: DEFAULT_HSN_CODE,
+            lineItems: order.items.map((item) => ({
+              description: item.productName,
+              qty: item.quantity,
+              rateCents: item.unitPriceCents,
+              amountCents: item.quantity * item.unitPriceCents,
+              hsn: DEFAULT_HSN_CODE
+            }))
+          }
         }
+      });
+
+      await recordOrderEvent({
+        orderId: order.id,
+        type: "invoice_generated",
+        title: "GST invoice generated",
+        detail: invoice.invoiceNumber,
+        metadata: { invoiceId: invoice.id }
+      });
+
+      return { created: true, invoiceId: invoice.id, invoiceNumber: invoice.invoiceNumber };
+    } catch (err: any) {
+      // Check if another concurrent thread just created the invoice for this exact orderId
+      const raced = await db.invoice.findUnique({ where: { orderId } });
+      if (raced) {
+        return { created: false, invoiceId: raced.id, invoiceNumber: raced.invoiceNumber };
       }
-    });
 
-    await recordOrderEvent({
-      orderId: order.id,
-      type: "invoice_generated",
-      title: "GST invoice generated",
-      detail: invoice.invoiceNumber,
-      metadata: { invoiceId: invoice.id }
-    });
-
-    return { created: true, invoiceId: invoice.id, invoiceNumber: invoice.invoiceNumber };
-  } catch (err) {
-    // Unique constraint race — another writer won; return theirs.
-    const raced = await db.invoice.findUnique({ where: { orderId } });
-    if (raced) {
-      return { created: false, invoiceId: raced.id, invoiceNumber: raced.invoiceNumber };
+      if (attempt === MAX_ATTEMPTS || err?.code !== "P2002") {
+        throw err;
+      }
+      logger.warn({ orderId, attempt }, "[ensureInvoiceForOrder] Sequence collision detected; retrying with fresh sequence...");
     }
-    throw err;
   }
+
+  return { created: false };
 }
 
 export async function runPaidOrderAutomation(orderId: string, source: string) {

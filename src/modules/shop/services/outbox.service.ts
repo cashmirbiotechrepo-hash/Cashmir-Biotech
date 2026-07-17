@@ -54,23 +54,47 @@ async function reclaimStaleProcessingTasks() {
  * Atomically claim one pending/failed task. Only one worker wins per row.
  */
 async function claimNextTask(): Promise<{ id: string; orderId: string; type: string; attempts: number } | null> {
-  const candidate = await db.orderTask.findFirst({
-    where: {
-      status: { in: ["pending", "failed"] },
-      attempts: { lt: MAX_ATTEMPTS }
-    },
-    orderBy: { createdAt: "asc" },
-    select: { id: true, orderId: true, type: true, attempts: true }
-  });
-  if (!candidate) return null;
+  try {
+    // PROJECT OMEGA / ITERATION 4 FIX: Native PostgreSQL atomic row-claiming with SKIP LOCKED
+    // Eliminates write contention and lock serialization delays during high-throughput parallel cron processing.
+    const claimed = await db.$queryRaw<Array<{ id: string; orderId: string; type: string; attempts: number }>>`
+      UPDATE "OrderTask"
+      SET status = 'processing', "updatedAt" = now()
+      WHERE id = (
+        SELECT id FROM "OrderTask"
+        WHERE status IN ('pending', 'failed') AND attempts < ${MAX_ATTEMPTS}
+          AND ("nextRetryAt" IS NULL OR "nextRetryAt" <= now())
+        ORDER BY "createdAt" ASC
+        LIMIT 1
+        FOR UPDATE SKIP LOCKED
+      )
+      RETURNING id, "orderId", type, attempts
+    `;
+    if (claimed && claimed.length > 0 && claimed[0]) {
+      return claimed[0];
+    }
+    return null;
+  } catch {
+    // Fallback for non-PostgreSQL / local SQLite test environments where FOR UPDATE SKIP LOCKED is not supported
+    const candidate = await db.orderTask.findFirst({
+      where: {
+        status: { in: ["pending", "failed"] },
+        attempts: { lt: MAX_ATTEMPTS },
+        OR: [{ nextRetryAt: null }, { nextRetryAt: { lte: new Date() } }]
+      },
+      orderBy: { createdAt: "asc" },
+      select: { id: true, orderId: true, type: true, attempts: true }
+    });
+    if (!candidate) return null;
 
-  const claimed = await db.orderTask.updateMany({
-    where: { id: candidate.id, status: { in: ["pending", "failed"] } },
-    data: { status: "processing" }
-  });
-  if (claimed.count !== 1) return null;
+    const claimed = await db.orderTask.updateMany({
+      where: { id: candidate.id, status: { in: ["pending", "failed"] } },
+      data: { status: "processing" }
+    });
+    if (claimed.count !== 1) return null;
 
-  return candidate;
+    return candidate;
+  }
 }
 
 /**
@@ -87,8 +111,15 @@ export async function processOutboxBatch(batchSize = 10): Promise<{
   let processed = 0;
   let failed = 0;
   let deadLettered = 0;
+  const startTime = Date.now();
 
   for (let i = 0; i < batchSize; i++) {
+    // PROJECT OMEGA / MED-01 FIX: Prevent cron execution starvation & Vercel 60s maxDuration kill
+    if (Date.now() - startTime > 45000) {
+      logger.warn({ processed, failed, deadLettered }, "Outbox batch execution nearing timeout threshold; breaking cleanly");
+      break;
+    }
+
     const task = await claimNextTask();
     if (!task) break;
 
@@ -98,20 +129,23 @@ export async function processOutboxBatch(batchSize = 10): Promise<{
       }
       await db.orderTask.update({
         where: { id: task.id },
-        data: { status: "completed", attempts: task.attempts + 1 }
+        data: { status: "completed", attempts: task.attempts + 1, nextRetryAt: null }
       });
       processed++;
     } catch (err) {
       const nextAttempts = task.attempts + 1;
       const nextStatus = nextAttempts >= MAX_ATTEMPTS ? "dead_letter" : "pending";
       const errorMsg = err instanceof Error ? err.message : String(err);
+      // PROJECT OMEGA / HIGH #1 & TOP-100 #4, #6 FIX: Exponential backoff delay (Math.pow(2, attempts) minutes)
+      const nextRetryAt = nextStatus === "pending" ? new Date(Date.now() + Math.pow(2, task.attempts) * 60000) : null;
 
       await db.orderTask.update({
         where: { id: task.id },
         data: {
           status: nextStatus,
           attempts: nextAttempts,
-          lastError: errorMsg.slice(0, 1000)
+          lastError: errorMsg.slice(0, 1000),
+          nextRetryAt
         }
       });
 

@@ -289,6 +289,7 @@ model OrderTask {
   status    String   @default("pending") /// pending, processing, completed, failed, dead_letter
   attempts  Int      @default(0)
   lastError String   @default("")
+  nextRetryAt DateTime? @default(now())
   payload   Json?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

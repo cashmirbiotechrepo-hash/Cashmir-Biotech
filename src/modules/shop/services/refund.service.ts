@@ -48,7 +48,7 @@ function orderLines(
  * Shared by admin refund action and refund.processed webhooks.
  */
 export async function applyOrderRefund(input: ApplyOrderRefundInput): Promise<ApplyOrderRefundResult> {
-  if (!input.razorpayRefundId || input.amountCents <= 0) {
+  if (!input.razorpayRefundId || input.amountCents <= 0 || !Number.isInteger(input.amountCents)) {
     return { ok: false, error: "invalid_refund" };
   }
 
@@ -82,7 +82,9 @@ export async function applyOrderRefund(input: ApplyOrderRefundInput): Promise<Ap
           applied = true;
         } catch (err) {
           if (!isUniqueViolation(err)) throw err;
-          duplicate = true;
+          // PROJECT OMEGA / CRITICAL #2 & TOP-100 #3 FIX: Immediately return on duplicate refund P2002
+          // Prevents execution fallthrough into aggregate / secondary inventory restoration (infinite stock inflation).
+          return { ok: true as const, applied: false, duplicate: true, fullyRefunded: false, newRefundedCents: 0 };
         }
 
         const aggregate = await tx.orderRefund.aggregate({
@@ -111,6 +113,14 @@ export async function applyOrderRefund(input: ApplyOrderRefundInput): Promise<Ap
             tx
           });
           restocked = true;
+        }
+
+        // PROJECT OMEGA / MEDIUM #1 & TOP-100 #7 FIX: Decrement Coupon.usedCount on full refund/cancellation
+        if (isFullyRefunded && order.couponCode) {
+          await tx.coupon.updateMany({
+            where: { code: order.couponCode, usedCount: { gt: 0 } },
+            data: { usedCount: { decrement: 1 } }
+          });
         }
 
         await tx.order.update({

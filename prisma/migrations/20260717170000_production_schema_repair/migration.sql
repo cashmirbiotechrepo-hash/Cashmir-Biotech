@@ -302,11 +302,13 @@ CREATE TABLE IF NOT EXISTS "OrderTask" (
   "status" TEXT NOT NULL DEFAULT 'pending',
   "attempts" INTEGER NOT NULL DEFAULT 0,
   "lastError" TEXT NOT NULL DEFAULT '',
+  "nextRetryAt" TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP,
   "payload" JSONB,
   "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
   "updatedAt" TIMESTAMP(3) NOT NULL,
   CONSTRAINT "OrderTask_pkey" PRIMARY KEY ("id")
 );
+ALTER TABLE "OrderTask" ADD COLUMN IF NOT EXISTS "nextRetryAt" TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP;
 CREATE INDEX IF NOT EXISTS "OrderTask_status_createdAt_idx" ON "OrderTask"("status", "createdAt");
 CREATE INDEX IF NOT EXISTS "OrderTask_orderId_idx" ON "OrderTask"("orderId");
 CREATE UNIQUE INDEX IF NOT EXISTS "OrderTask_orderId_type_key" ON "OrderTask"("orderId", "type");

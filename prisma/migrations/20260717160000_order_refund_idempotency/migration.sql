@@ -8,7 +8,8 @@ CREATE TABLE "OrderRefund" (
     "stockRestored" BOOLEAN NOT NULL DEFAULT false,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
-    CONSTRAINT "OrderRefund_pkey" PRIMARY KEY ("id")
+    CONSTRAINT "OrderRefund_pkey" PRIMARY KEY ("id"),
+    CONSTRAINT "OrderRefund_amount_nonneg" CHECK ("amountCents" > 0)
 );
 
 CREATE UNIQUE INDEX "OrderRefund_razorpayRefundId_key" ON "OrderRefund"("razorpayRefundId");

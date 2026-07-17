@@ -40,13 +40,14 @@ const checkoutSchema = z.object({
 
 const FINAL_ORDER_STATUSES = ["paid", "processing", "shipped", "delivered", "refunded", "partially_refunded"] as const;
 
-function readIdempotencyKey(request: Request) {
+function readIdempotencyKey(request: Request): string | { error: string } | null {
   const key = request.headers.get("idempotency-key")?.trim();
   if (!key) return null;
-  if (key.length <= 80) return key;
-  // If key exceeds 80 chars, combine prefix with SHA-256 hash so it never exceeds 100 char upstream proxy limits
-  const hash = createHash("sha256").update(key).digest("hex");
-  return `${key.slice(0, 30)}:${hash}`;
+  // PROJECT OMEGA / MED-02 FIX: Reject oversized keys immediately instead of hashing/slicing
+  if (key.length > 100) {
+    return { error: "Idempotency key exceeds maximum allowed length of 100 characters." };
+  }
+  return key;
 }
 
 function cartFromOrder(order: {
@@ -64,24 +65,41 @@ function cartFromOrder(order: {
   }>;
 }) {
   return {
-    lines: order.items.map((item) => ({
-      productId: item.productId ?? "",
+    subtotal: order.subtotalCents,
+    tax: order.taxCents,
+    shipping: order.shippingCents,
+    total: order.totalCents,
+    discount: order.discountCents ?? 0,
+    couponCode: order.couponCode ?? undefined,
+    items: order.items.map((item) => ({
+      productId: item.productId ?? "unknown",
       productName: item.productName,
       quantity: item.quantity,
-      unitPriceCents: item.unitPriceCents,
-      lineTotalCents: item.unitPriceCents * item.quantity
-    })),
-    subtotalCents: order.subtotalCents,
-    taxCents: order.taxCents,
-    shippingCents: order.shippingCents,
-    totalCents: order.totalCents,
-    couponCode: order.couponCode || undefined,
-    discountCents: order.discountCents || undefined
+      unitPriceCents: item.unitPriceCents
+    }))
   };
 }
 
 async function responseForExistingOrder(input: {
-  order: Awaited<ReturnType<typeof findOrderByIdempotencyKey>>;
+  order: {
+    id: string;
+    orderNumber: string;
+    status: string;
+    totalCents: number;
+    razorpayOrderId: string | null;
+    confirmationToken: string;
+    subtotalCents: number;
+    taxCents: number;
+    shippingCents: number;
+    discountCents: number | null;
+    couponCode: string | null;
+    items: Array<{
+      productId: string | null;
+      productName: string;
+      quantity: number;
+      unitPriceCents: number;
+    }>;
+  } | null;
 }) {
   const order = input.order;
   if (!order) return null;
@@ -155,7 +173,12 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: false, error: "Please check your cart and address details." }, { status: 422 });
   }
 
-  const idempotencyKey = readIdempotencyKey(request);
+  const idKeyResult = readIdempotencyKey(request);
+  if (idKeyResult && typeof idKeyResult === "object" && "error" in idKeyResult) {
+    return NextResponse.json({ ok: false, error: idKeyResult.error }, { status: 400 });
+  }
+  const idempotencyKey = idKeyResult as string | null;
+
   if (idempotencyKey) {
     const existingOrder = await findOrderByIdempotencyKey(idempotencyKey);
     const existingResponse = await responseForExistingOrder({ order: existingOrder });

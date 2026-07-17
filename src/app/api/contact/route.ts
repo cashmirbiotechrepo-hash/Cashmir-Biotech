@@ -4,6 +4,7 @@ import { db } from "@/lib/db";
 import { logger } from "@/lib/logger";
 import { SITE_CONTACT } from "@/lib/site-contact";
 import { requireJsonContent } from "@/lib/api-utils";
+import { getContactRatelimit, clientIpFromRequest } from "@/lib/rate-limit-edge";
 
 export const runtime = "nodejs";
 
@@ -18,6 +19,23 @@ const schema = z.object({
 export async function POST(request: Request) {
   const invalidType = requireJsonContent(request);
   if (invalidType) return invalidType;
+
+  // PROJECT OMEGA / HIGH-01 FIX: Rate limit contact route to prevent SMTP saturation / email bombing
+  const ip = clientIpFromRequest(request);
+  const rl = getContactRatelimit();
+  if (rl) {
+    const { success } = await rl.limit(ip);
+    if (!success) {
+      logger.warn({ ip, event: "contact_rate_limited" }, "Contact form submission rate limited");
+      return NextResponse.json({ ok: false, error: "Too many requests. Please try again in a few minutes." }, { status: 429 });
+    }
+  }
+
+  // PROJECT OMEGA / TOP-100 #6 FIX: Enforce payload volume limit (15 KB) to prevent memory flooding / DoS
+  const contentLength = Number(request.headers.get("content-length") ?? 0);
+  if (contentLength > 15000) {
+    return NextResponse.json({ ok: false, error: "Payload exceeds maximum allowed volume of 15 KB." }, { status: 413 });
+  }
 
   let body: unknown;
   try {

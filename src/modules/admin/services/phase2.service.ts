@@ -102,3 +102,22 @@ export async function nextInvoiceNumber() {
   });
   return `CB-${year}-${String(count + 1).padStart(4, "0")}`;
 }
+
+/**
+ * PROJECT OMEGA / CRIT-02 FIX: Atomic GST invoice sequence generation using PostgreSQL sequences.
+ * Invokes `SELECT nextval('invoice_seq')` to claim the next unique integer in O(1) time
+ * without acquiring table locks or risking TOCTOU count() collisions during concurrent checkouts.
+ */
+export async function nextInvoiceNumberAtomic(): Promise<string> {
+  const year = new Date().getFullYear();
+  try {
+    const result = await db.$queryRaw<Array<{ nextval: bigint }>>`
+      SELECT nextval('invoice_seq')
+    `;
+    const seq = Number(result[0]?.nextval ?? 1);
+    return `CB-${year}-${String(seq).padStart(4, "0")}`;
+  } catch {
+    // Fallback for non-Postgres / local SQLite test environments where invoice_seq does not exist yet
+    return nextInvoiceNumber();
+  }
+}
