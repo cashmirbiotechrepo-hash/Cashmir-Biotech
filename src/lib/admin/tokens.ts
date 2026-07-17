@@ -97,16 +97,7 @@ export class AdminTokenService {
       const stored = await db.adminRefreshToken.findUnique({ where: { tokenHash: oldTokenHash } });
       if (!stored) return { status: "invalid" };
 
-      if (!stored.revoked) {
-        // Atomic claim — only one concurrent request wins the rotation.
-        const claimed = await db.adminRefreshToken.updateMany({
-          where: { id: stored.id, revoked: false },
-          data: { revoked: true }
-        });
-        if (claimed.count === 0) {
-          return this.classifyRevokedToken(stored.sessionId);
-        }
-      } else {
+      if (stored.revoked) {
         return this.classifyRevokedToken(stored.sessionId);
       }
 
@@ -119,18 +110,57 @@ export class AdminTokenService {
       const newExpiresAt = slidingExpiry > maxAbsoluteExpiry ? maxAbsoluteExpiry : slidingExpiry;
       if (newExpiresAt <= new Date()) return { status: "invalid" };
 
-      await db.adminSession.update({
-        where: { id: session.id },
-        data: {
-          lastUsedAt: new Date(),
-          expiresAt: newExpiresAt
-        }
-      });
-
       const user = await db.adminUser.findFirst({
         where: { id: session.userId, active: true }
       });
       if (!user) return { status: "invalid" };
+
+      // Pre-generate the JWT before occupying a database transaction lock.
+      const jti = randomUUID();
+      const refreshToken = await new SignJWT({ sessionId: session.id, type: "refresh" })
+        .setProtectedHeader({ alg: "HS256" })
+        .setJti(jti)
+        .setIssuedAt()
+        .setIssuer(JWT_ISSUER)
+        .setAudience(JWT_AUDIENCE)
+        .setExpirationTime(REFRESH_TOKEN_EXPIRY)
+        .sign(jwtSecret());
+      const refreshTokenHash = createHash("sha256").update(refreshToken).digest("hex");
+
+      // Claim + replacement must commit together. Otherwise a losing tab can observe
+      // the revoked old token before the winner inserts its replacement (TOCTOU).
+      let raced = false;
+      await db.$transaction(async (tx) => {
+        const claimed = await tx.adminRefreshToken.updateMany({
+          where: { id: stored.id, revoked: false },
+          data: { revoked: true }
+        });
+        if (claimed.count === 0) {
+          raced = true;
+          return;
+        }
+
+        await tx.adminSession.update({
+          where: { id: session.id },
+          data: {
+            lastUsedAt: new Date(),
+            expiresAt: newExpiresAt
+          }
+        });
+
+        await tx.adminRefreshToken.create({
+          data: {
+            sessionId: session.id,
+            tokenHash: refreshTokenHash,
+            expiresAt: new Date(Date.now() + REFRESH_TOKEN_EXPIRY_MS)
+          }
+        });
+      });
+
+      if (raced) {
+        // Winner has already committed — newest token age is now trustworthy.
+        return this.classifyRevokedToken(stored.sessionId);
+      }
 
       const accessToken = await this.createAccessToken({
         sub: user.id,
@@ -140,7 +170,6 @@ export class AdminTokenService {
         role: user.role,
         sessionId: session.id
       });
-      const { token: refreshToken } = await this.createRefreshToken(session.id);
       return { status: "rotated", accessToken, refreshToken };
     } catch (err) {
       logger.error({ err, event: "refresh_rotate_unavailable" }, "refresh rotation unavailable");

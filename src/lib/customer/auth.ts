@@ -22,6 +22,8 @@ const ACCESS_TOKEN_EXPIRY = "15m";
 const ACCESS_COOKIE_MAX_AGE = 15 * 60; // 15 minutes in seconds
 
 const REFRESH_COOKIE_MAX_AGE = 90 * 24 * 60 * 60; // 90 days in seconds
+const CUSTOMER_REFRESH_EXPIRY_MS = 90 * 24 * 60 * 60 * 1000;
+const ROTATION_GRACE_MS = 10000;
 const OTP_EXPIRY_MS = 10 * 60 * 1000;
 const OTP_COOLDOWN_MS = 60 * 1000;
 const MAX_OTP_ATTEMPTS = 5;
@@ -375,6 +377,35 @@ export type CustomerRotateRefreshResult =
   /** Transient infra failure — caller must NOT clear cookies / force logout. */
   | { status: "unavailable" };
 
+async function classifyRevokedCustomerToken(
+  sessionId: string
+): Promise<CustomerRotateRefreshResult> {
+  const newest = await db.customerRefreshToken.findFirst({
+    where: { sessionId },
+    orderBy: { createdAt: "desc" },
+    select: { createdAt: true }
+  });
+  if (newest && Date.now() - newest.createdAt.getTime() < ROTATION_GRACE_MS) {
+    return { status: "raced" };
+  }
+
+  logger.warn(
+    { event: "customer_refresh_token_reuse", sessionId },
+    "customer refresh token reuse detected"
+  );
+  await db.$transaction(async (tx) => {
+    await tx.customerSession.updateMany({
+      where: { id: sessionId },
+      data: { isRevoked: true }
+    });
+    await tx.customerRefreshToken.updateMany({
+      where: { sessionId },
+      data: { revoked: true }
+    });
+  });
+  return { status: "invalid" };
+}
+
 /** Rotates customer refresh token — returns discriminated status (rotated, raced, invalid, or unavailable). */
 export async function rotateCustomerRefresh(encryptedRefreshCookie: string): Promise<CustomerRotateRefreshResult> {
   let jwt: string;
@@ -403,38 +434,7 @@ export async function rotateCustomerRefresh(encryptedRefreshCookie: string): Pro
     const stored = await db.customerRefreshToken.findUnique({ where: { tokenHash } });
     if (!stored) return { status: "invalid" };
 
-    if (stored.revoked) {
-      const newest = await db.customerRefreshToken.findFirst({
-        where: { sessionId: stored.sessionId },
-        orderBy: { createdAt: "desc" },
-        select: { createdAt: true }
-      });
-      if (newest && Date.now() - newest.createdAt.getTime() < 10000) {
-        // Concurrent refresh race inside 10s window — do not false-trigger full session revocation
-        return { status: "raced" };
-      }
-
-      // Token reuse detected outside grace window! Revoke the entire customer session immediately.
-      logger.warn({ event: "customer_refresh_token_reuse", sessionId: stored.sessionId }, "customer refresh token reuse detected");
-      await db.$transaction(async (tx) => {
-        await tx.customerSession.updateMany({
-          where: { id: stored.sessionId },
-          data: { isRevoked: true }
-        });
-        await tx.customerRefreshToken.updateMany({
-          where: { sessionId: stored.sessionId },
-          data: { revoked: true }
-        });
-      });
-      return { status: "invalid" };
-    }
-
-    // Atomic claim — only one concurrent request wins rotation.
-    const claimed = await db.customerRefreshToken.updateMany({
-      where: { id: stored.id, revoked: false },
-      data: { revoked: true }
-    });
-    if (claimed.count === 0) return { status: "raced" };
+    if (stored.revoked) return classifyRevokedCustomerToken(stored.sessionId);
 
     const session = await db.customerSession.findUnique({ where: { id: payload.sessionId } });
     if (!session || session.isRevoked || session.expiresAt < new Date()) return { status: "invalid" };
@@ -445,16 +445,57 @@ export async function rotateCustomerRefresh(encryptedRefreshCookie: string): Pro
     const newExpiresAt = slidingExpiry > maxAbsoluteExpiry ? maxAbsoluteExpiry : slidingExpiry;
     if (newExpiresAt <= new Date()) return { status: "invalid" };
 
-    await db.customerSession.update({
-      where: { id: session.id },
-      data: {
-        lastUsedAt: new Date(),
-        expiresAt: newExpiresAt
-      }
-    });
-
     const customer = await db.customer.findUnique({ where: { id: session.customerId } });
     if (!customer || !customer.active) return { status: "invalid" };
+
+    // Pre-generate the JWT before occupying a database transaction lock.
+    const newJti = randomUUID();
+    const refreshToken = await new SignJWT({
+      sessionId: session.id,
+      type: "customer_refresh"
+    })
+      .setProtectedHeader({ alg: "HS256" })
+      .setJti(newJti)
+      .setIssuedAt()
+      .setIssuer(JWT_ISSUER)
+      .setAudience(CUSTOMER_JWT_AUDIENCE)
+      .setExpirationTime("90d")
+      .sign(jwtSecret());
+    const refreshTokenHash = createHash("sha256").update(refreshToken).digest("hex");
+
+    // Claim + replacement must commit together (TOCTOU fix — same as admin).
+    let raced = false;
+    await db.$transaction(async (tx) => {
+      const claimed = await tx.customerRefreshToken.updateMany({
+        where: { id: stored.id, revoked: false },
+        data: { revoked: true }
+      });
+      if (claimed.count === 0) {
+        raced = true;
+        return;
+      }
+
+      await tx.customerSession.update({
+        where: { id: session.id },
+        data: {
+          lastUsedAt: new Date(),
+          expiresAt: newExpiresAt
+        }
+      });
+
+      await tx.customerRefreshToken.create({
+        data: {
+          sessionId: session.id,
+          tokenHash: refreshTokenHash,
+          expiresAt: new Date(Date.now() + CUSTOMER_REFRESH_EXPIRY_MS)
+        }
+      });
+    });
+
+    if (raced) {
+      // Winner has already committed — newest token age is now trustworthy.
+      return classifyRevokedCustomerToken(stored.sessionId);
+    }
 
     const accessToken = await mintCustomerAccessToken({
       id: customer.id,
@@ -463,7 +504,6 @@ export async function rotateCustomerRefresh(encryptedRefreshCookie: string): Pro
       sessionId: session.id,
       emailVerified: Boolean(customer.emailVerifiedAt)
     });
-    const refreshToken = await mintCustomerRefreshToken(session.id);
     return { status: "rotated", accessToken, refreshToken };
   } catch (err) {
     // Database / infra blips must not look like an invalid session (audit MED-01).
