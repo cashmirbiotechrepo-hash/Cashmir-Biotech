@@ -1,5 +1,13 @@
-import nextCoreWebVitals from "eslint-config-next/core-web-vitals";
-import nextTypescript from "eslint-config-next/typescript";
+import { dirname } from "node:path";
+import { fileURLToPath } from "node:url";
+import { FlatCompat } from "@eslint/eslintrc";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+
+const compat = new FlatCompat({
+  baseDirectory: __dirname
+});
 
 const config = [
   {
@@ -12,20 +20,7 @@ const config = [
       "src/generated/**"
     ]
   },
-  ...nextCoreWebVitals,
-  ...nextTypescript,
-  {
-    files: ["**/*.{ts,tsx}"],
-    rules: {
-      // Existing UI patterns are valid React but trip Next 16's stricter
-      // compiler lint rules. Keep CI lint focused on actionable defects until
-      // the app is intentionally refactored for React Compiler compliance.
-      "react-hooks/purity": "off",
-      "react-hooks/refs": "off",
-      "react-hooks/immutability": "off",
-      "react-hooks/set-state-in-effect": "off"
-    }
-  },
+  ...compat.extends("next/core-web-vitals", "next/typescript"),
   {
     files: ["**/*.cjs"],
     rules: {
