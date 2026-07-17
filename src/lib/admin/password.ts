@@ -10,11 +10,6 @@ function applyPepper(password: string): string {
   return createHmac("sha256", pepper).update(password).digest("hex");
 }
 
-/** Legacy env-admin hashes used bcrypt(password) without pepper — detect by re-hash path in verify. */
-function applyLegacyPepper(password: string): string {
-  return password;
-}
-
 export class AdminPasswordService {
   static hash(password: string): string {
     return hashSync(applyPepper(password), BCRYPT_ROUNDS);
@@ -23,9 +18,7 @@ export class AdminPasswordService {
   static verify(password: string, hashValue: string): boolean {
     if (!hashValue) return false;
     const peppered = applyPepper(password);
-    if (compareSync(peppered, hashValue)) return true;
-    // Legacy: bcrypt of raw password (migrated env ADMIN_PASSWORD_HASH)
-    return compareSync(applyLegacyPepper(password), hashValue);
+    return compareSync(peppered, hashValue);
   }
 
   /** Run a dummy hash to equalize timing when user is unknown. */
@@ -34,8 +27,7 @@ export class AdminPasswordService {
   }
 
   static needsPepperUpgrade(password: string, hashValue: string): boolean {
-    if (compareSync(applyPepper(password), hashValue)) return false;
-    return compareSync(applyLegacyPepper(password), hashValue);
+    return false;
   }
 
   static timingSafeEqualStrings(a: string, b: string): boolean {

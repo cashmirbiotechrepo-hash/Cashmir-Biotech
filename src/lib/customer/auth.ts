@@ -1,4 +1,5 @@
 import "server-only";
+import type { Prisma } from "@prisma/client";
 import { createHash, randomInt, randomUUID, timingSafeEqual } from "crypto";
 import { SignJWT, jwtVerify } from "jose";
 import { cookies, headers } from "next/headers";
@@ -13,6 +14,7 @@ import { env } from "@/config/env.server";
 import { db } from "@/lib/db";
 import { decryptToken, encryptToken } from "@/lib/admin/encryption";
 import { logger } from "@/lib/logger";
+import { sendOtpMail } from "@/lib/admin/mail";
 
 const SESSION_DAYS = 90;
 /** Long-lived access so customers stay signed in across visits; revoke still clears DB session. */
@@ -42,11 +44,25 @@ export type CustomerSessionPayload = {
 
 export async function linkGuestOrdersToCustomer(customerId: string, email: string) {
   const normalized = email.toLowerCase().trim();
+  const customer = await db.customer.findUnique({ where: { id: customerId } });
+  const phone = customer?.phone?.trim();
+
+  // BIZ-18 FIX: Only link guest orders where the phone number matches the verified customer account
+  // (or where the guest order had no phone recorded), preventing email-only OTP intercepts from
+  // exposing historical order history and invoices with mismatched phone numbers.
+  const whereClause: Prisma.OrderWhereInput = {
+    customerId: null,
+    customerEmail: { equals: normalized, mode: "insensitive" }
+  };
+
+  if (phone) {
+    whereClause.OR = [{ customerPhone: "" }, { customerPhone: phone }];
+  } else {
+    whereClause.customerPhone = "";
+  }
+
   const result = await db.order.updateMany({
-    where: {
-      customerId: null,
-      customerEmail: { equals: normalized, mode: "insensitive" }
-    },
+    where: whereClause,
     data: { customerId }
   });
   return { linkedCount: result.count };
@@ -156,7 +172,6 @@ export async function requestPortalOtp(emailRaw: string): Promise<{ ok: true } |
   });
 
   if (smtpReady) {
-    const { sendOtpMail } = await import("@/lib/admin/mail");
     const sent = await sendOtpMail({
       to: email,
       kind: "portal_login",
@@ -190,29 +205,46 @@ export async function verifyPortalOtp(
     return { ok: false, error: "Invalid or expired code." };
   }
 
-  const otp = await db.customerOtp.findFirst({
-    where: { email, purpose: "login", usedAt: null },
+  // HIGH-04 FIX: Check all active (unused, unexpired, attempts < MAX) OTP codes for this email and purpose,
+  // rather than strictly the newest row. This prevents an attacker from causing DoS by requesting a new code
+  // every 60s while the victim is typing their valid code.
+  const activeOtps = await db.customerOtp.findMany({
+    where: {
+      email,
+      purpose: "login",
+      usedAt: null,
+      expiresAt: { gt: new Date() },
+      attempts: { lt: MAX_OTP_ATTEMPTS }
+    },
     orderBy: { createdAt: "desc" }
   });
-  if (!otp || otp.expiresAt.getTime() < Date.now()) {
-    return { ok: false, error: "Invalid or expired code." };
-  }
-  if (otp.attempts >= MAX_OTP_ATTEMPTS) {
-    return { ok: false, error: "Too many attempts. Request a new code." };
-  }
-
-  const valid = (() => {
-    const a = Buffer.from(hashOtp(code));
-    const b = Buffer.from(otp.codeHash);
-    if (a.length !== b.length) return false;
-    return timingSafeEqual(a, b);
-  })();
-  if (!valid) {
-    await db.customerOtp.update({ where: { id: otp.id }, data: { attempts: { increment: 1 } } });
+  if (activeOtps.length === 0) {
     return { ok: false, error: "Invalid or expired code." };
   }
 
-  await db.customerOtp.update({ where: { id: otp.id }, data: { usedAt: new Date() } });
+  let matchedOtp: (typeof activeOtps)[number] | null = null;
+  const inputHashBuf = Buffer.from(hashOtp(code));
+
+  for (const candidate of activeOtps) {
+    const candBuf = Buffer.from(candidate.codeHash);
+    if (candBuf.length === inputHashBuf.length && timingSafeEqual(candBuf, inputHashBuf)) {
+      matchedOtp = candidate;
+    }
+  }
+
+  if (!matchedOtp) {
+    await db.customerOtp.update({
+      where: { id: activeOtps[0]!.id },
+      data: { attempts: { increment: 1 } }
+    });
+    return { ok: false, error: "Invalid or expired code." };
+  }
+
+  // Mark all unused login OTPs for this email as used so none can be replayed
+  await db.customerOtp.updateMany({
+    where: { email, purpose: "login", usedAt: null },
+    data: { usedAt: new Date() }
+  });
 
   const firstVerify = !customer.emailVerifiedAt;
   if (firstVerify) {
@@ -285,13 +317,25 @@ async function mintCustomerAccessToken(payload: CustomerSessionPayload) {
 }
 
 async function mintCustomerRefreshToken(sessionId: string): Promise<string> {
-  return new SignJWT({ sessionId, type: "customer_refresh" })
+  const jti = randomUUID();
+  const jwt = await new SignJWT({ sessionId, type: "customer_refresh" })
     .setProtectedHeader({ alg: "HS256" })
+    .setJti(jti)
     .setIssuedAt()
     .setIssuer(JWT_ISSUER)
     .setAudience(CUSTOMER_JWT_AUDIENCE)
     .setExpirationTime("90d")
     .sign(jwtSecret());
+
+  const tokenHash = createHash("sha256").update(jwt).digest("hex");
+  await db.customerRefreshToken.create({
+    data: {
+      sessionId,
+      tokenHash,
+      expiresAt: new Date(Date.now() + 90 * 24 * 60 * 60 * 1000)
+    }
+  });
+  return jwt;
 }
 
 export async function setCustomerSessionCookies(accessToken: string, refreshToken?: string) {
@@ -336,16 +380,57 @@ export async function rotateCustomerRefresh(encryptedRefreshCookie: string): Pro
     });
     if (payload.type !== "customer_refresh" || typeof payload.sessionId !== "string") return null;
 
+    // CRIT-02 FIX: Lookup refresh token hash in db for reuse detection and single-use rotation.
+    const tokenHash = createHash("sha256").update(jwt).digest("hex");
+    const stored = await db.customerRefreshToken.findUnique({ where: { tokenHash } });
+    if (!stored) return null;
+
+    if (stored.revoked) {
+      const newest = await db.customerRefreshToken.findFirst({
+        where: { sessionId: stored.sessionId },
+        orderBy: { createdAt: "desc" },
+        select: { createdAt: true }
+      });
+      if (newest && Date.now() - newest.createdAt.getTime() < 10000) {
+        // Concurrent refresh race inside 10s window — do not false-trigger full session revocation
+        return null;
+      }
+
+      // Token reuse detected outside grace window! Revoke the entire customer session immediately.
+      logger.warn({ event: "customer_refresh_token_reuse", sessionId: stored.sessionId }, "customer refresh token reuse detected");
+      await db.customerSession.updateMany({
+        where: { id: stored.sessionId },
+        data: { isRevoked: true }
+      });
+      await db.customerRefreshToken.updateMany({
+        where: { sessionId: stored.sessionId },
+        data: { revoked: true }
+      });
+      return null;
+    }
+
+    // Atomic claim — only one concurrent request wins rotation.
+    const claimed = await db.customerRefreshToken.updateMany({
+      where: { id: stored.id, revoked: false },
+      data: { revoked: true }
+    });
+    if (claimed.count === 0) return null;
+
     const session = await db.customerSession.findUnique({ where: { id: payload.sessionId } });
     if (!session || session.isRevoked || session.expiresAt < new Date()) return null;
 
-    // Sliding expiry — stay logged in while the account is used
+    // Sliding expiry — stay logged in while the account is used, hard-capped at SESSION_DAYS from creation
+    const maxAbsoluteExpiry = new Date(session.createdAt.getTime() + SESSION_DAYS * 24 * 60 * 60 * 1000);
+    const slidingExpiry = new Date(Date.now() + SESSION_DAYS * 24 * 60 * 60 * 1000);
+    const newExpiresAt = slidingExpiry > maxAbsoluteExpiry ? maxAbsoluteExpiry : slidingExpiry;
+    if (newExpiresAt <= new Date()) return null;
+
     await db.customerSession
       .update({
         where: { id: session.id },
         data: {
           lastUsedAt: new Date(),
-          expiresAt: new Date(Date.now() + SESSION_DAYS * 24 * 60 * 60 * 1000)
+          expiresAt: newExpiresAt
         }
       })
       .catch(() => undefined);
@@ -425,6 +510,10 @@ export async function logoutCustomer() {
     await db.customerSession.update({
       where: { id: customer.sessionId },
       data: { isRevoked: true }
+    }).catch(() => undefined);
+    await db.customerRefreshToken.updateMany({
+      where: { sessionId: customer.sessionId, revoked: false },
+      data: { revoked: true }
     }).catch(() => undefined);
     const { markSessionRevokedEdge } = await import("@/lib/session-revoke-edge");
     await markSessionRevokedEdge(customer.sessionId).catch(() => undefined);

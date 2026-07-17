@@ -98,12 +98,31 @@ export type PriceResult = { ok: true; cart: PricedCart } | { ok: false; error: s
  * The client only supplies product IDs + quantities + optional coupon — never prices or totals.
  */
 export async function priceCart(items: CartInputItem[], couponCode?: string): Promise<PriceResult> {
+  if (!items || !Array.isArray(items) || items.length === 0) {
+    return { ok: false, error: "Your cart is empty." };
+  }
+  if (items.length > 20) {
+    return { ok: false, error: "Too many distinct items in cart (maximum 20)." };
+  }
+
   const clean = new Map<string, number>();
+  let totalUnits = 0;
   for (const item of items) {
-    if (!item?.productId || typeof item.quantity !== "number") continue;
+    if (!item?.productId || typeof item.productId !== "string" || typeof item.quantity !== "number" || !Number.isFinite(item.quantity)) continue;
     const qty = Math.floor(item.quantity);
-    if (qty < 1) continue;
-    clean.set(item.productId, Math.min(MAX_QTY_PER_ITEM, (clean.get(item.productId) ?? 0) + qty));
+    if (qty < 1 || qty > MAX_QTY_PER_ITEM) {
+      return { ok: false, error: `Quantity per item must be between 1 and ${MAX_QTY_PER_ITEM}.` };
+    }
+    const current = clean.get(item.productId) ?? 0;
+    const combined = current + qty;
+    if (combined > MAX_QTY_PER_ITEM) {
+      return { ok: false, error: `Maximum ${MAX_QTY_PER_ITEM} units allowed per item.` };
+    }
+    clean.set(item.productId, combined);
+    totalUnits += qty;
+    if (totalUnits > 100) {
+      return { ok: false, error: "Cart exceeds maximum total units limit (100)." };
+    }
   }
   if (clean.size === 0) return { ok: false, error: "Your cart is empty." };
 
@@ -401,6 +420,18 @@ export async function markOrderPaid(input: {
 
       // Re-drive inventory if a prior attempt left paid-without-deduct.
       if (!existing.stockDeducted && existing.status === "paid") {
+        // Atomic claim: ensure no concurrent retry thread double-deducts inventory
+        const claimedRedrive = await db.$executeRaw`
+          UPDATE "Order"
+          SET "stockDeducted" = true, "stockReserved" = false, "updatedAt" = now()
+          WHERE id = ${input.orderId} AND "stockDeducted" = false
+        `;
+        if (claimedRedrive === 0) {
+          const { enqueuePostPaymentTask } = await import("@/modules/shop/services/outbox.service");
+          await enqueuePostPaymentTask(input.orderId);
+          return { ok: true, confirmationToken: existing.confirmationToken, alreadyPaid: true };
+        }
+
         const order = await db.order.findUnique({
           where: { id: input.orderId },
           include: { items: true }
@@ -412,6 +443,7 @@ export async function markOrderPaid(input: {
             const res = await reserveStockForOrder({ orderId: order.id, lines });
             if (!res.ok) {
               logger.error({ orderId: order.id, err: res.error }, "redrive stock reservation failed");
+              await db.order.update({ where: { id: order.id }, data: { stockDeducted: false } });
               return { ok: false, confirmationToken: order.confirmationToken };
             }
             await db.order.update({ where: { id: order.id }, data: { stockReserved: true } });
@@ -422,12 +454,9 @@ export async function markOrderPaid(input: {
             releaseReserved: true,
             createdBy: `payment:${input.source}:redrive`
           });
-          await db.order.update({
-            where: { id: order.id },
-            data: { stockDeducted: true, stockReserved: false }
-          });
         } catch (err) {
           logger.error({ orderId: input.orderId, err }, "redrive stock deduct failed");
+          await db.order.update({ where: { id: input.orderId }, data: { stockDeducted: false } });
           return { ok: false, confirmationToken: existing.confirmationToken };
         }
       }
@@ -489,10 +518,18 @@ export async function markOrderPaid(input: {
         AND ("maxUses" IS NULL OR "usedCount" < "maxUses")
     `;
     if (burned === 0) {
-      logger.warn(
+      logger.error(
         { orderId: order.id, coupon: order.couponCode },
-        "coupon maxUses reached at burn time — order remains paid"
+        "Coupon maxUses reached at payment — holding order for compliance review"
       );
+      await db.order.update({
+        where: { id: order.id },
+        data: {
+          status: "pending",
+          adminNotes: "[SECURITY] Coupon maxUses breached at payment. Order held for compliance review and full collection."
+        }
+      });
+      return { ok: false, confirmationToken: order.confirmationToken };
     }
   }
 

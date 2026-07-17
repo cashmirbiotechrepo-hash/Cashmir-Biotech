@@ -110,23 +110,6 @@ const serverEnvSchema = z
     }
 
     if (liveDeploy) {
-      if (process.env.CHECKOUT_SKIP_PAYMENT === "true" || process.env.CHECKOUT_SKIP_PAYMENT === "1") {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          message: "CHECKOUT_SKIP_PAYMENT must not be enabled in production.",
-          path: ["CHECKOUT_SKIP_PAYMENT"]
-        });
-      }
-      if (
-        process.env.NEXT_PUBLIC_CHECKOUT_SKIP_PAYMENT === "true" ||
-        process.env.NEXT_PUBLIC_CHECKOUT_SKIP_PAYMENT === "1"
-      ) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          message: "NEXT_PUBLIC_CHECKOUT_SKIP_PAYMENT must not be set in production builds.",
-          path: ["NEXT_PUBLIC_CHECKOUT_SKIP_PAYMENT"]
-        });
-      }
       if (process.env.E2E_HOOKS_ENABLED === "true" || process.env.E2E_HOOKS_ENABLED === "1") {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,

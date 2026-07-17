@@ -1,6 +1,5 @@
 import "server-only";
 import { db } from "@/lib/db";
-import { featureEnabled } from "@/lib/feature-flags";
 import { logger } from "@/lib/logger";
 
 const DEFAULT_PLANS = [
@@ -81,24 +80,7 @@ export async function startCircleSubscription(input: {
     return { ok: false as const, error: "You already have an active Research Circle membership." };
   }
 
-  const skip = featureEnabled("checkout_skip_payment");
-
-  if (skip) {
-    const now = new Date();
-    const sub = await db.researchCircleSubscription.create({
-      data: {
-        customerId: input.customerId,
-        planId: plan.id,
-        status: "active",
-        currentPeriodStart: now,
-        currentPeriodEnd: addMonths(now, plan.intervalMonths),
-        razorpayPaymentId: `circle_skip_${Date.now()}`
-      },
-      include: { plan: true }
-    });
-    logger.info({ event: "circle_subscribed_skip", customerId: input.customerId, planId: plan.id }, "circle join (skip pay)");
-    return { ok: true as const, skipPayment: true as const, subscription: sub };
-  }
+  // Online payment completion flow is required for enrollment
 
   logger.warn(
     { event: "circle_paid_join_disabled", customerId: input.customerId, planId: plan.id },

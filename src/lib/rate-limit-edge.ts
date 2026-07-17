@@ -22,6 +22,7 @@ const singletons = new Map<string, Ratelimit>();
 
 class InMemoryStore {
   private windows = new Map<string, number[]>();
+  private lastCleanup = 0;
 
   hit(key: string, maxHits: number, windowMs: number): { success: boolean; remaining: number } {
     const now = Date.now();
@@ -30,10 +31,16 @@ class InMemoryStore {
     hits.push(now);
     this.windows.set(key, hits);
 
-    // Periodic cleanup of stale keys
-    if (this.windows.size > 10_000) {
+    // Throttled, bounded cleanup of stale keys to prevent event loop blocking
+    if (this.windows.size > 5_000 && now - this.lastCleanup > 30_000) {
+      this.lastCleanup = now;
+      let cleaned = 0;
       for (const [k, v] of this.windows) {
-        if (v.every((t) => t < cutoff)) this.windows.delete(k);
+        if (v.every((t) => t < cutoff)) {
+          this.windows.delete(k);
+          cleaned++;
+          if (cleaned >= 1000) break;
+        }
       }
     }
 
@@ -178,12 +185,20 @@ export function getPaymentVerifyRatelimit(): Ratelimit {
   return createRateLimiter({ prefix: "payment_verify", limit: 30, window: "1 m" });
 }
 
+/** Rate limit PoW challenge requests — 30 per minute per IP. */
+export function getPowChallengeRatelimit(): Ratelimit {
+  return createRateLimiter({ prefix: "pow_challenge", limit: 30, window: "1 m" });
+}
+
 /**
  * Resolve client IP for rate limiting.
  * Prefer platform-trusted headers (Cloudflare / proxies) over the leftmost
  * X-Forwarded-For hop, which clients can forge.
  */
 export function clientIpFromRequest(request: Request): string {
+  const reqIp = (request as { ip?: string }).ip?.trim();
+  if (reqIp) return reqIp;
+
   const cf = request.headers.get("cf-connecting-ip")?.trim();
   if (cf) return cf;
 

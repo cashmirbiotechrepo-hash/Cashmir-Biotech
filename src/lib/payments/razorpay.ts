@@ -122,6 +122,10 @@ export async function assertCapturedPayment(input: {
     if (json.status !== "captured") {
       return { ok: false, error: `Payment status is ${json.status}.` };
     }
+    if (json.currency !== "INR") {
+      logger.error({ event: "razorpay_currency_mismatch", expected: "INR", actual: json.currency, paymentId: input.paymentId }, "payment currency mismatch");
+      return { ok: false, error: "Payment currency must be INR." };
+    }
     if (Number(json.amount) !== input.amountCents) {
       logger.error(
         {
@@ -141,7 +145,7 @@ export async function assertCapturedPayment(input: {
 }
 
 /** Issues a Razorpay refund against a captured payment (amount in paise). */
-export type RazorpayRefund = { id: string; amount: number; status: string; payment_id: string };
+export type RazorpayRefund = { id: string; amount: number; currency?: string; status: string; payment_id: string };
 
 export async function createRazorpayRefund(input: {
   paymentId: string;
@@ -176,6 +180,49 @@ export async function createRazorpayRefund(input: {
       throw new Error(json?.error?.description ?? "Failed to create refund.");
     }
     return json as RazorpayRefund;
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+/** Fetches a refund from Razorpay API and asserts amount/status/currency (REF-16). */
+export async function verifyRazorpayRefund(input: {
+  refundId: string;
+  expectedAmountCents?: number;
+}): Promise<{ ok: true; refund: RazorpayRefund } | { ok: false; error: string }> {
+  const keyId = process.env.RAZORPAY_KEY_ID;
+  const keySecret = process.env.RAZORPAY_KEY_SECRET;
+  if (!keyId || !keySecret) return { ok: false, error: "Razorpay is not configured." };
+
+  const auth = Buffer.from(`${keyId}:${keySecret}`).toString("base64");
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 15000);
+  try {
+    const res = await fetch(`${RZP_API}/refunds/${encodeURIComponent(input.refundId)}`, {
+      headers: { Authorization: `Basic ${auth}` },
+      signal: controller.signal
+    });
+    const json = (await res.json().catch(() => null)) as RazorpayRefund | null;
+    if (!res.ok || !json) {
+      logger.error({ event: "razorpay_refund_fetch_failed", status: res.status, body: json }, "refund fetch failed");
+      return { ok: false, error: "Could not confirm refund with Razorpay." };
+    }
+    if (json.currency && json.currency !== "INR") {
+      return { ok: false, error: "Refund currency must be INR." };
+    }
+    if (typeof input.expectedAmountCents === "number" && Number(json.amount) !== input.expectedAmountCents) {
+      logger.error(
+        {
+          event: "razorpay_refund_amount_mismatch",
+          expected: input.expectedAmountCents,
+          actual: json.amount,
+          refundId: input.refundId
+        },
+        "refund amount mismatch"
+      );
+      return { ok: false, error: "Refund amount does not match expected amount." };
+    }
+    return { ok: true, refund: json };
   } finally {
     clearTimeout(timeout);
   }

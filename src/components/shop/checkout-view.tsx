@@ -877,7 +877,7 @@ export function CheckoutView({
 
             {/* Desktop CTA (sticky aside also has one) */}
             <div className="hidden lg:block">
-              <PayButton total={total} submitting={submitting} valid={isValid} attempted={attempted} />
+              <SubmitButton total={total} submitting={submitting} valid={isValid} attempted={attempted} />
             </div>
           </form>
 
@@ -955,7 +955,7 @@ export function CheckoutView({
             </ul>
 
             <div className="mt-5">
-              <PayButton total={total} submitting={submitting} valid={isValid} attempted={attempted} />
+              <SubmitButton total={total} submitting={submitting} valid={isValid} attempted={attempted} />
               <PaymentStrip className="mt-3" />
             </div>
           </aside>
@@ -1126,7 +1126,7 @@ function Accordion({
   );
 }
 
-function PayButton({
+function SubmitButton({
   total,
   submitting,
   valid,
@@ -1137,15 +1137,8 @@ function PayButton({
   valid: boolean;
   attempted: boolean;
 }) {
-  const skipPayment = process.env.NEXT_PUBLIC_CHECKOUT_SKIP_PAYMENT === "true";
-
   return (
     <div>
-      {skipPayment ? (
-        <p className="mb-2 border border-gold/40 bg-pearl/80 px-3 py-2 text-center text-[12px] text-ink">
-          Test mode — Razorpay is off. Orders complete without payment.
-        </p>
-      ) : null}
       <button
         type="submit"
         form="checkout-form"
@@ -1153,13 +1146,7 @@ function PayButton({
         className="flex min-h-[3.5rem] w-full items-center justify-center gap-2 bg-ink text-[15px] font-medium text-paper shadow-[0_10px_28px_-14px_rgba(17,17,17,0.55)] transition-transform hover:-translate-y-px disabled:cursor-wait disabled:hover:translate-y-0"
       >
         <Lock className="h-4 w-4" strokeWidth={2} />
-        {submitting
-          ? skipPayment
-            ? "Placing test order…"
-            : "Opening secure payment…"
-          : skipPayment
-            ? `Complete test order · ${inr.format(total)}`
-            : `Complete secure purchase · ${inr.format(total)}`}
+        {submitting ? "Opening secure payment…" : `Complete secure purchase · ${inr.format(total)}`}
       </button>
       {attempted && !valid ? (
         <p className="mt-2 text-center text-[12px] text-red-700">

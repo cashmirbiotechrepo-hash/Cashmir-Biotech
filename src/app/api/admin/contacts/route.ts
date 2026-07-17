@@ -1,6 +1,7 @@
 import { adminErr, adminOk, requireAdminApi } from "@/lib/admin/api";
 import { db } from "@/lib/db";
 import { contactSchema } from "@/modules/admin/validations/phase2";
+import { requireJsonContent } from "@/lib/api-utils";
 
 export async function GET() {
   const { error } = await requireAdminApi();
@@ -10,6 +11,9 @@ export async function GET() {
 }
 
 export async function POST(req: Request) {
+  const invalidType = requireJsonContent(req);
+  if (invalidType) return invalidType;
+
   const { admin, error } = await requireAdminApi();
   if (error || !admin) return error!;
   let body: unknown;

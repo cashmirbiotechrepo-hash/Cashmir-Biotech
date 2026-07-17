@@ -2,12 +2,16 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { db } from "@/lib/db";
 import { logger } from "@/lib/logger";
+import { requireJsonContent } from "@/lib/api-utils";
 
 const subscribeSchema = z.object({
   email: z.string().trim().email().max(320)
 });
 
 export async function POST(request: Request) {
+  const invalidType = requireJsonContent(request);
+  if (invalidType) return invalidType;
+
   let body: unknown;
   try {
     body = await request.json();

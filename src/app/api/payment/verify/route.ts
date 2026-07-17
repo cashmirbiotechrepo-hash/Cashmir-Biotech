@@ -4,6 +4,7 @@ import { db } from "@/lib/db";
 import { logger } from "@/lib/logger";
 import { markOrderPaid } from "@/modules/shop/services/order.service";
 import { assertCapturedPayment, verifyPaymentSignature } from "@/lib/payments/razorpay";
+import { requireJsonContent } from "@/lib/api-utils";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -15,6 +16,9 @@ const verifySchema = z.object({
 });
 
 export async function POST(request: Request) {
+  const invalidType = requireJsonContent(request);
+  if (invalidType) return invalidType;
+
   let body: unknown;
   try {
     body = await request.json();

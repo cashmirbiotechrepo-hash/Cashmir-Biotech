@@ -11,6 +11,7 @@ import {
   getOrderLookupRatelimit,
   getPaymentVerifyRatelimit,
   getPortalOtpRatelimit,
+  getPowChallengeRatelimit,
   getToolsRatelimit
 } from "@/lib/rate-limit-edge";
 
@@ -196,6 +197,17 @@ export async function middleware(request: NextRequest) {
         const url = request.nextUrl.clone();
         url.searchParams.set("rateLimited", "1");
         return attachSecurityHeaders(NextResponse.redirect(url), request, nonce);
+      }
+    }
+  }
+
+  if (pathname === "/api/admin/auth/pow-challenge" && request.method === "GET") {
+    const rl = getPowChallengeRatelimit();
+    if (rl) {
+      const ip = clientIpFromRequest(request);
+      const { success } = await rl.limit(ip);
+      if (!success) {
+        return deny(request, nonce, 429, { error: "Too many challenge requests. Please slow down." });
       }
     }
   }

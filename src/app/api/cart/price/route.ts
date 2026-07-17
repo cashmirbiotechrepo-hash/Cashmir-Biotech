@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { db } from "@/lib/db";
 import { priceCart } from "@/modules/shop/services/order.service";
+import { requireJsonContent } from "@/lib/api-utils";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -24,6 +25,9 @@ const bodySchema = z.object({
  * Client prices in localStorage are advisory only.
  */
 export async function POST(request: Request) {
+  const invalidType = requireJsonContent(request);
+  if (invalidType) return invalidType;
+
   let body: unknown;
   try {
     body = await request.json();

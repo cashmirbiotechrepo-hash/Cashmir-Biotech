@@ -1,5 +1,4 @@
 import "server-only";
-import { compareSync } from "bcryptjs";
 import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
 import {
@@ -68,14 +67,6 @@ export async function verifyAdminSession(token: string) {
   }
 }
 
-/** Legacy env credential check — migration/seed only */
-export function credentialsAreValid(email: string, password: string) {
-  const adminEmail = env.ADMIN_EMAIL;
-  const adminHash = env.ADMIN_PASSWORD_HASH;
-  if (!adminEmail || !adminHash) return false;
-  const emailMatches = email.toLowerCase() === adminEmail.toLowerCase();
-  return emailMatches && compareSync(password, adminHash);
-}
 
 export async function getCurrentAdmin(): Promise<AdminSession | null> {
   const admin = await readAndVerifyCookie();

@@ -32,16 +32,18 @@ export async function isSessionRevokedEdge(sessionId: string): Promise<boolean> 
 
   const r = redis();
   if (!r) {
-    // No distributed denylist — access JWTs are short-lived (15m); DB session checks cover Node routes.
+    const strictProd =
+      process.env.NODE_ENV === "production" &&
+      (process.env.RUNTIME_ENV_STRICT === "true" || process.env.VERCEL_ENV === "production");
+    if (strictProd) {
+      return true;
+    }
     return false;
   }
   try {
     const v = await r.get(key);
     return Boolean(v);
   } catch {
-    // S-01 FIX: Fail closed in production — if we cannot verify the denylist,
-    // treat the session as revoked. This prevents a Redis outage from bypassing
-    // session revocation for deactivated/logged-out users.
     if (process.env.NODE_ENV === "production") {
       return true;
     }

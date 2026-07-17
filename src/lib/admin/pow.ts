@@ -40,22 +40,25 @@ async function getRedis() {
 const devUsedChallenges = new Map<string, number>();
 
 async function markChallengeUsed(challenge: string): Promise<boolean> {
-  const redis = await getRedis();
-
-  if (redis) {
-    // Atomic SETNX + TTL: returns true only if we set it (first use)
-    const key = `pow:used:${challenge}`;
-    const ttlSeconds = Math.ceil((POW_CONFIG.validityWindowMs * 2) / 1000);
-    const wasSet = await redis.set(key, "1", { nx: true, ex: ttlSeconds });
-    return wasSet === "OK";
-  }
-
   const strictProd =
     process.env.NODE_ENV === "production" &&
     (process.env.RUNTIME_ENV_STRICT === "true" || process.env.VERCEL_ENV === "production");
 
+  try {
+    const redis = await getRedis();
+    if (redis) {
+      const key = `pow:used:${challenge}`;
+      const ttlSeconds = Math.ceil((POW_CONFIG.validityWindowMs * 2) / 1000);
+      const wasSet = await redis.set(key, "1", { nx: true, ex: ttlSeconds });
+      return wasSet === "OK";
+    }
+  } catch (err) {
+    if (process.env.NODE_ENV === "production") {
+      return false;
+    }
+  }
+
   if (strictProd) {
-    // Fail closed only when Upstash is mandatory.
     return false;
   }
 

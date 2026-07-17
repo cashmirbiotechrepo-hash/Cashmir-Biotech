@@ -4,6 +4,7 @@ import { timingSafeEqual } from "crypto";
 import { db } from "@/lib/db";
 import { logger } from "@/lib/logger";
 import { AdminPasswordService } from "@/lib/admin/password";
+import { sendOtpMail } from "@/lib/admin/mail";
 
 const CODE_EXPIRY_MS = 10 * 60 * 1000;
 const MAX_ATTEMPTS = 5;
@@ -46,7 +47,6 @@ export async function generateAdminTwoFactorCode(email: string): Promise<TwoFact
     process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS;
 
   if (smtpReady) {
-    const { sendOtpMail } = await import("@/lib/admin/mail");
     const sent = await sendOtpMail({
       to: normalized,
       kind: "admin_2fa",

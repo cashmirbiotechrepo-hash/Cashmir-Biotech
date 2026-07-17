@@ -55,12 +55,8 @@ export async function joinResearchCircleAction(
   const planId = String(formData.get("planId") || "");
   const result = await startCircleSubscription({ customerId: session.id, planId });
   if (!result.ok) return { error: result.error };
-  if (result.skipPayment) {
-    revalidatePath("/portal/circle");
-    return { ok: true };
-  }
   return {
-    error: "Complete payment in checkout (Razorpay). Dev: set CHECKOUT_SKIP_PAYMENT=true to join instantly."
+    error: "Complete payment in checkout via Razorpay to activate your membership."
   };
 }
 

@@ -208,28 +208,25 @@ async function fulfillAndRecord(
     return NextResponse.json({ ok: false, retry: true }, { status: 500 });
   }
 
-  // Fulfillment succeeded — now record/update the PaymentEvent with processedAt.
-  if (existingEventId) {
-    // Was an incomplete re-drive — stamp processedAt.
-    await db.paymentEvent
-      .update({ where: { id: existingEventId }, data: { processedAt: new Date() } })
-      .catch(() => undefined);
-  } else {
-    // First successful attempt — create with processedAt set.
-    try {
-      await db.paymentEvent.create({
-        data: {
-          eventType,
-          providerEventId: eventId,
-          orderId: order.id,
-          signatureValid: true,
-          payload: rawEvent as unknown as object,
-          processedAt: new Date()
-        }
-      });
-    } catch {
-      // Concurrent duplicate after success — safe (other caller also succeeded).
-    }
+  // Fulfillment succeeded — now record/update the PaymentEvent with processedAt via upsert
+  try {
+    await db.paymentEvent.upsert({
+      where: { providerEventId: eventId },
+      create: {
+        eventType,
+        providerEventId: eventId,
+        orderId: order.id,
+        signatureValid: true,
+        payload: rawEvent as unknown as object,
+        processedAt: new Date()
+      },
+      update: {
+        processedAt: new Date(),
+        orderId: order.id
+      }
+    });
+  } catch (err) {
+    logger.error({ err, eventId, orderId: order.id, event: "payment_event_record_error" }, "failed to stamp paymentEvent processedAt");
   }
 
   return NextResponse.json({ ok: true });
@@ -290,6 +287,16 @@ async function handleRefundWebhook(
     return NextResponse.json({ ok: true });
   }
 
+  const { verifyRazorpayRefund } = await import("@/lib/payments/razorpay");
+  const verified = await verifyRazorpayRefund({
+    refundId: razorpayRefundId,
+    expectedAmountCents: refundAmountCents
+  });
+  if (!verified.ok) {
+    logger.error({ event: "refund_webhook_verify_failed", razorpayRefundId, error: verified.error }, "refund verification against Razorpay API failed");
+    return NextResponse.json({ ok: false, error: verified.error }, { status: 400 });
+  }
+
   const { applyOrderRefund } = await import("@/modules/shop/services/refund.service");
   const result = await applyOrderRefund({
     orderId: order.id,
@@ -306,25 +313,23 @@ async function handleRefundWebhook(
   }
 
   try {
-    if (existingEvent) {
-      await db.paymentEvent.update({
-        where: { id: existingEvent.id },
-        data: { processedAt: new Date(), orderId: order.id }
-      });
-    } else {
-      await db.paymentEvent.create({
-        data: {
-          eventType,
-          providerEventId: eventId,
-          orderId: order.id,
-          signatureValid: true,
-          payload: rawEvent as unknown as object,
-          processedAt: new Date()
-        }
-      });
-    }
-  } catch {
-    // Concurrent duplicate — safe.
+    await db.paymentEvent.upsert({
+      where: { providerEventId: eventId },
+      create: {
+        eventType,
+        providerEventId: eventId,
+        orderId: order.id,
+        signatureValid: true,
+        payload: rawEvent as unknown as object,
+        processedAt: new Date()
+      },
+      update: {
+        processedAt: new Date(),
+        orderId: order.id
+      }
+    });
+  } catch (err) {
+    logger.error({ err, eventId, orderId: order.id, event: "refund_event_record_error" }, "failed to stamp refund paymentEvent processedAt");
   }
 
   return NextResponse.json({ ok: true, duplicate: result.duplicate });
@@ -338,14 +343,19 @@ async function recordEventSafe(
   rawEvent: RazorpayWebhook
 ) {
   try {
-    await db.paymentEvent.create({
-      data: {
+    await db.paymentEvent.upsert({
+      where: { providerEventId: eventId },
+      create: {
         eventType,
         providerEventId: eventId,
         orderId,
         signatureValid: true,
         payload: rawEvent as unknown as object,
         processedAt: new Date()
+      },
+      update: {
+        processedAt: new Date(),
+        orderId: orderId ?? undefined
       }
     });
   } catch {

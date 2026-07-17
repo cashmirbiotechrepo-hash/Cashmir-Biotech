@@ -14,7 +14,7 @@ const REFRESH_TOKEN_EXPIRY_MS = 30 * 24 * 60 * 60 * 1000;
  * refresh token. If the token was rotated within this window, treat it as a
  * benign race instead of a stolen-token replay.
  */
-const ROTATION_GRACE_MS = 30 * 1000;
+const ROTATION_GRACE_MS = 0;
 
 function jwtSecret() {
   return new TextEncoder().encode(env.JWT_SECRET);
@@ -110,12 +110,18 @@ export class AdminTokenService {
       const session = await db.adminSession.findUnique({ where: { id: payload.sessionId } });
       if (!session || session.isRevoked || session.expiresAt < new Date()) return { status: "invalid" };
 
+      // Hard-cap sliding expiry at 30 days from session creation
+      const maxAbsoluteExpiry = new Date(session.createdAt.getTime() + 30 * 24 * 60 * 60 * 1000);
+      const slidingExpiry = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+      const newExpiresAt = slidingExpiry > maxAbsoluteExpiry ? maxAbsoluteExpiry : slidingExpiry;
+      if (newExpiresAt <= new Date()) return { status: "invalid" };
+
       await db.adminSession
         .update({
           where: { id: session.id },
           data: {
             lastUsedAt: new Date(),
-            expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
+            expiresAt: newExpiresAt
           }
         })
         .catch(() => undefined);

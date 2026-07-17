@@ -1,12 +1,16 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { requestMeta, requestPortalOtp } from "@/lib/customer/auth";
+import { requireJsonContent } from "@/lib/api-utils";
 
 const bodySchema = z.object({
   email: z.string().email().max(254)
 });
 
 export async function POST(request: Request) {
+  const invalidType = requireJsonContent(request);
+  if (invalidType) return invalidType;
+
   let json: unknown;
   try {
     json = await request.json();

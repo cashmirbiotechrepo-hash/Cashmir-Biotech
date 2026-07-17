@@ -1,6 +1,7 @@
 import { adminErr, adminOk, requireAdminRole } from "@/lib/admin/api";
 import { db } from "@/lib/db";
 import { couponSchema } from "@/modules/admin/validations/phase2";
+import { requireJsonContent } from "@/lib/api-utils";
 
 export async function GET() {
   const { error } = await requireAdminRole(["owner", "admin"]);
@@ -10,6 +11,9 @@ export async function GET() {
 }
 
 export async function POST(req: Request) {
+  const invalidType = requireJsonContent(req);
+  if (invalidType) return invalidType;
+
   const { error } = await requireAdminRole(["owner", "admin"]);
   if (error) return error;
   let body: unknown;

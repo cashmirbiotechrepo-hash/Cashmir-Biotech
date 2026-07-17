@@ -1,31 +1,18 @@
 import { NextResponse } from "next/server";
+import { createHash } from "node:crypto";
 import { z } from "zod";
 import { db } from "@/lib/db";
 import { logger } from "@/lib/logger";
 import {
   createPendingOrder,
   markOrderFailed,
-  markOrderPaid,
   priceCart
 } from "@/modules/shop/services/order.service";
 import { createRazorpayOrder, razorpayConfigured, razorpayPublicKey } from "@/lib/payments/razorpay";
-
-import { featureEnabled } from "@/lib/feature-flags";
+import { requireJsonContent } from "@/lib/api-utils";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-
-/** Dev/test only: complete orders without opening Razorpay. */
-function checkoutSkipPaymentEnabled() {
-  const enabled = featureEnabled("checkout_skip_payment");
-  if (enabled && process.env.NODE_ENV === "production") {
-    logger.error(
-      { event: "checkout_skip_payment_enabled_in_production" },
-      "CRITICAL: CHECKOUT_SKIP_PAYMENT is enabled in production — disable before real traffic"
-    );
-  }
-  return enabled;
-}
 
 const checkoutSchema = z.object({
   items: z
@@ -37,18 +24,18 @@ const checkoutSchema = z.object({
     )
     .min(1)
     .max(50),
+  couponCode: z.string().optional().nullable(),
   address: z.object({
-    fullName: z.string().trim().min(2).max(120),
-    phone: z.string().trim().min(6).max(20),
-    email: z.string().trim().email().max(320),
-    line1: z.string().trim().min(3).max(200),
-    line2: z.string().trim().max(200).optional().default(""),
-    city: z.string().trim().min(2).max(100),
-    state: z.string().trim().min(2).max(100),
-    postalCode: z.string().trim().min(3).max(20),
-    country: z.string().trim().min(2).max(100).optional().default("India")
-  }),
-  couponCode: z.string().trim().max(50).optional()
+    fullName: z.string().min(2).max(120),
+    email: z.string().email(),
+    phone: z.string().min(10).max(20),
+    line1: z.string().min(3).max(160),
+    line2: z.string().optional().default(""),
+    city: z.string().min(2).max(80),
+    state: z.string().min(2).max(80),
+    postalCode: z.string().min(4).max(12),
+    country: z.string().default("India")
+  })
 });
 
 const FINAL_ORDER_STATUSES = ["paid", "processing", "shipped", "delivered", "refunded", "partially_refunded"] as const;
@@ -56,7 +43,10 @@ const FINAL_ORDER_STATUSES = ["paid", "processing", "shipped", "delivered", "ref
 function readIdempotencyKey(request: Request) {
   const key = request.headers.get("idempotency-key")?.trim();
   if (!key) return null;
-  return key.slice(0, 120);
+  if (key.length <= 120) return key;
+  // If key exceeds 120 chars, combine prefix with SHA-256 hash so it never truncates away uniqueness
+  const hash = createHash("sha256").update(key).digest("hex");
+  return `${key.slice(0, 50)}:${hash}`;
 }
 
 function cartFromOrder(order: {
@@ -92,7 +82,6 @@ function cartFromOrder(order: {
 
 async function responseForExistingOrder(input: {
   order: Awaited<ReturnType<typeof findOrderByIdempotencyKey>>;
-  skipPayment: boolean;
 }) {
   const order = input.order;
   if (!order) return null;
@@ -101,31 +90,9 @@ async function responseForExistingOrder(input: {
     return NextResponse.json({
       ok: true,
       alreadyPaid: true,
-      skipPayment: true,
       orderId: order.id,
       orderNumber: order.orderNumber,
       confirmationToken: order.confirmationToken,
-      amountCents: order.totalCents,
-      currency: "INR",
-      cart: cartFromOrder(order)
-    });
-  }
-
-  if (input.skipPayment) {
-    const paid = await markOrderPaid({
-      orderId: order.id,
-      razorpayPaymentId: `test_skip_${order.orderNumber}`,
-      source: "test_skip_idempotent"
-    });
-    if (!paid.ok) {
-      return NextResponse.json({ ok: false, error: "Could not complete test order." }, { status: 500 });
-    }
-    return NextResponse.json({
-      ok: true,
-      skipPayment: true,
-      orderId: order.id,
-      orderNumber: order.orderNumber,
-      confirmationToken: paid.confirmationToken ?? order.confirmationToken,
       amountCents: order.totalCents,
       currency: "INR",
       cart: cartFromOrder(order)
@@ -146,6 +113,9 @@ async function responseForExistingOrder(input: {
     });
   }
 
+  // HIGH-05 FIX: Return only gateway continuation headers and confirmation tokens.
+  // Stripping customer: { name, email, phone } prevents an attacker with an idempotency key
+  // from exfiltrating sensitive customer PII.
   return NextResponse.json({
     ok: true,
     orderId: order.id,
@@ -156,12 +126,7 @@ async function responseForExistingOrder(input: {
     currency: "INR",
     keyId: razorpayPublicKey(),
     idempotent: true,
-    cart: cartFromOrder(order),
-    customer: {
-      name: order.customerName,
-      email: order.customerEmail,
-      phone: order.customerPhone
-    }
+    cart: cartFromOrder(order)
   });
 }
 
@@ -173,9 +138,10 @@ function findOrderByIdempotencyKey(idempotencyKey: string) {
 }
 
 export async function POST(request: Request) {
-  const skipPayment = checkoutSkipPaymentEnabled();
+  const invalidType = requireJsonContent(request);
+  if (invalidType) return invalidType;
 
-  if (!skipPayment && !razorpayConfigured()) {
+  if (!razorpayConfigured()) {
     return NextResponse.json(
       { ok: false, error: "Online payments are not configured yet. Please contact us to order." },
       { status: 503 }
@@ -197,11 +163,11 @@ export async function POST(request: Request) {
   const idempotencyKey = readIdempotencyKey(request);
   if (idempotencyKey) {
     const existingOrder = await findOrderByIdempotencyKey(idempotencyKey);
-    const existingResponse = await responseForExistingOrder({ order: existingOrder, skipPayment });
+    const existingResponse = await responseForExistingOrder({ order: existingOrder });
     if (existingResponse) return existingResponse;
   }
 
-  const priced = await priceCart(parsed.data.items, parsed.data.couponCode);
+  const priced = await priceCart(parsed.data.items, parsed.data.couponCode ?? undefined);
   if (!priced.ok) {
     return NextResponse.json({ ok: false, error: priced.error }, { status: 409 });
   }
@@ -214,44 +180,10 @@ export async function POST(request: Request) {
   if (!created.ok) {
     if (idempotencyKey) {
       const existingOrder = await findOrderByIdempotencyKey(idempotencyKey);
-      const existingResponse = await responseForExistingOrder({ order: existingOrder, skipPayment });
+      const existingResponse = await responseForExistingOrder({ order: existingOrder });
       if (existingResponse) return existingResponse;
     }
     return NextResponse.json({ ok: false, error: created.error }, { status: 409 });
-  }
-
-  if (skipPayment) {
-    logger.warn(
-      { event: "checkout_skip_payment", orderId: created.orderId, orderNumber: created.orderNumber },
-      "CHECKOUT_SKIP_PAYMENT — marking order paid without Razorpay"
-    );
-
-    const paid = await markOrderPaid({
-      orderId: created.orderId,
-      razorpayPaymentId: `test_skip_${created.orderNumber}`,
-      source: "test_skip"
-    });
-
-    if (!paid.ok) {
-      await markOrderFailed({ orderId: created.orderId, source: "verify" }).catch(() => undefined);
-      return NextResponse.json({ ok: false, error: "Could not complete test order." }, { status: 500 });
-    }
-
-    return NextResponse.json({
-      ok: true,
-      skipPayment: true,
-      orderId: created.orderId,
-      orderNumber: created.orderNumber,
-      confirmationToken: created.confirmationToken,
-      amountCents: priced.cart.totalCents,
-      currency: "INR",
-      cart: priced.cart,
-      customer: {
-        name: parsed.data.address.fullName,
-        email: parsed.data.address.email,
-        phone: parsed.data.address.phone
-      }
-    });
   }
 
   try {

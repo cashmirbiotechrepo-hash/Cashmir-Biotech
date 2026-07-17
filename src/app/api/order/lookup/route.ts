@@ -3,6 +3,8 @@ import { createHash, randomInt } from "crypto";
 import { z } from "zod";
 import { db } from "@/lib/db";
 import { logger } from "@/lib/logger";
+import { requireJsonContent } from "@/lib/api-utils";
+import { sendOtpMail } from "@/lib/admin/mail";
 
 export const runtime = "nodejs";
 
@@ -15,18 +17,21 @@ const verifySchema = requestSchema.extend({
   code: z.string().trim().regex(/^\d{6}$/)
 });
 
+const OTP_EXPIRY_MS = 10 * 60 * 1000;
+const OTP_COOLDOWN_MS = 60 * 1000;
+
 function hashOtp(code: string) {
   return createHash("sha256").update(code).digest("hex");
 }
-
-const OTP_EXPIRY_MS = 10 * 60 * 1000;
-const OTP_COOLDOWN_MS = 60 * 1000;
 
 /**
  * Guest order lookup with email + order number + OTP.
  * Uniform responses avoid enumeration; confirmation token only after OTP verify.
  */
 export async function POST(request: Request) {
+  const invalidType = requireJsonContent(request);
+  if (invalidType) return invalidType;
+
   let body: unknown;
   try {
     body = await request.json();
@@ -83,7 +88,6 @@ async function requestLookup(body: unknown) {
     });
 
     if (order?.customerEmail) {
-      const { sendOtpMail } = await import("@/lib/admin/mail");
       await sendOtpMail({
         to: order.customerEmail,
         kind: "order_lookup",
