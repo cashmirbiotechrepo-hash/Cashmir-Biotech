@@ -7,8 +7,6 @@ const nextConfig: NextConfig = {
   serverExternalPackages: ["pino", "thread-stream"],
   outputFileTracingRoot: path.join(process.cwd(), "./"),
   experimental: {
-    // Avoid Next 15.5.x minify plugin crash on some Linux CI hosts.
-    serverMinification: false,
     optimizePackageImports: ["lucide-react", "framer-motion", "@radix-ui/react-icons", "@radix-ui/react-popover"]
   },
   images: {

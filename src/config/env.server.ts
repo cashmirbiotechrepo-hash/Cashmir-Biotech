@@ -146,9 +146,11 @@ function normalizeProcessEnv() {
     if (p[key] != null && String(p[key]).trim() === "") p[key] = undefined;
   }
   // Amplify SSR often omits NEXT_PUBLIC_* at runtime — default to production origin.
+  // NOTE: never assign to process.env.NEXT_PUBLIC_* via static member access —
+  // Next inlines those references at build time, turning the assignment into
+  // `"literal" = value` (SyntaxError: Invalid left-hand side in assignment).
   if (!p.NEXT_PUBLIC_SITE_URL) {
     p.NEXT_PUBLIC_SITE_URL = "https://www.cashmirbiotech.com";
-    process.env.NEXT_PUBLIC_SITE_URL = p.NEXT_PUBLIC_SITE_URL;
   }
   return p;
 }
