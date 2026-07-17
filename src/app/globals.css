@@ -342,17 +342,10 @@
       inset 0 0 0 1px rgb(255 255 255 / 0.06);
   }
 
-  /* Dark-safe logo plate — never invert photography/wordmarks */
+  /* Keep logo chrome transparent in both themes — no light plate in dark mode. */
   .logo-plate {
     display: inline-flex;
     align-items: center;
-    border-radius: 999px;
-    padding: 0.15rem 0.35rem;
-  }
-
-  :root[data-theme="dark"] .logo-plate {
-    background: rgb(250 250 249 / 0.94);
-    box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.08);
   }
 
   .hairline-x {

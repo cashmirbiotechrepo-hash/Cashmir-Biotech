@@ -20,8 +20,6 @@ const CYCLE_MS = 4200;
 const PRODUCTS = [
   "/products/magic-food-taxo.png",
   "/products/1.png",
-  "/products/2.png",
-  "/products/3.png",
   "/products/4.png",
   "/products/5.png",
   "/products/6.png",
