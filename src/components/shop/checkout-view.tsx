@@ -857,6 +857,15 @@ export function CheckoutView({
               <PaymentStrip className="mt-4 justify-start" />
             </section>
 
+            {priceWarning ? (
+              <p
+                role="status"
+                className="border border-gold/35 bg-pearl/80 px-4 py-3 text-[13px] text-ink"
+              >
+                {priceWarning}
+              </p>
+            ) : null}
+
             {error ? (
               <p
                 role="alert"
@@ -924,6 +933,15 @@ export function CheckoutView({
                 </dd>
               </div>
             </dl>
+
+            {priceWarning ? (
+              <p
+                role="status"
+                className="mt-4 border border-gold/35 bg-pearl/80 px-3 py-2 text-[12px] text-ink"
+              >
+                {priceWarning}
+              </p>
+            ) : null}
 
             <ul className="mt-5 space-y-2 border-t border-ink/8 pt-4">
               {["Batch verified", "GST invoice", `Ships by ${shipsBy}`, "Razorpay protected"].map(

@@ -1,3 +1,72 @@
+-- Prerequisite tables that were present in Prisma schema before this migration
+-- was made fully deployable on a clean database.
+CREATE TABLE IF NOT EXISTS "Customer" (
+    "id" TEXT NOT NULL,
+    "email" TEXT NOT NULL,
+    "passwordHash" TEXT,
+    "name" TEXT,
+    "phone" TEXT,
+    "emailVerifiedAt" TIMESTAMP(3),
+    "active" BOOLEAN NOT NULL DEFAULT true,
+    "failedLoginAttempts" INTEGER NOT NULL DEFAULT 0,
+    "lockedUntil" TIMESTAMP(3),
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+    CONSTRAINT "Customer_pkey" PRIMARY KEY ("id")
+);
+CREATE UNIQUE INDEX IF NOT EXISTS "Customer_email_key" ON "Customer"("email");
+
+CREATE TABLE IF NOT EXISTS "Organization" (
+    "id" TEXT NOT NULL,
+    "name" TEXT NOT NULL,
+    "gstin" TEXT NOT NULL DEFAULT '',
+    "billingEmail" TEXT NOT NULL DEFAULT '',
+    "active" BOOLEAN NOT NULL DEFAULT true,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+    CONSTRAINT "Organization_pkey" PRIMARY KEY ("id")
+);
+CREATE INDEX IF NOT EXISTS "Organization_active_idx" ON "Organization"("active");
+
+CREATE TABLE IF NOT EXISTS "OrganizationMember" (
+    "id" TEXT NOT NULL,
+    "organizationId" TEXT NOT NULL,
+    "customerId" TEXT NOT NULL,
+    "role" TEXT NOT NULL DEFAULT 'buyer',
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT "OrganizationMember_pkey" PRIMARY KEY ("id")
+);
+CREATE UNIQUE INDEX IF NOT EXISTS "OrganizationMember_organizationId_customerId_key" ON "OrganizationMember"("organizationId", "customerId");
+CREATE INDEX IF NOT EXISTS "OrganizationMember_customerId_idx" ON "OrganizationMember"("customerId");
+
+CREATE TABLE IF NOT EXISTS "Quote" (
+    "id" TEXT NOT NULL,
+    "organizationId" TEXT NOT NULL,
+    "title" TEXT NOT NULL,
+    "status" TEXT NOT NULL DEFAULT 'draft',
+    "totalCents" INTEGER NOT NULL DEFAULT 0,
+    "notes" TEXT NOT NULL DEFAULT '',
+    "poNumber" TEXT NOT NULL DEFAULT '',
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+    CONSTRAINT "Quote_pkey" PRIMARY KEY ("id")
+);
+CREATE INDEX IF NOT EXISTS "Quote_organizationId_status_idx" ON "Quote"("organizationId", "status");
+
+CREATE TABLE IF NOT EXISTS "Inventory" (
+    "id" TEXT NOT NULL,
+    "productId" TEXT NOT NULL,
+    "sku" TEXT NOT NULL DEFAULT '',
+    "quantityOnHand" INTEGER NOT NULL DEFAULT 0,
+    "quantityReserved" INTEGER NOT NULL DEFAULT 0,
+    "lowStockThreshold" INTEGER NOT NULL DEFAULT 10,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+    CONSTRAINT "Inventory_pkey" PRIMARY KEY ("id")
+);
+CREATE UNIQUE INDEX IF NOT EXISTS "Inventory_productId_key" ON "Inventory"("productId");
+CREATE INDEX IF NOT EXISTS "Inventory_sku_idx" ON "Inventory"("sku");
+
 -- AlterTable
 ALTER TABLE "OrderItem" ADD COLUMN IF NOT EXISTS "lotCodes" TEXT NOT NULL DEFAULT '';
 

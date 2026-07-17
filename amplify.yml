@@ -7,8 +7,7 @@ frontend:
         - npx prisma generate
     build:
       commands:
-        # Amplify SSR compute often has empty process.env for app secrets.
-        # Snapshot console env into a JSON module that the server bundle loads.
+        # Normalize DB URL for Prisma without writing secrets into source files.
         - |
           if [ -n "$DB_HOST" ] && [ -n "$DB_USER" ] && [ -n "$DB_PASSWORD" ] && [ -n "$DB_NAME" ]; then
             export DATABASE_URL="postgresql://${DB_USER}:${DB_PASSWORD}@${DB_HOST}:${DB_PORT:-5432}/${DB_NAME}?sslmode=${DB_SSLMODE:-require}"
@@ -23,7 +22,6 @@ frontend:
         # D-01 FIX: Apply pending migrations to production DB on every deploy.
         # Without this, schema changes (new columns, tables) are not applied.
         - npx prisma migrate deploy
-        - node scripts/write-amplify-runtime-env.cjs
         - npm run build
   artifacts:
     baseDirectory: .next

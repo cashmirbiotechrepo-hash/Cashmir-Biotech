@@ -14,10 +14,16 @@ Option B — Console
    - API key name: Authorization
    - Value: Bearer YOUR_CRON_SECRET
 2. Create API destinations:
+   - GET https://YOUR.amplifyapp.com/api/cron/process-outbox
    - GET https://YOUR.amplifyapp.com/api/cron/release-stale-orders
+   - GET https://YOUR.amplifyapp.com/api/cron/reconcile-payments
    - GET https://YOUR.amplifyapp.com/api/cron/cleanup-sessions
 3. EventBridge Scheduler → Create schedule
+   - rate(2 minutes) → process-outbox (post-payment email/invoice outbox)
    - Every 20 minutes → invoke release-stale destination
+   - cron(0 */6 * * ? *) UTC → reconcile-payments (orphan Razorpay payment healing)
    - cron(30 21 * * ? *) UTC → cleanup-sessions (03:00 IST)
+4. Smoke test after deploy:
+   curl -H "Authorization: Bearer YOUR_CRON_SECRET" https://YOUR.amplifyapp.com/api/cron/process-outbox
 
 vercel.json crons do NOT run on Amplify — these schedules replace them.

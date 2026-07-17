@@ -204,6 +204,7 @@ type ShippingAddress = {
 export async function createPendingOrder(input: {
   cart: PricedCart;
   address: ShippingAddress;
+  idempotencyKey?: string | null;
 }): Promise<
   { ok: true; orderId: string; orderNumber: string; confirmationToken: string } | { ok: false; error: string }
 > {
@@ -254,6 +255,7 @@ export async function createPendingOrder(input: {
             totalCents: cart.totalCents,
             couponCode: cart.couponCode ?? "",
             adminNotes,
+            idempotencyKey: input.idempotencyKey || null,
             shippingAddress: {
               ...address,
               couponCode: cart.couponCode,

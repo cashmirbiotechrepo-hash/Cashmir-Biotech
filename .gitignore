@@ -39,6 +39,7 @@ playwright/.cache/
 
 # AWS deploy secrets / generated connection strings
 deploy/aws/out/
+src/generated/amplify-runtime-env.json
 
 # admin uploads (user-generated, served from /public/uploads)
 /public/uploads

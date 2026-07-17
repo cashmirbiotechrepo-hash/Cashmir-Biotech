@@ -57,7 +57,6 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     if (!ready) return;
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
-      setPriceWarning(null);
     } catch {
       setPriceWarning("Your cart couldn't be saved locally. It may reset if you leave this page.");
     }

@@ -7,7 +7,7 @@
  *   $env:DATABASE_URL="postgresql://..."
  *   $env:PASSWORD_PEPPER="<amplify pepper>"
  *   $env:ADMIN_EMAIL="cashmirbiotech@gmail.com"
- *   $env:ADMIN_RESET_PASSWORD="Khalid@345"
+ *   $env:ADMIN_RESET_PASSWORD="<strong one-time password>"
  *   node --import tsx scripts/seed-amplify-catalog.ts
  */
 import { readFileSync } from "node:fs";

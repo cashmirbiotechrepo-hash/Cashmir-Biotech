@@ -49,6 +49,14 @@ Important Amplify env flags
 ---------------------------
 RUNTIME_ENV_STRICT=true
 DATABASE_URL=...&connection_limit=5&pool_timeout=10
+UPSTASH_REDIS_REST_URL=<required when RUNTIME_ENV_STRICT=true>
+UPSTASH_REDIS_REST_TOKEN=<required when RUNTIME_ENV_STRICT=true>
+RAZORPAY_KEY_ID=<required when RUNTIME_ENV_STRICT=true>
+RAZORPAY_KEY_SECRET=<required when RUNTIME_ENV_STRICT=true>
+RAZORPAY_WEBHOOK_SECRET=<required when RUNTIME_ENV_STRICT=true>
+BLOB_READ_WRITE_TOKEN=<required when RUNTIME_ENV_STRICT=true>
+SENTRY_DSN=<required when RUNTIME_ENV_STRICT=true>
+NEXT_PUBLIC_SENTRY_DSN=<required when RUNTIME_ENV_STRICT=true>
 (amplify.yml in repo root runs npm ci + prisma generate + next build)
 
 Do not commit

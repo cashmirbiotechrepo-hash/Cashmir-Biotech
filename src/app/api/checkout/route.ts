@@ -51,6 +51,127 @@ const checkoutSchema = z.object({
   couponCode: z.string().trim().max(50).optional()
 });
 
+const FINAL_ORDER_STATUSES = ["paid", "processing", "shipped", "delivered", "refunded", "partially_refunded"] as const;
+
+function readIdempotencyKey(request: Request) {
+  const key = request.headers.get("idempotency-key")?.trim();
+  if (!key) return null;
+  return key.slice(0, 120);
+}
+
+function cartFromOrder(order: {
+  subtotalCents: number;
+  taxCents: number;
+  shippingCents: number;
+  totalCents: number;
+  discountCents: number | null;
+  couponCode: string | null;
+  items: Array<{
+    productId: string | null;
+    productName: string;
+    quantity: number;
+    unitPriceCents: number;
+  }>;
+}) {
+  return {
+    lines: order.items.map((item) => ({
+      productId: item.productId ?? "",
+      productName: item.productName,
+      quantity: item.quantity,
+      unitPriceCents: item.unitPriceCents,
+      lineTotalCents: item.unitPriceCents * item.quantity
+    })),
+    subtotalCents: order.subtotalCents,
+    taxCents: order.taxCents,
+    shippingCents: order.shippingCents,
+    totalCents: order.totalCents,
+    couponCode: order.couponCode || undefined,
+    discountCents: order.discountCents || undefined
+  };
+}
+
+async function responseForExistingOrder(input: {
+  order: Awaited<ReturnType<typeof findOrderByIdempotencyKey>>;
+  skipPayment: boolean;
+}) {
+  const order = input.order;
+  if (!order) return null;
+
+  if (FINAL_ORDER_STATUSES.includes(order.status as (typeof FINAL_ORDER_STATUSES)[number])) {
+    return NextResponse.json({
+      ok: true,
+      alreadyPaid: true,
+      skipPayment: true,
+      orderId: order.id,
+      orderNumber: order.orderNumber,
+      confirmationToken: order.confirmationToken,
+      amountCents: order.totalCents,
+      currency: "INR",
+      cart: cartFromOrder(order)
+    });
+  }
+
+  if (input.skipPayment) {
+    const paid = await markOrderPaid({
+      orderId: order.id,
+      razorpayPaymentId: `test_skip_${order.orderNumber}`,
+      source: "test_skip_idempotent"
+    });
+    if (!paid.ok) {
+      return NextResponse.json({ ok: false, error: "Could not complete test order." }, { status: 500 });
+    }
+    return NextResponse.json({
+      ok: true,
+      skipPayment: true,
+      orderId: order.id,
+      orderNumber: order.orderNumber,
+      confirmationToken: paid.confirmationToken ?? order.confirmationToken,
+      amountCents: order.totalCents,
+      currency: "INR",
+      cart: cartFromOrder(order)
+    });
+  }
+
+  let razorpayOrderId = order.razorpayOrderId;
+  if (!razorpayOrderId) {
+    const rzpOrder = await createRazorpayOrder({
+      amountCents: order.totalCents,
+      receipt: order.orderNumber,
+      notes: { orderId: order.id, orderNumber: order.orderNumber }
+    });
+    razorpayOrderId = rzpOrder.id;
+    await db.order.update({
+      where: { id: order.id },
+      data: { razorpayOrderId }
+    });
+  }
+
+  return NextResponse.json({
+    ok: true,
+    orderId: order.id,
+    orderNumber: order.orderNumber,
+    confirmationToken: order.confirmationToken,
+    razorpayOrderId,
+    amountCents: order.totalCents,
+    currency: "INR",
+    keyId: razorpayPublicKey(),
+    idempotent: true,
+    cart: cartFromOrder(order),
+    customer: {
+      name: order.customerName,
+      email: order.customerEmail,
+      phone: order.customerPhone
+    }
+  });
+}
+
+function findOrderByIdempotencyKey(idempotencyKey: string) {
+  return db.order.findUnique({
+    where: { idempotencyKey },
+    include: { items: true }
+  });
+}
+
 export async function POST(request: Request) {
   const skipPayment = checkoutSkipPaymentEnabled();
 
@@ -73,40 +194,11 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: false, error: "Please check your cart and address details." }, { status: 422 });
   }
 
-  // P-08 / M-02 FIX: Checkout idempotency.
-  // If client sends Idempotency-Key header, check for existing pending order with same key.
-  // Prevents double-click creating two pending orders + two Razorpay orders.
-  const idempotencyKey = request.headers.get("idempotency-key")?.trim();
+  const idempotencyKey = readIdempotencyKey(request);
   if (idempotencyKey) {
-    const existingOrder = await db.order.findFirst({
-      where: {
-        adminNotes: { contains: `[idem:${idempotencyKey}]` },
-        status: { in: ["pending", "paid"] }
-      },
-      select: {
-        id: true,
-        orderNumber: true,
-        confirmationToken: true,
-        razorpayOrderId: true,
-        totalCents: true,
-        status: true
-      }
-    });
-    if (existingOrder?.razorpayOrderId) {
-      const priced = await priceCart(parsed.data.items, parsed.data.couponCode);
-      return NextResponse.json({
-        ok: true,
-        orderId: existingOrder.id,
-        orderNumber: existingOrder.orderNumber,
-        confirmationToken: existingOrder.confirmationToken,
-        razorpayOrderId: existingOrder.razorpayOrderId,
-        amountCents: existingOrder.totalCents,
-        currency: "INR",
-        keyId: razorpayPublicKey(),
-        idempotent: true,
-        cart: priced.ok ? priced.cart : undefined
-      });
-    }
+    const existingOrder = await findOrderByIdempotencyKey(idempotencyKey);
+    const existingResponse = await responseForExistingOrder({ order: existingOrder, skipPayment });
+    if (existingResponse) return existingResponse;
   }
 
   const priced = await priceCart(parsed.data.items, parsed.data.couponCode);
@@ -114,21 +206,18 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: false, error: priced.error }, { status: 409 });
   }
 
-  const created = await createPendingOrder({ cart: priced.cart, address: parsed.data.address });
+  const created = await createPendingOrder({
+    cart: priced.cart,
+    address: parsed.data.address,
+    idempotencyKey
+  });
   if (!created.ok) {
+    if (idempotencyKey) {
+      const existingOrder = await findOrderByIdempotencyKey(idempotencyKey);
+      const existingResponse = await responseForExistingOrder({ order: existingOrder, skipPayment });
+      if (existingResponse) return existingResponse;
+    }
     return NextResponse.json({ ok: false, error: created.error }, { status: 409 });
-  }
-
-  // Stamp idempotency key on the order for future lookups.
-  if (idempotencyKey) {
-    await db.order
-      .update({
-        where: { id: created.orderId },
-        data: {
-          adminNotes: { set: `[idem:${idempotencyKey}]` }
-        }
-      })
-      .catch(() => undefined);
   }
 
   if (skipPayment) {

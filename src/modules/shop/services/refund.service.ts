@@ -1,4 +1,5 @@
 import "server-only";
+import type { Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
 import { logger } from "@/lib/logger";
 import { restoreStockForOrder } from "@/modules/admin/services/inventory.service";
@@ -32,6 +33,16 @@ function isUniqueViolation(err: unknown): boolean {
   );
 }
 
+function orderLines(
+  items: Array<{ productId: string | null; quantity: number; productName: string }>
+) {
+  return items.map((i) => ({
+    productId: i.productId,
+    quantity: i.quantity,
+    productName: i.productName
+  }));
+}
+
 /**
  * Apply a Razorpay refund exactly once per `razorpayRefundId`.
  * Shared by admin refund action and refund.processed webhooks.
@@ -41,122 +52,154 @@ export async function applyOrderRefund(input: ApplyOrderRefundInput): Promise<Ap
     return { ok: false, error: "invalid_refund" };
   }
 
+  let applied = false;
+  let duplicate = false;
+  let fullyRefunded = false;
+  let newRefundedCents = 0;
+  let restocked = false;
+
   try {
-    await db.orderRefund.create({
-      data: {
-        orderId: input.orderId,
-        razorpayRefundId: input.razorpayRefundId,
-        amountCents: input.amountCents,
-        source: input.source
+    const outcome = await db.$transaction(
+      async (tx) => {
+        // Serialize all refund accounting for this order, including duplicate reconciliation.
+        await tx.$queryRaw`SELECT id FROM "Order" WHERE id = ${input.orderId} FOR UPDATE`;
+
+        const order = await tx.order.findUnique({
+          where: { id: input.orderId },
+          include: { items: true }
+        });
+        if (!order) {
+          return { ok: false as const, error: "order_not_found" };
+        }
+
+        try {
+          await tx.orderRefund.create({
+            data: {
+              orderId: input.orderId,
+              razorpayRefundId: input.razorpayRefundId,
+              amountCents: input.amountCents,
+              source: input.source
+            }
+          });
+          applied = true;
+        } catch (err) {
+          if (!isUniqueViolation(err)) throw err;
+          duplicate = true;
+        }
+
+        const aggregate = await tx.orderRefund.aggregate({
+          where: { orderId: input.orderId },
+          _sum: { amountCents: true }
+        });
+        const totalRefunded = aggregate._sum.amountCents ?? 0;
+        if (totalRefunded > order.totalCents) {
+          throw new Error("refund_exceeds_order_total");
+        }
+
+        const isFullyRefunded = totalRefunded >= order.totalCents;
+        const newStatus = isFullyRefunded ? "refunded" : "partially_refunded";
+        const statusUpdate: Prisma.OrderUpdateInput =
+          REFUNDABLE_STATUSES.includes(order.status as (typeof REFUNDABLE_STATUSES)[number])
+            ? { status: newStatus }
+            : {};
+        const shouldRestock = (input.restock ?? true) && isFullyRefunded && order.stockDeducted;
+
+        if (shouldRestock) {
+          await restoreStockForOrder({
+            orderId: order.id,
+            lines: orderLines(order.items),
+            changeType: "order_returned",
+            createdBy: input.actorEmail ?? `refund:${input.source}`,
+            tx
+          });
+          restocked = true;
+        }
+
+        await tx.order.update({
+          where: { id: order.id },
+          data: {
+            refundedCents: totalRefunded,
+            ...(shouldRestock ? { stockDeducted: false } : {}),
+            ...statusUpdate
+          }
+        });
+
+        if (restocked) {
+          await tx.orderRefund.update({
+            where: { razorpayRefundId: input.razorpayRefundId },
+            data: { stockRestored: true }
+          });
+        }
+
+        return {
+          ok: true as const,
+          fullyRefunded: isFullyRefunded,
+          newRefundedCents: totalRefunded
+        };
+      },
+      {
+        isolationLevel: "Serializable",
+        maxWait: 5000,
+        timeout: 15000
       }
-    });
+    );
+
+    if (!outcome.ok) return outcome;
+    fullyRefunded = outcome.fullyRefunded;
+    newRefundedCents = outcome.newRefundedCents;
   } catch (err) {
-    if (isUniqueViolation(err)) {
-      const order = await db.order.findUnique({
-        where: { id: input.orderId },
-        select: { refundedCents: true, totalCents: true }
-      });
-      const newRefundedCents = order?.refundedCents ?? 0;
-      return {
-        ok: true,
-        applied: false,
-        duplicate: true,
-        fullyRefunded: newRefundedCents >= (order?.totalCents ?? 0),
-        newRefundedCents
-      };
-    }
-    throw err;
-  }
-
-  const order = await db.order.findUnique({
-    where: { id: input.orderId },
-    include: { items: true }
-  });
-  if (!order) {
-    return { ok: false, error: "order_not_found" };
-  }
-
-  const newRefundedCents = (order.refundedCents ?? 0) + input.amountCents;
-  const fullyRefunded = newRefundedCents >= order.totalCents;
-  const newStatus = fullyRefunded ? "refunded" : "partially_refunded";
-  const shouldRestock = (input.restock ?? true) && fullyRefunded;
-
-  const statusUpdate =
-    REFUNDABLE_STATUSES.includes(order.status as (typeof REFUNDABLE_STATUSES)[number])
-      ? { status: newStatus as typeof order.status }
-      : {};
-
-  if (shouldRestock && order.stockDeducted) {
-    const cleared = await db.order.updateMany({
-      where: { id: order.id, stockDeducted: true },
-      data: {
-        refundedCents: newRefundedCents,
-        stockDeducted: false,
-        ...statusUpdate
-      }
-    });
-
-    if (cleared.count === 1) {
-      await restoreStockForOrder({
-        orderId: order.id,
-        lines: order.items.map((i) => ({
-          productId: i.productId,
-          quantity: i.quantity,
-          productName: i.productName
-        })),
-        changeType: "order_returned",
-        createdBy: input.actorEmail ?? `refund:${input.source}`
-      });
-      await db.orderRefund
-        .update({
-          where: { razorpayRefundId: input.razorpayRefundId },
-          data: { stockRestored: true }
-        })
-        .catch(() => undefined);
-    } else {
-      await db.order.update({
-        where: { id: order.id },
-        data: { refundedCents: newRefundedCents, ...statusUpdate }
-      });
-    }
-  } else {
-    await db.order.update({
-      where: { id: order.id },
-      data: { refundedCents: newRefundedCents, ...statusUpdate }
-    });
+    logger.error(
+      { err, event: "order_refund_apply_failed", orderId: input.orderId, refundId: input.razorpayRefundId },
+      "refund apply failed"
+    );
+    return { ok: false, error: err instanceof Error ? err.message : "refund_apply_failed" };
   }
 
   const title = fullyRefunded ? "Full refund applied" : "Partial refund applied";
   const detail = `₹${(input.amountCents / 100).toFixed(2)} refunded (total: ₹${(newRefundedCents / 100).toFixed(2)})`;
 
-  await recordOrderEvent({
-    orderId: order.id,
-    type: input.eventType ?? (input.source === "admin" ? "refund_issued" : "refund_processed"),
-    title,
-    detail: input.reason ? `${detail} · ${input.reason}` : detail,
-    actorEmail: input.actorEmail,
-    metadata: {
-      refundId: input.razorpayRefundId,
-      amountCents: input.amountCents,
-      refundedCents: newRefundedCents,
-      restock: shouldRestock,
-      fullyRefunded,
-      source: input.source
-    }
-  });
+  if (applied) {
+    await recordOrderEvent({
+      orderId: input.orderId,
+      type: input.eventType ?? (input.source === "admin" ? "refund_issued" : "refund_processed"),
+      title,
+      detail: input.reason ? `${detail} · ${input.reason}` : detail,
+      actorEmail: input.actorEmail,
+      metadata: {
+        refundId: input.razorpayRefundId,
+        amountCents: input.amountCents,
+        refundedCents: newRefundedCents,
+        restock: restocked,
+        fullyRefunded,
+        source: input.source
+      }
+    });
+  }
 
   logger.info(
     {
       event: "order_refund_applied",
-      orderId: order.id,
+      orderId: input.orderId,
       refundId: input.razorpayRefundId,
       amountCents: input.amountCents,
       newRefundedCents,
       fullyRefunded,
-      source: input.source
+      source: input.source,
+      duplicate,
+      restocked
     },
     "refund applied"
   );
+
+  if (duplicate) {
+    return {
+      ok: true,
+      applied: false,
+      duplicate: true,
+      fullyRefunded,
+      newRefundedCents
+    };
+  }
 
   return {
     ok: true,

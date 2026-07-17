@@ -25,7 +25,10 @@ export async function register() {
         "SMTP_HOST",
         "SMTP_USER",
         "SMTP_PASS",
-        "NEXT_PUBLIC_SITE_URL"
+        "NEXT_PUBLIC_SITE_URL",
+        "BLOB_READ_WRITE_TOKEN",
+        "SENTRY_DSN",
+        "NEXT_PUBLIC_SENTRY_DSN"
       ]) {
         if (!process.env[key]) missing.push(key);
       }

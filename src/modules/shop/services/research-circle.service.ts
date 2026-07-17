@@ -1,7 +1,6 @@
 import "server-only";
 import { db } from "@/lib/db";
 import { featureEnabled } from "@/lib/feature-flags";
-import { createRazorpayOrder, razorpayConfigured, razorpayPublicKey } from "@/lib/payments/razorpay";
 import { logger } from "@/lib/logger";
 
 const DEFAULT_PLANS = [
@@ -101,25 +100,13 @@ export async function startCircleSubscription(input: {
     return { ok: true as const, skipPayment: true as const, subscription: sub };
   }
 
-  if (!razorpayConfigured()) {
-    return { ok: false as const, error: "Payments are not configured." };
-  }
-
-  const receipt = `circle_${input.customerId.slice(0, 8)}_${Date.now()}`;
-  const rzp = await createRazorpayOrder({
-    amountCents: plan.priceCents,
-    receipt,
-    notes: { purpose: "research_circle", planId: plan.id, customerId: input.customerId }
-  });
-
+  logger.warn(
+    { event: "circle_paid_join_disabled", customerId: input.customerId, planId: plan.id },
+    "Research Circle paid enrollment requested before payment completion flow is wired"
+  );
   return {
-    ok: true as const,
-    skipPayment: false as const,
-    razorpayOrderId: rzp.id,
-    amountCents: plan.priceCents,
-    keyId: razorpayPublicKey(),
-    planId: plan.id,
-    receipt
+    ok: false as const,
+    error: "Research Circle online enrollment is temporarily unavailable. Please contact support to join."
   };
 }
 

@@ -1,10 +1,11 @@
 import type { NextConfig } from "next";
+import path from "node:path";
 import { withSentryConfig } from "@sentry/nextjs";
 
 const nextConfig: NextConfig = {
   /** Pino / thread-stream must not be bundled into vendor-chunks with broken worker paths */
   serverExternalPackages: ["pino", "thread-stream"],
-  outputFileTracingRoot: require("path").join(__dirname, "./"),
+  outputFileTracingRoot: path.join(process.cwd(), "./"),
   experimental: {
     optimizePackageImports: ["lucide-react", "framer-motion", "@radix-ui/react-icons", "@radix-ui/react-popover"]
   },

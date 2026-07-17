@@ -58,7 +58,9 @@ const serverEnvSchema = z
     RAZORPAY_KEY_ID: z.string().min(1).optional(),
     RAZORPAY_KEY_SECRET: z.string().min(1).optional(),
     RAZORPAY_WEBHOOK_SECRET: z.string().min(1).optional(),
-    BLOB_READ_WRITE_TOKEN: z.string().min(1).optional()
+    BLOB_READ_WRITE_TOKEN: z.string().min(1).optional(),
+    SENTRY_DSN: z.string().min(1).optional(),
+    NEXT_PUBLIC_SENTRY_DSN: z.string().min(1).optional()
   })
   .superRefine((val, ctx) => {
     // During `next build`, NODE_ENV is production — don't demand live money/redis providers
@@ -92,6 +94,9 @@ const serverEnvSchema = z
       require("RAZORPAY_KEY_ID", "RAZORPAY_KEY_ID is required in production.");
       require("RAZORPAY_KEY_SECRET", "RAZORPAY_KEY_SECRET is required in production.");
       require("RAZORPAY_WEBHOOK_SECRET", "RAZORPAY_WEBHOOK_SECRET is required in production.");
+      require("BLOB_READ_WRITE_TOKEN", "BLOB_READ_WRITE_TOKEN is required in production.");
+      require("SENTRY_DSN", "SENTRY_DSN is required in production.");
+      require("NEXT_PUBLIC_SENTRY_DSN", "NEXT_PUBLIC_SENTRY_DSN is required in production.");
     }
 
     for (const [key, value] of Object.entries(val)) {

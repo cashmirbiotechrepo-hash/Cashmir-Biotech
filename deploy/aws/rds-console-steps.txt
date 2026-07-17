@@ -6,7 +6,7 @@ Region: Asia Pacific (Mumbai) ap-south-1
 1. Search bar → RDS → Create database
 2. Standard create
 3. Engine: PostgreSQL 16
-4. Templates: Free tier (if shown) OR Dev/Test
+4. Templates: Production or Dev/Test (do not use public/free-tier defaults for real traffic)
 5. DB instance identifier: cashmir-biotech-db
 6. Credentials:
    - Master username: cashmir
@@ -14,14 +14,16 @@ Region: Asia Pacific (Mumbai) ap-south-1
 7. Instance: db.t4g.micro or db.t3.micro
 8. Storage: 20 GB gp3
 9. Connectivity:
-   - Virtual private cloud: default
-   - Public access: Yes
+   - Virtual private cloud: the same VPC used by the app/network integration
+   - Public access: No
    - VPC security group: create new "cashmir-db-sg"
+   - Inbound: PostgreSQL 5432 only from the application VPC CIDR / app security group
 10. Additional: Initial database name: cashmir
 11. Create database → wait until Status = Available
 12. Click the DB → Connectivity & security → copy Endpoint
-13. Open security group → Inbound rules → Edit → Add:
-    Type PostgreSQL, Port 5432, Source 0.0.0.0/0 (TEMP for Amplify)
+13. Open security group → Inbound rules → verify:
+    Type PostgreSQL, Port 5432, Source = application VPC CIDR / app security group
+    Never use 0.0.0.0/0 for production database access.
 14. Build URL (encode special chars in password):
 
 postgresql://cashmir:YOUR_PASSWORD@YOUR_ENDPOINT:5432/cashmir?schema=public&connection_limit=5&pool_timeout=10

@@ -179,6 +179,7 @@ model Order {
   carrier         String      @default("")
   shippedAt       DateTime?
   adminNotes      String      @default("")
+  idempotencyKey  String?     @unique
   stockReserved   Boolean     @default(false)
   stockDeducted   Boolean     @default(false)
   /// Razorpay order id — unique when set; NULL until checkout creates a provider order.

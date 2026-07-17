@@ -41,5 +41,10 @@ if ($LASTEXITCODE -ne 0) { throw "Run aws configure first" }
 if ($LASTEXITCODE -ne 0) { throw "Cron stack deploy failed" }
 
 Write-Host "Cron schedules deployed:"
+Write-Host "  - rate(2 minutes) → $SiteBaseUrl/api/cron/process-outbox"
 Write-Host "  - rate(20 minutes) → $SiteBaseUrl/api/cron/release-stale-orders"
+Write-Host "  - every 6 hours → $SiteBaseUrl/api/cron/reconcile-payments"
 Write-Host "  - daily 21:30 UTC (03:00 IST) → $SiteBaseUrl/api/cron/cleanup-sessions"
+Write-Host ""
+Write-Host "Smoke test one route with:"
+Write-Host "  curl -H `"Authorization: Bearer <CRON_SECRET>`" $SiteBaseUrl/api/cron/process-outbox"

@@ -60,6 +60,12 @@ jobs:
           npx prisma validate
           npx prisma generate
 
+      - name: Apply Prisma migrations to CI Postgres
+        run: npx prisma migrate deploy
+
+      - name: Run TypeScript typecheck
+        run: npm run typecheck
+
       - name: Run unit test suite (Vitest)
         run: npm test
 

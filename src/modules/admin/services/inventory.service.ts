@@ -274,14 +274,16 @@ export async function restoreStockForOrder(input: {
   lines: StockLine[];
   changeType?: Extract<InventoryChangeType, "order_cancelled" | "order_returned">;
   createdBy?: string | null;
+  tx?: Tx;
 }) {
   const { restoreLotsForOrderItem } = await import("@/modules/admin/services/inventory-lots.service");
-  const trackable = await filterTrackable(input.lines);
-  const orderItems = await db.orderItem.findMany({ where: { orderId: input.orderId } });
+  const client = input.tx ?? db;
+  const trackable = await filterTrackable(input.lines, client);
+  const orderItems = await client.orderItem.findMany({ where: { orderId: input.orderId } });
 
   for (const line of trackable) {
-    const snapshot = await ensureInventory(line.productId);
-    await db.$transaction(async (tx) => {
+    const snapshot = await ensureInventory(line.productId, client);
+    const restore = async (tx: Tx) => {
       await applyDelta(tx, snapshot, line.quantity, input.changeType ?? "order_cancelled", {
         referenceType: "order",
         referenceId: input.orderId,
@@ -291,7 +293,13 @@ export async function restoreStockForOrder(input: {
       for (const item of orderItems.filter((i) => i.productId === line.productId)) {
         await restoreLotsForOrderItem(item.id, tx);
       }
-    });
+    };
+
+    if (input.tx) {
+      await restore(input.tx);
+    } else {
+      await db.$transaction(restore);
+    }
   }
 }
 
