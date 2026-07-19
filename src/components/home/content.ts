@@ -9,6 +9,8 @@ export type ProductCard = {
   category: string;
   sizeLabel: string;
   mrpInr: number;
+  pricePaise?: number | null;
+  stockQty?: number;
   imageUrl?: string;
   featured?: boolean;
 };
@@ -139,6 +141,8 @@ export function buildHomeContent(data: PublicHomeData | null): HomeContent {
           category: p.category,
           sizeLabel: p.sizeLabel,
           mrpInr: p.mrpInr,
+          pricePaise: p.pricePaise,
+          stockQty: p.stockQty,
           imageUrl: p.imageUrl,
           featured: p.featured
         }))

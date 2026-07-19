@@ -21,7 +21,12 @@ import { getShippingRates } from "@/modules/shop/services/order.service";
 import { ProductGallery } from "@/components/ui/product-gallery";
 import { AddToCart } from "@/components/shop/add-to-cart";
 import { ProductDetailAccordion } from "@/components/shop/product-detail-accordion";
+import { ProductInfoSections } from "@/components/shop/product-info-sections";
+import { ProductJsonLd } from "@/components/shop/product-json-ld";
+import { ProductPrice } from "@/components/shop/product-price";
 import { Reveal } from "@/components/ui/reveal";
+import { sellingInrFromPaise } from "@/lib/pricing";
+import { getStockStatus } from "@/lib/pricing";
 
 export const revalidate = 300;
 
@@ -75,9 +80,11 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
   const availability = await getProductAvailability(product);
   const inStock = availability.available > 0;
   const patent = product.patent;
-  const priceLabel = inr.format(product.mrpInr);
+  const sellingInr = sellingInrFromPaise(product.pricePaise, product.mrpInr);
+  const priceLabel = inr.format(sellingInr);
   const patentCount = patents.length;
-  const low = inStock && availability.isLow;
+  const stockStatus = getStockStatus(availability.available, product.lowStockThreshold);
+  const low = stockStatus === "low_stock";
 
   const leadLabel = `Ships ~${product.leadTimeDays}d`;
 
@@ -108,6 +115,7 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
 
   return (
     <div className="bg-paper pb-16 sm:pb-24">
+      <ProductJsonLd product={product} available={availability.available} />
       {/* 58 / 42 hero — product left, buy panel supports */}
       <section className="frame scroll-mt-28 pt-[4.75rem] md:scroll-mt-32 md:pt-20 lg:pt-24">
         <div className="grid grid-cols-1 items-start gap-4 md:gap-8 lg:grid-cols-[minmax(0,1.05fr)_minmax(0,0.95fr)] lg:gap-12 xl:gap-16">
@@ -153,15 +161,22 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
               {product.name}
             </h1>
 
-            {/* One sentence sells — full copy lives in accordion */}
             <p className="mt-2.5 max-w-md text-[14px] leading-snug text-ink-mute sm:mt-3 sm:text-[15px]">
               {product.shortBenefit}
             </p>
 
-            <div className="mt-4 flex items-baseline gap-3 sm:mt-5">
-              <span className="text-[1.45rem] font-light tracking-tight text-ink sm:text-[1.55rem]">{priceLabel}</span>
-              <span className="text-[12px] text-ink-faint">{product.sizeLabel}</span>
-              {low ? <span className="text-[12px] text-gold">Only {availability.available} left</span> : null}
+            <div className="mt-4 sm:mt-5">
+              <ProductPrice
+                mrpInr={product.mrpInr}
+                sellingInr={sellingInr}
+                sizeLabel={product.sizeLabel}
+              />
+              {low ? (
+                <p className="mt-1.5 text-[12px] text-gold">Only {availability.available} left</p>
+              ) : null}
+              {stockStatus === "out_of_stock" ? (
+                <p className="mt-1.5 text-[12px] text-[#CC0C39]">Out of stock</p>
+              ) : null}
             </div>
 
             <AddToCart
@@ -173,12 +188,11 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
                 slug: product.slug,
                 name: product.name,
                 sizeLabel: product.sizeLabel,
-                priceInr: product.mrpInr,
+                priceInr: sellingInr,
                 imageUrl: product.imageUrl
               }}
             />
 
-            {/* Trust — single horizontal scroller on mobile, grid on larger */}
             <ul className="mt-5 flex gap-x-4 gap-y-2 overflow-x-auto pb-0.5 [-ms-overflow-style:none] [scrollbar-width:none] sm:mt-7 sm:grid sm:grid-cols-4 sm:overflow-visible lg:grid-cols-2 xl:grid-cols-4 [&::-webkit-scrollbar]:hidden">
               {[
                 { icon: Package, label: leadLabel },
@@ -193,13 +207,20 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
               ))}
             </ul>
 
-            {/* Research open by default — biotech confidence */}
             <div className="mt-3 sm:mt-4">
               <ProductDetailAccordion sections={accordion} defaultOpenId="research" />
             </div>
           </Reveal>
         </div>
       </section>
+
+      <ProductInfoSections
+        measurements={product.measurements}
+        specs={product.specs}
+        usage={product.usage}
+        otherInfo={product.otherInfo}
+        customFields={product.customFields ?? []}
+      />
 
       {/* Emotional Kashmir beat — large / tiny rhythm */}
       <section className="frame scroll-mt-28 mt-14 md:mt-16 lg:mt-20">

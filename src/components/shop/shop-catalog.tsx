@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Search } from "lucide-react";
+import { Search, X } from "lucide-react";
 import { Reveal } from "@/components/ui/reveal";
 import {
   ShopComingSoonCard,
@@ -9,6 +9,7 @@ import {
   ShopProductCard
 } from "@/components/shop/shop-product-card";
 import { cn } from "@/lib/utils";
+import { effectiveSellingPaise } from "@/lib/pricing";
 
 type CatalogProduct = {
   id: string;
@@ -24,6 +25,7 @@ type CatalogProduct = {
   images: string[];
   sku: string;
   stockQty: number;
+  lowStockThreshold?: number;
   featured: boolean;
   patent?: { patentCode: string; title: string } | null;
 };
@@ -53,6 +55,19 @@ export function ShopCatalog({
   const [category, setCategory] = useState("");
   const [sort, setSort] = useState<"featured" | "price-asc" | "price-desc" | "name">("featured");
 
+  const allProducts = useMemo(
+    () => (featured ? [featured, ...catalog] : catalog),
+    [featured, catalog]
+  );
+
+  const categoryCounts = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const p of allProducts) {
+      counts.set(p.category, (counts.get(p.category) ?? 0) + 1);
+    }
+    return counts;
+  }, [allProducts]);
+
   const filtered = useMemo(() => {
     const query = q.trim().toLowerCase();
     let list = catalog.filter((p) => {
@@ -67,8 +82,8 @@ export function ShopCatalog({
     });
 
     list = [...list].sort((a, b) => {
-      const pa = (a.pricePaise ?? a.mrpInr * 100) / 100;
-      const pb = (b.pricePaise ?? b.mrpInr * 100) / 100;
+      const pa = effectiveSellingPaise(a.pricePaise, a.mrpInr) / 100;
+      const pb = effectiveSellingPaise(b.pricePaise, b.mrpInr) / 100;
       if (sort === "price-asc") return pa - pb;
       if (sort === "price-desc") return pb - pa;
       if (sort === "name") return a.name.localeCompare(b.name);
@@ -84,109 +99,139 @@ export function ShopCatalog({
     sort === "featured";
 
   const visibleCount = filtered.length + (showFeatured ? 1 : 0);
-  const totalCount = catalog.length + (featured ? 1 : 0);
+  const totalCount = allProducts.length;
+  const isFiltering = Boolean(q.trim() || category);
 
   return (
     <>
       {showFeatured ? (
-        <Reveal y={24}>
-          <div className="mb-2.5">
-            <p className="technical !text-ink-soft">Flagship</p>
-          </div>
+        <Reveal y={20}>
           <ShopProductCard product={featured} featured />
         </Reveal>
       ) : null}
 
-      <div id="formulas" className="mx-auto mt-8 max-w-4xl scroll-mt-28 md:mt-11">
-        <div className="mb-3 flex items-end justify-between gap-3">
-          <div>
-            <h2 className="text-lg font-light tracking-tight text-ink md:text-xl">Browse Formulations</h2>
-            <p className="mt-0.5 text-[12px] text-ink-mute">
-              {visibleCount} product{visibleCount === 1 ? "" : "s"}
-              {q || category ? ` · of ${totalCount}` : ""}
+      <div id="formulas" className="mt-5 scroll-mt-36 md:mt-6">
+        {/* One sticky toolbar: search · sort · count · category chips */}
+        <div className="sticky top-[4.5rem] z-30 -mx-1 mb-4 border-b border-ink/8 bg-paper/95 px-1 pb-2.5 pt-2 backdrop-blur-md md:top-[4.75rem]">
+          <div className="flex items-center gap-2">
+            <label className="relative min-w-0 flex-1">
+              <span className="sr-only">Search products</span>
+              <Search
+                className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-ink-faint"
+                aria-hidden
+              />
+              <input
+                id="shop-search"
+                value={q}
+                onChange={(e) => setQ(e.target.value)}
+                placeholder="Search formulas"
+                className="w-full border border-ink/12 bg-paper py-2 pl-9 pr-8 text-[13px] outline-none ring-gold/25 focus:ring-2"
+              />
+              {q ? (
+                <button
+                  type="button"
+                  onClick={() => setQ("")}
+                  aria-label="Clear search"
+                  className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-ink-faint hover:text-ink"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              ) : null}
+            </label>
+
+            <select
+              aria-label="Sort products"
+              value={sort}
+              onChange={(e) => setSort(e.target.value as typeof sort)}
+              className="h-[38px] shrink-0 border border-ink/12 bg-paper px-2.5 text-[12px] text-ink outline-none ring-gold/25 focus:ring-2"
+            >
+              <option value="featured">Popular</option>
+              <option value="name">Name</option>
+              <option value="price-asc">Price: low to high</option>
+              <option value="price-desc">Price: high to low</option>
+            </select>
+
+            <p className="hidden shrink-0 text-[12px] tabular-nums text-ink-mute sm:block" aria-live="polite">
+              {visibleCount}
+              {isFiltering ? ` of ${totalCount}` : ""} product{visibleCount === 1 ? "" : "s"}
             </p>
           </div>
-          <select
-            aria-label="Sort products"
-            value={sort}
-            onChange={(e) => setSort(e.target.value as typeof sort)}
-            className="rounded-md border border-ink/12 bg-paper px-2.5 py-1.5 text-[11px] text-ink outline-none"
-          >
-            <option value="featured">Popular</option>
-            <option value="name">Name</option>
-            <option value="price-asc">Price ↑</option>
-            <option value="price-desc">Price ↓</option>
-          </select>
-        </div>
 
-        <label className="relative mb-3 block">
-          <span className="sr-only">Search products</span>
-          <Search
-            className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-ink-faint"
-            aria-hidden
-          />
-          <input
-            id="shop-search"
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
-            placeholder="Search"
-            className="w-full border border-ink/12 bg-paper py-2.5 pl-9 pr-3 text-[13px] outline-none ring-gold/25 focus:ring-2"
-          />
-        </label>
-
-        {categories.length > 0 ? (
-          <nav
-            aria-label="Product categories"
-            className="-mx-1 mb-4 flex gap-2 overflow-x-auto px-1 pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-          >
-            <button
-              type="button"
-              onClick={() => setCategory("")}
-              className={cn(
-                "shrink-0 rounded-full border px-3.5 py-1.5 text-[12px] transition-colors",
-                !category
-                  ? "border-ink bg-ink text-paper"
-                  : "border-ink/12 bg-paper text-ink-mute active:bg-pearl"
-              )}
+          {categories.length > 1 ? (
+            <nav
+              aria-label="Product categories"
+              className="-mx-1 mt-2 flex gap-1.5 overflow-x-auto px-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
             >
-              All
-            </button>
-            {categories.map((cat) => (
               <button
-                key={cat}
                 type="button"
-                onClick={() => setCategory(cat)}
+                onClick={() => setCategory("")}
+                aria-pressed={!category}
                 className={cn(
-                  "shrink-0 rounded-full border px-3.5 py-1.5 text-[12px] transition-colors",
-                  category === cat
+                  "shrink-0 rounded-full border px-3 py-1 text-[12px] transition-colors",
+                  !category
                     ? "border-ink bg-ink text-paper"
-                    : "border-ink/12 bg-paper text-ink-mute active:bg-pearl"
+                    : "border-ink/12 bg-paper text-ink-mute hover:border-ink/30 active:bg-pearl"
                 )}
               >
-                {chipLabel(cat)}
+                All <span className={cn("tabular-nums", !category ? "text-paper/60" : "text-ink-faint")}>{totalCount}</span>
               </button>
-            ))}
-          </nav>
-        ) : null}
+              {categories.map((cat) => {
+                const active = category === cat;
+                return (
+                  <button
+                    key={cat}
+                    type="button"
+                    onClick={() => setCategory(active ? "" : cat)}
+                    aria-pressed={active}
+                    className={cn(
+                      "shrink-0 rounded-full border px-3 py-1 text-[12px] transition-colors",
+                      active
+                        ? "border-ink bg-ink text-paper"
+                        : "border-ink/12 bg-paper text-ink-mute hover:border-ink/30 active:bg-pearl"
+                    )}
+                  >
+                    {chipLabel(cat)}{" "}
+                    <span className={cn("tabular-nums", active ? "text-paper/60" : "text-ink-faint")}>
+                      {categoryCounts.get(cat) ?? 0}
+                    </span>
+                  </button>
+                );
+              })}
+            </nav>
+          ) : null}
+        </div>
 
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4">
+        <div className="grid grid-cols-2 gap-2.5 sm:gap-3 md:grid-cols-3 xl:grid-cols-4">
           {filtered.map((product, i) => (
-            <Reveal key={product.id} delay={0.03 * (i % 2)} y={18}>
-              <div id={categories.length > 1 ? `cat-${categorySlug(product.category)}` : undefined}>
+            <Reveal key={product.id} delay={0.025 * (i % 4)} y={14}>
+              <div
+                className="h-full"
+                id={categories.length > 1 ? `cat-${categorySlug(product.category)}` : undefined}
+              >
                 <ShopProductCard product={product} />
               </div>
             </Reveal>
           ))}
 
           {filtered.length === 0 && catalog.length > 0 ? (
-            <p className="py-8 text-center text-sm text-ink-mute sm:col-span-2">
-              No formulas match your search.
-            </p>
+            <div className="col-span-full py-10 text-center">
+              <p className="text-sm text-ink-mute">No formulas match your search.</p>
+              <button
+                type="button"
+                onClick={() => {
+                  setQ("");
+                  setCategory("");
+                }}
+                className="mt-2 text-[13px] font-medium text-ink underline underline-offset-4"
+              >
+                Clear filters
+              </button>
+            </div>
           ) : null}
 
           {catalog.length === 0 ? (
             <>
-              <Reveal y={24}>
+              <Reveal y={20}>
                 <ShopEducationCard
                   label="Research kits"
                   title="Assay-ready fractions"
@@ -194,7 +239,7 @@ export function ShopCatalog({
                   href="#pipeline"
                 />
               </Reveal>
-              <Reveal delay={0.05} y={24}>
+              <Reveal delay={0.05} y={20}>
                 <ShopEducationCard
                   label="Evidence"
                   title="Patent registry"
@@ -203,15 +248,6 @@ export function ShopCatalog({
                 />
               </Reveal>
             </>
-          ) : catalog.length === 1 && filtered.length <= 1 ? (
-            <Reveal delay={0.05} y={24}>
-              <ShopEducationCard
-                label="Coming soon"
-                title="Next formulation"
-                blurb="Additional molecules are in discovery. Explore the pipeline for readiness."
-                href="#pipeline"
-              />
-            </Reveal>
           ) : null}
         </div>
       </div>

@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import Image from "next/image";
-import { ArrowDown, ArrowUpRight } from "lucide-react";
+import { ArrowUpRight } from "lucide-react";
 import {
   listActiveProducts,
   listPatents,
@@ -12,11 +12,8 @@ import { Reveal, RevealText } from "@/components/ui/reveal";
 import { TechChip } from "@/components/ui/tech-chip";
 import { LuxeButton } from "@/components/ui/luxe-button";
 import { SITE_CONTACT } from "@/lib/site-contact";
-import { ShopCountUp } from "@/components/shop/shop-count-up";
 import { ShopFaq } from "@/components/shop/shop-faq";
-import {
-  ShopComingSoonCard
-} from "@/components/shop/shop-product-card";
+import { ShopComingSoonCard } from "@/components/shop/shop-product-card";
 import { ShopCatalog } from "@/components/shop/shop-catalog";
 
 export const dynamic = "force-dynamic";
@@ -119,62 +116,82 @@ export default async function ProductsPage() {
 
   return (
     <div className="pb-12">
-      {/* ── Hero: narrative left / evidence right ────────────────────── */}
-      <header className="frame relative pb-6 pt-28 md:pb-8 md:pt-32">
-        <div className="max-w-2xl">
-          <Reveal>
-            <TechChip className="mb-4 !text-ink-soft">The Shop</TechChip>
-          </Reveal>
-          <h1 className="max-w-[15ch] text-[clamp(2.1rem,4.8vw,3.75rem)] font-light leading-[1.05] tracking-tightest [&_.text-gold]:font-light [&_.text-gold]:text-gold/75">
-            <RevealText text="Nutrition, engineered molecule-first." accentWords={[2]} />
-          </h1>
-          <Reveal delay={0.08}>
-            <p className="mt-4 max-w-md text-[14px] leading-relaxed text-ink-mute">
-              Patent-backed formulas from Himalayan flora — assayed, finished, orderable.
-            </p>
-          </Reveal>
-          <Reveal delay={0.1}>
-            <div className="mt-6 flex flex-wrap items-center gap-3">
-              <LuxeButton href="#catalog" magnetic={false} className="!px-6 !py-3">
-                Browse products
-                <ArrowDown className="h-3.5 w-3.5" strokeWidth={1.75} />
-              </LuxeButton>
-              <Link
-                href="#method"
-                className="text-[13px] text-ink-mute underline-offset-4 transition-colors hover:text-ink hover:underline"
-              >
-                Why molecule-first
+      {/* ── Hero: one compact beat, products immediately below ──────── */}
+      <header className="frame relative pb-5 pt-24 md:pt-28">
+        <div className="flex flex-wrap items-end justify-between gap-x-8 gap-y-3">
+          <div>
+            <Reveal>
+              <TechChip className="mb-3 !text-ink-soft">The Shop</TechChip>
+            </Reveal>
+            <h1 className="max-w-[18ch] text-[clamp(1.7rem,3.4vw,2.6rem)] font-light leading-[1.08] tracking-tightest [&_.text-gold]:font-light [&_.text-gold]:text-gold/75">
+              <RevealText text="Nutrition, engineered molecule-first." accentWords={[2]} />
+            </h1>
+          </div>
+          <Reveal delay={0.06}>
+            <p className="max-w-xs text-[13px] leading-relaxed text-ink-mute">
+              Patent-backed formulas from Himalayan flora — assayed, finished, orderable.{" "}
+              <Link href="#method" className="text-ink underline-offset-4 hover:underline">
+                The method
               </Link>
-            </div>
+            </p>
           </Reveal>
         </div>
 
-        {/* Proof metrics — numbers, not footer fluff */}
-        <Reveal delay={0.12}>
-          <dl className="mt-8 grid grid-cols-2 gap-px bg-ink/10 sm:grid-cols-4">
-            <div className="bg-paper px-4 py-4 md:px-5">
-              <dt className="font-mono text-[9px] uppercase tracking-[0.14em] text-ink-soft">Patents</dt>
-              <dd className="mt-1 text-2xl font-light tracking-tight text-ink md:text-3xl">
-                <ShopCountUp value={patentCount > 0 ? patentCount : 12} />
-              </dd>
-            </div>
-            <div className="bg-paper px-4 py-4 md:px-5">
-              <dt className="font-mono text-[9px] uppercase tracking-[0.14em] text-ink-soft">Partner</dt>
-              <dd className="mt-1 text-xl font-light tracking-tight text-ink md:text-2xl">SKUAST-K</dd>
-            </div>
-            <div className="bg-paper px-4 py-4 md:px-5">
-              <dt className="font-mono text-[9px] uppercase tracking-[0.14em] text-ink-soft">Origin</dt>
-              <dd className="mt-1 text-xl font-light tracking-tight text-ink md:text-2xl">Kashmir</dd>
-            </div>
-            <div className="bg-paper px-4 py-4 md:px-5">
-              <dt className="font-mono text-[9px] uppercase tracking-[0.14em] text-ink-soft">Method</dt>
-              <dd className="mt-1 text-xl font-light tracking-tight text-ink md:text-2xl">Assayed</dd>
-            </div>
-          </dl>
+        {/* Proof strip — one quiet line, not a stats section */}
+        <Reveal delay={0.1}>
+          <p className="mt-4 flex flex-wrap items-center gap-x-2.5 gap-y-1 border-t border-ink/8 pt-3 font-mono text-[10px] uppercase tracking-[0.13em] text-ink-soft">
+            <span className="text-ink">{patentCount > 0 ? patentCount : 12} patents</span>
+            <span aria-hidden className="text-ink/20">·</span>
+            <span>SKUAST-K partner</span>
+            <span aria-hidden className="text-ink/20">·</span>
+            <span>Kashmir origin</span>
+            <span aria-hidden className="text-ink/20">·</span>
+            <span>Every lot assayed</span>
+          </p>
         </Reveal>
       </header>
 
-      {/* ── Method: copy + process diagram (small→medium rhythm) ─────── */}
+      {/* ── Catalog first: featured + sticky toolbar + dense grid ────── */}
+      <section id="catalog" className="frame scroll-mt-24 pb-10 pt-1 md:pb-12">
+        {products.length === 0 ? (
+          <Reveal>
+            <div className="px-4 py-12 text-center">
+              <p className="technical mb-3 !text-ink-soft">No products published yet</p>
+              <p className="mx-auto max-w-md text-sm text-ink-mute">
+                The catalog is being prepared. Reach out for current availability.
+              </p>
+              <div className="mt-6 flex justify-center">
+                <LuxeButton href={`mailto:${SITE_CONTACT.primaryEmail}`} variant="ghost" magnetic={false}>
+                  Contact us
+                </LuxeButton>
+              </div>
+            </div>
+          </Reveal>
+        ) : (
+          <ShopCatalog
+            featured={featured}
+            catalog={catalog}
+            categories={categories}
+          />
+        )}
+      </section>
+
+      {/* ── Pipeline — supporting band after the shopping is done ────── */}
+      <section id="pipeline" className="frame scroll-mt-28 border-t border-ink/8 py-7 md:py-9">
+        <Reveal>
+          <p className="technical mb-0.5 !text-ink-soft">Pipeline</p>
+          <h2 className="text-lg font-light tracking-tight text-ink">Not yet on the shelf</h2>
+        </Reveal>
+        <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:max-w-3xl">
+          {PIPELINE.map((item, i) => (
+            <Reveal key={item.title} delay={0.04 * i} y={18}>
+              <ShopComingSoonCard {...item} />
+            </Reveal>
+          ))}
+        </div>
+      </section>
+
+      {/* ── Method: the science, for readers who keep scrolling ──────── */}
       <section id="method" className="frame scroll-mt-28 border-t border-ink/8 py-8 md:py-10">
         <div className="grid gap-8 lg:grid-cols-12 lg:gap-10">
           <div className="lg:col-span-5">
@@ -219,46 +236,6 @@ export default async function ProductsPage() {
               </ol>
             </div>
           </Reveal>
-        </div>
-      </section>
-
-      {/* ── Catalog: featured + dense centered grid ──────────────────── */}
-      <section id="catalog" className="frame scroll-mt-28 border-t border-ink/8 py-10 md:py-12">
-        {products.length === 0 ? (
-          <Reveal>
-            <div className="px-4 py-12 text-center">
-              <p className="technical mb-3 !text-ink-soft">No products published yet</p>
-              <p className="mx-auto max-w-md text-sm text-ink-mute">
-                The catalog is being prepared. Reach out for current availability.
-              </p>
-              <div className="mt-6 flex justify-center">
-                <LuxeButton href={`mailto:${SITE_CONTACT.primaryEmail}`} variant="ghost" magnetic={false}>
-                  Contact us
-                </LuxeButton>
-              </div>
-            </div>
-          </Reveal>
-        ) : (
-          <ShopCatalog
-            featured={featured}
-            catalog={catalog}
-            categories={categories}
-          />
-        )}
-      </section>
-
-      {/* ── Pipeline — alive supporting band ─────────────────────────── */}
-      <section id="pipeline" className="frame scroll-mt-28 py-7 md:py-9">
-        <Reveal>
-          <p className="technical mb-0.5 !text-ink-soft">Pipeline</p>
-          <h2 className="text-lg font-light tracking-tight text-ink">Not yet on the shelf</h2>
-        </Reveal>
-        <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:max-w-3xl">
-          {PIPELINE.map((item, i) => (
-            <Reveal key={item.title} delay={0.04 * i} y={18}>
-              <ShopComingSoonCard {...item} />
-            </Reveal>
-          ))}
         </div>
       </section>
 

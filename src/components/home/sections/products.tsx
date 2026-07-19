@@ -5,14 +5,10 @@ import Link from "next/link";
 import { useMemo, useState } from "react";
 import { ArrowUpRight } from "lucide-react";
 import { Reveal, RevealText } from "@/components/ui/reveal";
+import { ProductPrice } from "@/components/shop/product-price";
 import type { ProductCard } from "@/components/home/content";
+import { effectiveSellingPaise, sellingInrFromPaise } from "@/lib/pricing";
 import { cn } from "@/lib/utils";
-
-const inr = new Intl.NumberFormat("en-IN", {
-  style: "currency",
-  currency: "INR",
-  maximumFractionDigits: 0
-});
 
 function splitName(name: string): { brand: string; rest: string } {
   const known = ["TaxO", "ZincMag", "Pavitra+", "Pavitra", "Iron Revive", "Cashmir Isabghol", "Dandelion"];
@@ -84,8 +80,16 @@ export function Products({ products }: { products: ProductCard[] }) {
     });
 
     rows = [...rows].sort((a, b) => {
-      if (sort === "price-asc") return a.mrpInr - b.mrpInr;
-      if (sort === "price-desc") return b.mrpInr - a.mrpInr;
+      if (sort === "price-asc") {
+        return (
+          effectiveSellingPaise(a.pricePaise, a.mrpInr) - effectiveSellingPaise(b.pricePaise, b.mrpInr)
+        );
+      }
+      if (sort === "price-desc") {
+        return (
+          effectiveSellingPaise(b.pricePaise, b.mrpInr) - effectiveSellingPaise(a.pricePaise, a.mrpInr)
+        );
+      }
       if (sort === "name") return a.name.localeCompare(b.name);
       // featured first, then as provided
       return Number(Boolean(b.featured)) - Number(Boolean(a.featured));
@@ -280,7 +284,11 @@ function HomeProductCard({ product }: { product: ProductCard }) {
 
         <div className="mt-auto flex items-end justify-between gap-3 border-t border-ink/8 pt-3">
           <div>
-            <p className="text-lg font-light tabular-nums tracking-tight text-ink">{inr.format(product.mrpInr)}</p>
+            <ProductPrice
+              mrpInr={product.mrpInr}
+              sellingInr={sellingInrFromPaise(product.pricePaise, product.mrpInr)}
+              compact
+            />
             <p className="font-mono text-[9px] uppercase tracking-[0.12em] text-ink-faint">{product.sizeLabel}</p>
           </div>
           <span className="inline-flex items-center gap-1 text-[13px] font-medium text-ink">

@@ -18,8 +18,12 @@ import { writeAuditLog } from "@/modules/admin/services/audit.service";
 import {
   homepageSettingsSchema,
   patentUpdateSchema,
-  productUpdateSchema,
-  teamMemberUpdateSchema
+  teamMemberUpdateSchema,
+  customFieldSchema,
+  measurementsSchema,
+  specsSchema,
+  usageSchema,
+  otherInfoSchema
 } from "@/modules/cms/validations/admin";
 import {
   updatePatentContent,
@@ -28,7 +32,10 @@ import {
 } from "@/modules/cms/services/content.service";
 import { db } from "@/lib/db";
 import { logger } from "@/lib/logger";
+import { paiseFromInr } from "@/lib/pricing";
+import { stripEmptyStrings } from "@/lib/product-sections";
 import { z } from "zod";
+import { Prisma } from "@prisma/client";
 
 export type ActionState = { ok?: boolean; message?: string; error?: string };
 
@@ -76,18 +83,59 @@ const checkbox = z
   .union([z.literal("on"), z.literal("true"), z.literal("false"), z.undefined()])
   .transform((v) => v === "on" || v === "true");
 
-const productUpsertSchema = productUpdateSchema.extend({
-  id: z.string().optional(),
-  category: z.string().trim().max(200).optional(),
-  sku: z.string().optional(),
-  stockQty: z.coerce.number().int().min(0),
-  lowStockThreshold: z.coerce.number().int().min(0),
-  leadTimeDays: z.coerce.number().int().min(0).max(365).optional(),
-  images: z.string().optional(),
-  featured: checkbox,
-  hasInventoryTracking: checkbox,
-  active: checkbox
-});
+const productUpsertSchema = z
+  .object({
+    id: z.string().optional(),
+    name: z.string().trim().min(1).max(500),
+    shortBenefit: z.string().trim().min(1).max(500),
+    description: z.string().max(50000),
+    mrpInr: z.coerce.number().int().positive("MRP must be greater than zero").max(100_000_000),
+    sellingPriceInr: z.coerce
+      .number()
+      .int()
+      .positive("Selling price must be greater than zero")
+      .max(100_000_000),
+    currency: z.string().trim().min(1).max(8).default("INR"),
+    minOrderQty: z.coerce.number().int().min(1).max(100).default(1),
+    maxOrderQty: z.preprocess((val) => {
+      if (val === "" || val === null || val === undefined) return undefined;
+      const n = typeof val === "number" ? val : Number(val);
+      return Number.isFinite(n) ? n : undefined;
+    }, z.number().int().min(1).max(100).optional()),
+    sizeLabel: z.string().trim().min(1).max(200),
+    imageUrl: z.string().trim().min(1).max(2000),
+    category: z.string().trim().max(200).optional(),
+    sku: z.string().optional(),
+    stockQty: z.coerce.number().int().min(0),
+    lowStockThreshold: z.coerce.number().int().min(0),
+    leadTimeDays: z.coerce.number().int().min(0).max(365).optional(),
+    images: z.string().optional(),
+    featured: checkbox,
+    hasInventoryTracking: checkbox,
+    active: checkbox,
+    taxIncluded: checkbox,
+    measurementsJson: z.string().optional(),
+    specsJson: z.string().optional(),
+    usageJson: z.string().optional(),
+    otherInfoJson: z.string().optional(),
+    customFieldsJson: z.string().optional()
+  })
+  .superRefine((data, ctx) => {
+    if (data.sellingPriceInr > data.mrpInr) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Selling price cannot exceed MRP",
+        path: ["sellingPriceInr"]
+      });
+    }
+    if (data.maxOrderQty != null && data.maxOrderQty < data.minOrderQty) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Max order quantity must be ≥ min order quantity",
+        path: ["maxOrderQty"]
+      });
+    }
+  });
 
 function parseGallery(raw: string | undefined): string[] {
   if (!raw?.trim()) return [];
@@ -103,6 +151,41 @@ function parseGallery(raw: string | undefined): string[] {
     // fall through to empty
   }
   return [];
+}
+
+function parseJsonBlock<T>(
+  raw: string | undefined,
+  schema: z.ZodType<T>
+): T | undefined {
+  if (!raw?.trim()) return undefined;
+  try {
+    const parsed = JSON.parse(raw);
+    const result = schema.safeParse(parsed);
+    if (!result.success) return undefined;
+    const stripped = stripEmptyStrings(result.data as Record<string, unknown>);
+    return Object.keys(stripped).length > 0 ? (stripped as T) : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+function parseCustomFields(raw: string | undefined) {
+  if (!raw?.trim()) return [];
+  try {
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    const fields: Array<{ label: string; value: string; sortOrder: number }> = [];
+    for (let i = 0; i < Math.min(parsed.length, 40); i++) {
+      const result = customFieldSchema.safeParse({
+        ...(typeof parsed[i] === "object" && parsed[i] ? parsed[i] : {}),
+        sortOrder: i
+      });
+      if (result.success) fields.push(result.data);
+    }
+    return fields;
+  } catch {
+    return [];
+  }
 }
 
 export async function saveHomepageAction(formData: FormData): Promise<ActionState> {
@@ -134,32 +217,85 @@ export async function saveProductAction(formData: FormData): Promise<ActionState
   if (!parsed.success) {
     return { error: parsed.error.issues[0]?.message ?? "Please check the product fields." };
   }
-  const { id, sku, stockQty, lowStockThreshold, active, featured, leadTimeDays, hasInventoryTracking, images, category, ...data } =
-    parsed.data;
+  const {
+    id,
+    sku,
+    stockQty,
+    lowStockThreshold,
+    active,
+    featured,
+    leadTimeDays,
+    hasInventoryTracking,
+    images,
+    category,
+    sellingPriceInr,
+    mrpInr,
+    currency,
+    taxIncluded,
+    minOrderQty,
+    maxOrderQty,
+    measurementsJson,
+    specsJson,
+    usageJson,
+    otherInfoJson,
+    customFieldsJson,
+    ...data
+  } = parsed.data;
+
   const gallery = parseGallery(images);
   const trimmedSku = sku?.trim() ?? "";
+  const pricePaise = paiseFromInr(sellingPriceInr);
+  const measurements = parseJsonBlock(measurementsJson, measurementsSchema);
+  const specs = parseJsonBlock(specsJson, specsSchema);
+  const usage = parseJsonBlock(usageJson, usageSchema);
+  const otherInfo = parseJsonBlock(otherInfoJson, otherInfoSchema);
+  const customFields = parseCustomFields(customFieldsJson);
+
+  const productData = {
+    ...data,
+    mrpInr,
+    pricePaise,
+    currency: currency || "INR",
+    taxIncluded,
+    minOrderQty,
+    maxOrderQty: maxOrderQty ?? null,
+    measurements: measurements ?? Prisma.DbNull,
+    specs: specs ?? Prisma.DbNull,
+    usage: usage ?? Prisma.DbNull,
+    otherInfo: otherInfo ?? Prisma.DbNull
+  };
+
   try {
     if (id) {
-      // Keep an existing SKU; only auto-generate if this product still has none.
       let finalSku = trimmedSku;
       if (!finalSku) {
         const current = await db.product.findUnique({ where: { id }, select: { sku: true } });
         finalSku = current?.sku?.trim() || (await generateUniqueSku(data.name, category || "Functional Food"));
       }
-      await db.product.update({
-        where: { id },
-        data: {
-          ...data,
-          ...(category ? { category } : {}),
-          ...(leadTimeDays !== undefined ? { leadTimeDays } : {}),
-          sku: finalSku,
-          images: gallery,
-          stockQty,
-          lowStockThreshold,
-          featured,
-          hasInventoryTracking,
-          active
-        }
+      await db.$transaction(async (tx) => {
+        await tx.productCustomField.deleteMany({ where: { productId: id } });
+        await tx.product.update({
+          where: { id },
+          data: {
+            ...productData,
+            ...(category ? { category } : {}),
+            ...(leadTimeDays !== undefined ? { leadTimeDays } : {}),
+            sku: finalSku,
+            images: gallery,
+            stockQty,
+            lowStockThreshold,
+            featured,
+            hasInventoryTracking,
+            active,
+            customFields: {
+              create: customFields.map((f, i) => ({
+                label: f.label,
+                value: f.value,
+                sortOrder: i
+              }))
+            }
+          }
+        });
       });
       if (hasInventoryTracking) {
         await reconcileFromProductForm({
@@ -175,7 +311,7 @@ export async function saveProductAction(formData: FormData): Promise<ActionState
       await db.$transaction(async (tx) => {
         const product = await tx.product.create({
           data: {
-            ...data,
+            ...productData,
             slug: await uniqueProductSlug(data.name),
             category: category || "Functional Food",
             ...(leadTimeDays !== undefined ? { leadTimeDays } : {}),
@@ -185,7 +321,14 @@ export async function saveProductAction(formData: FormData): Promise<ActionState
             lowStockThreshold,
             featured,
             hasInventoryTracking,
-            active
+            active,
+            customFields: {
+              create: customFields.map((f, i) => ({
+                label: f.label,
+                value: f.value,
+                sortOrder: i
+              }))
+            }
           }
         });
         if (hasInventoryTracking) {
@@ -204,7 +347,7 @@ export async function saveProductAction(formData: FormData): Promise<ActionState
       action: id ? "update" : "create",
       entityType: "product",
       entityId: id ?? data.name,
-      diff: { name: data.name, stockQty, active }
+      diff: { name: data.name, stockQty, active, mrpInr, sellingPriceInr }
     });
     revalidatePath("/products");
     revalidatePath("/");

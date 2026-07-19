@@ -2,6 +2,7 @@ import "server-only";
 import { db } from "@/lib/db";
 import { logger } from "@/lib/logger";
 import { Money } from "@/lib/money";
+import { effectiveSellingPaise } from "@/lib/pricing";
 
 export type ShippingRates = {
   flatShippingInr: number;
@@ -146,10 +147,29 @@ export async function priceCart(items: CartInputItem[], couponCode?: string): Pr
   for (const [productId, quantity] of clean) {
     const product = products.find((p) => p.id === productId);
     if (!product) return { ok: false, error: "One or more items are no longer available." };
-    const unitPrice = Money.fromInr(product.mrpInr);
+
+    const minQty = Math.max(1, product.minOrderQty || 1);
+    const maxQty = Math.min(
+      MAX_QTY_PER_ITEM,
+      product.maxOrderQty && product.maxOrderQty > 0 ? product.maxOrderQty : MAX_QTY_PER_ITEM
+    );
+    if (quantity < minQty) {
+      return {
+        ok: false,
+        error: `${product.name}: minimum order quantity is ${minQty}.`
+      };
+    }
+    if (quantity > maxQty) {
+      return {
+        ok: false,
+        error: `${product.name}: maximum order quantity is ${maxQty}.`
+      };
+    }
+
+    const unitPrice = Money.fromCents(effectiveSellingPaise(product.pricePaise, product.mrpInr));
     const lineTotal = unitPrice.multiply(quantity);
     subtotal = subtotal.add(lineTotal);
-    
+
     lines.push({
       productId: product.id,
       productName: product.name,

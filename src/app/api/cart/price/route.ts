@@ -54,12 +54,19 @@ export async function POST(request: Request) {
       sizeLabel: true,
       imageUrl: true,
       mrpInr: true,
-      stockQty: true
+      pricePaise: true,
+      stockQty: true,
+      minOrderQty: true,
+      maxOrderQty: true,
+      lowStockThreshold: true,
+      hasInventoryTracking: true
     }
   });
 
   const items = priced.cart.lines.map((line) => {
     const product = products.find((p) => p.id === line.productId);
+    const maxOrder = product?.maxOrderQty && product.maxOrderQty > 0 ? product.maxOrderQty : 20;
+    const stockCap = Math.max(1, product?.stockQty ?? 20);
     return {
       productId: line.productId,
       slug: product?.slug ?? "",
@@ -67,8 +74,10 @@ export async function POST(request: Request) {
       sizeLabel: product?.sizeLabel ?? "",
       imageUrl: product?.imageUrl ?? "",
       priceInr: line.unitPriceCents / 100,
+      mrpInr: product?.mrpInr ?? line.unitPriceCents / 100,
       quantity: line.quantity,
-      maxQty: Math.min(20, Math.max(1, product?.stockQty ?? 20))
+      minQty: Math.max(1, product?.minOrderQty ?? 1),
+      maxQty: Math.min(20, maxOrder, stockCap)
     };
   });
 

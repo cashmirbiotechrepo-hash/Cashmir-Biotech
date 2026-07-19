@@ -143,7 +143,8 @@ export async function listActiveProducts() {
   return db.product.findMany({
     where: { active: true },
     include: {
-      patent: { select: { patentCode: true, title: true } }
+      patent: { select: { patentCode: true, title: true } },
+      customFields: { orderBy: { sortOrder: "asc" } }
     },
     orderBy: [{ featured: "desc" }, { createdAt: "desc" }]
   });
@@ -188,7 +189,8 @@ export async function getActiveProductBySlug(slug: string) {
           jurisdiction: true,
           lifecycleStatus: true
         }
-      }
+      },
+      customFields: { orderBy: { sortOrder: "asc" } }
     }
   });
 }

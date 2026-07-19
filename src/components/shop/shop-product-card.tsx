@@ -1,6 +1,9 @@
 import Link from "next/link";
-import Image from "next/image";
 import { ArrowUpRight, Check } from "lucide-react";
+import { ProductPrice } from "@/components/shop/product-price";
+import { CardQuickAdd } from "@/components/shop/card-quick-add";
+import { ProductCardImage } from "@/components/shop/product-card-image";
+import { getStockStatus, sellingInrFromPaise } from "@/lib/pricing";
 import { cn } from "@/lib/utils";
 
 export type ShopCardProduct = {
@@ -10,18 +13,14 @@ export type ShopCardProduct = {
   shortBenefit: string;
   sizeLabel: string;
   mrpInr: number;
+  pricePaise?: number | null;
   imageUrl: string;
   featured: boolean;
   stockQty: number;
+  lowStockThreshold?: number;
   category: string;
   patent?: { patentCode: string } | null;
 };
-
-const inr = new Intl.NumberFormat("en-IN", {
-  style: "currency",
-  currency: "INR",
-  maximumFractionDigits: 0
-});
 
 const FEATURED_TRUST = ["Patent-backed", "Clinically labelled", "Independent assay"] as const;
 
@@ -31,10 +30,55 @@ type Props = {
   className?: string;
 };
 
-/** One continuous shopping object: portrait bottle → essentials → price + CTA. */
+function CardBadges({
+  product,
+  stock,
+  featured
+}: {
+  product: ShopCardProduct;
+  stock: ReturnType<typeof getStockStatus>;
+  featured?: boolean;
+}) {
+  return (
+    <div className="pointer-events-none absolute left-2 top-2 z-10 flex flex-wrap gap-1">
+      {featured ? (
+        <span className="bg-ink px-2 py-0.5 text-[9px] font-medium uppercase tracking-[0.08em] text-paper">
+          Best seller
+        </span>
+      ) : null}
+      {product.patent ? (
+        <span className="bg-gold/90 px-2 py-0.5 text-[9px] font-medium uppercase tracking-[0.08em] text-paper">
+          Patented
+        </span>
+      ) : null}
+      {stock === "out_of_stock" ? (
+        <span className="bg-[#CC0C39] px-2 py-0.5 text-[9px] font-medium uppercase tracking-[0.08em] text-paper">
+          Out of stock
+        </span>
+      ) : stock === "low_stock" ? (
+        <span className="bg-paper/90 px-2 py-0.5 text-[9px] font-medium uppercase tracking-[0.08em] text-[#CC0C39]">
+          Low stock
+        </span>
+      ) : null}
+    </div>
+  );
+}
+
+/** Compact shopping card: tight square image → category / name / benefit → price + quick add. */
 export function ShopProductCard({ product, featured = false, className }: Props) {
   const href = `/products/${product.slug}`;
   const blurb = product.shortBenefit.replace(/\s+/g, " ").trim();
+  const sellingInr = sellingInrFromPaise(product.pricePaise, product.mrpInr);
+  const stock = getStockStatus(product.stockQty, product.lowStockThreshold ?? 5);
+
+  const quickAddProduct = {
+    productId: product.id,
+    slug: product.slug,
+    name: product.name,
+    sizeLabel: product.sizeLabel,
+    priceInr: sellingInr,
+    imageUrl: product.imageUrl
+  };
 
   if (featured) {
     return (
@@ -42,60 +86,56 @@ export function ShopProductCard({ product, featured = false, className }: Props)
         href={href}
         data-cursor="Open"
         className={cn(
-          "group relative grid overflow-hidden bg-paper transition-[transform,box-shadow] duration-300 ease-out",
-          "border border-ink/10 active:scale-[0.985] md:grid-cols-[0.9fr_1.1fr]",
-          "md:hover:-translate-y-0.5 md:hover:shadow-premium md:hover:border-ink/15",
+          "group relative grid overflow-hidden bg-paper transition-[transform,box-shadow,border-color] duration-300 ease-out",
+          "border border-ink/10 active:scale-[0.99] md:grid-cols-[minmax(0,300px)_1fr]",
+          "md:hover:-translate-y-1 md:hover:border-ink/20 md:hover:shadow-premium",
           className
         )}
       >
-        <div className="relative aspect-[4/5] bg-pearl md:aspect-auto md:min-h-[280px]">
+        <div className="relative aspect-square bg-pearl md:aspect-auto md:min-h-[240px]">
           {product.imageUrl ? (
-            <Image
+            <ProductCardImage
               src={product.imageUrl}
               alt={product.name}
-              fill
-              sizes="(max-width: 768px) 100vw, 42vw"
-              className="object-contain object-center p-5 transition-transform duration-700 ease-expo group-hover:scale-[1.02] md:p-8"
+              sizes="(max-width: 768px) 100vw, 300px"
               priority
+              className="object-contain object-center p-4 transition-transform duration-700 ease-expo group-hover:scale-105"
             />
           ) : null}
+          <CardBadges product={product} stock={stock} featured />
         </div>
 
-        <div className="flex flex-col justify-center gap-2.5 px-4 pb-4 pt-3 sm:px-5 md:gap-3 md:p-7">
-          {product.patent ? (
-            <p className="inline-flex items-center gap-1.5 text-[11px] text-gold">
-              <Check className="h-3 w-3 shrink-0" strokeWidth={2.25} aria-hidden />
-              Patent-backed
-            </p>
-          ) : (
-            <p className="text-[11px] text-ink-soft">{product.category}</p>
-          )}
+        <div className="flex flex-col justify-center gap-2 px-4 py-4 sm:px-5 md:gap-2.5 md:py-5">
+          <p className="text-[11px] uppercase tracking-[0.1em] text-ink-soft">{product.category}</p>
 
-          <h2 className="line-clamp-2 text-[1.35rem] font-light tracking-tight text-ink md:text-[1.65rem]">
+          <h2 className="line-clamp-2 text-[1.3rem] font-light tracking-tight text-ink md:text-[1.5rem]">
             {product.name}
           </h2>
-          <p className="line-clamp-2 max-w-sm text-[13px] leading-snug text-ink-mute">{blurb}</p>
+          <p className="line-clamp-2 max-w-md text-[13px] leading-snug text-ink-mute">{blurb}</p>
 
-          <ul className="mt-1 hidden space-y-1.5 md:block">
+          <ul className="mt-0.5 hidden gap-x-4 gap-y-1 md:flex md:flex-wrap">
             {FEATURED_TRUST.map((item) => (
-              <li key={item} className="flex items-center gap-2 text-[12px] text-ink-mute">
+              <li key={item} className="flex items-center gap-1.5 text-[11.5px] text-ink-mute">
                 <Check className="h-3 w-3 shrink-0 text-gold" strokeWidth={2} />
                 {item}
               </li>
             ))}
           </ul>
 
-          <div className="mt-2 flex items-center justify-between gap-3 border-t border-ink/8 pt-3.5">
-            <div>
-              <p className="text-[1.35rem] font-light tracking-tight text-ink md:text-[1.5rem]">
-                {inr.format(product.mrpInr)}
-              </p>
-              <p className="mt-0.5 text-[11px] text-ink-faint">{product.sizeLabel}</p>
+          <div className="mt-1.5 flex flex-wrap items-center justify-between gap-3 border-t border-ink/8 pt-3">
+            <ProductPrice
+              mrpInr={product.mrpInr}
+              sellingInr={sellingInr}
+              sizeLabel={product.sizeLabel}
+              compact
+            />
+            <div className="flex items-center gap-2">
+              <CardQuickAdd product={quickAddProduct} available={product.stockQty} variant="wide" />
+              <span className="inline-flex h-10 items-center gap-1.5 bg-ink px-4 text-[12px] font-medium text-paper">
+                View
+                <ArrowUpRight className="h-3.5 w-3.5 transition-transform duration-300 group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
+              </span>
             </div>
-            <span className="inline-flex items-center gap-1.5 text-[13px] font-medium text-ink">
-              View Product
-              <ArrowUpRight className="h-3.5 w-3.5 transition-transform duration-300 group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
-            </span>
           </div>
         </div>
       </Link>
@@ -107,51 +147,40 @@ export function ShopProductCard({ product, featured = false, className }: Props)
       href={href}
       data-cursor="Open"
       className={cn(
-        "group relative flex h-full flex-col overflow-hidden bg-paper transition-[transform,box-shadow] duration-300 ease-out",
+        "group relative flex h-full flex-col overflow-hidden bg-paper transition-[transform,box-shadow,border-color] duration-300 ease-out",
         "border border-ink/10 active:scale-[0.985]",
-        "md:hover:-translate-y-0.5 md:hover:shadow-premium md:hover:border-ink/15",
+        "md:hover:-translate-y-1 md:hover:border-ink/20 md:hover:shadow-premium",
         className
       )}
     >
-      {/* Portrait frame — bottles fill ~80% with soft margins, not a square crop */}
-      <div className="relative aspect-[4/5] bg-pearl">
+      <div className="relative aspect-square bg-pearl">
         {product.imageUrl ? (
-          <Image
+          <ProductCardImage
             src={product.imageUrl}
             alt={product.name}
-            fill
-            sizes="(max-width: 640px) 100vw, 50vw"
-            className="object-contain object-center p-4 transition-transform duration-700 ease-expo group-hover:scale-[1.03] sm:p-5"
+            sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
+            className="object-contain object-center p-3 transition-transform duration-700 ease-expo group-hover:scale-105"
           />
         ) : null}
+        <CardBadges product={product} stock={stock} />
       </div>
 
-      <div className="flex flex-1 flex-col px-3.5 pb-3.5 pt-3">
-        {product.patent ? (
-          <p className="mb-1.5 inline-flex items-center gap-1 text-[10px] text-gold">
-            <Check className="h-2.5 w-2.5 shrink-0" strokeWidth={2.5} aria-hidden />
-            Patent-backed
-          </p>
-        ) : null}
+      <div className="flex flex-1 flex-col gap-1 px-3 pb-3 pt-2.5">
+        <p className="truncate text-[10px] uppercase tracking-[0.1em] text-ink-soft">
+          {product.category}
+          {product.sizeLabel ? (
+            <span className="normal-case tracking-normal text-ink-faint"> · {product.sizeLabel}</span>
+          ) : null}
+        </p>
 
-        <h2 className="line-clamp-2 text-[16px] font-light leading-snug tracking-tight text-ink">
+        <h2 className="line-clamp-2 text-[14px] font-medium leading-snug tracking-tight text-ink">
           {product.name}
         </h2>
-        <p className="mt-1 line-clamp-2 text-[12px] leading-snug text-ink-mute">{blurb}</p>
+        <p className="line-clamp-1 text-[11.5px] leading-snug text-ink-mute">{blurb}</p>
 
-        <div className="mt-auto flex items-end justify-between gap-3 border-t border-ink/8 pt-3">
-          <div className="min-w-0">
-            <p className="text-[1.2rem] font-light tracking-tight text-ink">{inr.format(product.mrpInr)}</p>
-            <p className="mt-0.5 truncate text-[10px] text-ink-faint">
-              {product.sizeLabel}
-              <span className="mx-1 text-ink/20">·</span>
-              {product.category}
-            </p>
-          </div>
-          <span className="inline-flex shrink-0 items-center gap-1 text-[12px] font-medium text-ink">
-            View Product
-            <ArrowUpRight className="h-3.5 w-3.5" />
-          </span>
+        <div className="mt-auto flex items-end justify-between gap-2 pt-2">
+          <ProductPrice mrpInr={product.mrpInr} sellingInr={sellingInr} compact />
+          <CardQuickAdd product={quickAddProduct} available={product.stockQty} />
         </div>
       </div>
     </Link>

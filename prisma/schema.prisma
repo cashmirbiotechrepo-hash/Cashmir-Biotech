@@ -25,35 +25,67 @@ model SiteSettings {
   updatedAt                DateTime @updatedAt
 }
 
+/// Pricing: keep mrpInr (MRP in rupees) and pricePaise (selling price in paise).
+/// Never store derived discount %. Product info lives in JSON; custom fields are relational.
 model Product {
-  id                String        @id @default(cuid())
-  slug              String        @unique
-  name              String
-  shortBenefit      String
-  description       String
-  mrpInr            Int
-  pricePaise        Int?          @default(0)
-  sizeLabel         String
-  category          String
-  imageUrl          String
-  images            String[]      @default([])
-  sku               String        @default("")
-  stockQty          Int           @default(0)
-  lowStockThreshold Int           @default(10)
-  leadTimeDays      Int           @default(7)
-  hasInventoryTracking Boolean    @default(true)
-  patentId          String?
-  featured          Boolean       @default(false)
-  active            Boolean       @default(true)
-  createdAt         DateTime      @default(now())
-  updatedAt         DateTime      @updatedAt
-  orderItems        OrderItem[]
-  inventory         Inventory?
-  certificates      CertificateOfAnalysis[]
-  patent            Patent?       @relation(fields: [patentId], references: [id], onDelete: SetNull)
+  id                   String               @id @default(cuid())
+  slug                 String               @unique
+  name                 String
+  shortBenefit         String
+  description          String
+  /// Legacy MRP in whole INR — keep for backward compatibility; do not rename/drop.
+  mrpInr               Int
+  /// Selling price in paise. Effective charge = pricePaise > 0 ? pricePaise : mrpInr * 100.
+  pricePaise           Int?                 @default(0)
+  currency             String               @default("INR")
+  taxIncluded          Boolean              @default(true)
+  sizeLabel            String
+  category             String
+  imageUrl             String
+  images               String[]             @default([])
+  sku                  String               @default("")
+  stockQty             Int                  @default(0)
+  lowStockThreshold    Int                  @default(10)
+  leadTimeDays         Int                  @default(7)
+  hasInventoryTracking Boolean              @default(true)
+  minOrderQty          Int                  @default(1)
+  maxOrderQty          Int?
+  /// { unitCount, itemWeight, netQuantity, itemDimensions }
+  measurements         Json?
+  /// { flavor, specialIngredients, dietType, form, ageRange, materialFeatures,
+  ///   countryOfOrigin, manufacturer, manufacturerAddress, packer, brand, genericName }
+  specs                Json?
+  /// { directions, recommendedUsage, storageInstructions, safetyInformation }
+  usage                Json?
+  /// { shelfLife, batchNumber, fssaiNumber, barcode, certifications,
+  ///   suitableFor, allergens, servingSize, servingsPerContainer }
+  otherInfo            Json?
+  patentId             String?
+  featured             Boolean              @default(false)
+  active               Boolean              @default(true)
+  createdAt            DateTime             @default(now())
+  updatedAt            DateTime             @updatedAt
+  orderItems           OrderItem[]
+  inventory            Inventory?
+  certificates         CertificateOfAnalysis[]
+  customFields         ProductCustomField[]
+  patent               Patent?              @relation(fields: [patentId], references: [id], onDelete: SetNull)
 
   @@index([patentId])
   @@unique([sku])
+}
+
+model ProductCustomField {
+  id        String   @id @default(cuid())
+  productId String
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  label     String
+  value     String
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([productId, sortOrder])
 }
 
 /// Catalog taxonomy (string Product.category remains denormalized label for storefront filters).

@@ -48,7 +48,8 @@ export default async function AdminProductsPage({
             quantityReserved: true,
             lowStockThreshold: true
           }
-        }
+        },
+        customFields: { orderBy: { sortOrder: "asc" } }
       }
     }),
     db.product.count({ where }),
