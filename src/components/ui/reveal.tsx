@@ -1,6 +1,6 @@
 "use client";
 
-import { type ReactNode } from "react";
+import { type ReactNode, useEffect, useRef, useState } from "react";
 import { motion, type Variants } from "framer-motion";
 import { EASE_OUT_EXPO } from "@/lib/motion/ease";
 import { cn } from "@/lib/utils";
@@ -15,13 +15,30 @@ type RevealProps = {
 
 /** Generic blur + rise reveal for any block entering the viewport. */
 export function Reveal({ children, className, delay = 0, y = 34, once = true }: RevealProps) {
+  const ref = useRef<HTMLDivElement>(null);
+  // Programmatic Lenis scrolls can miss whileInView; product tabs dispatch this.
+  const [forced, setForced] = useState(false);
+
+  useEffect(() => {
+    const node = ref.current;
+    if (!node) return;
+    const onForce = () => setForced(true);
+    node.addEventListener("cb:reveal", onForce);
+    return () => node.removeEventListener("cb:reveal", onForce);
+  }, []);
+
   return (
     <motion.div
+      ref={ref}
+      data-reveal
       className={className}
       initial={{ opacity: 0, y, filter: "blur(8px)" }}
-      whileInView={{ opacity: 1, y: 0, filter: "blur(0px)" }}
-      viewport={{ once, margin: "0px 0px -12% 0px" }}
-      transition={{ duration: 1.1, ease: EASE_OUT_EXPO, delay }}
+      animate={forced ? { opacity: 1, y: 0, filter: "blur(0px)" } : undefined}
+      whileInView={forced ? undefined : { opacity: 1, y: 0, filter: "blur(0px)" }}
+      // Generous margins so Lenis jump-scrolls still trip the observer; amount
+      // "some" fires as soon as any pixel is visible.
+      viewport={{ once, amount: "some", margin: "120px 0px 120px 0px" }}
+      transition={{ duration: 0.55, ease: EASE_OUT_EXPO, delay: forced ? 0 : delay }}
     >
       {children}
     </motion.div>

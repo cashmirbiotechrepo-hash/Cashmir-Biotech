@@ -79,7 +79,7 @@ export function ProductHowToUse({ usage }: { usage: unknown }) {
   if (!cards.length) return null;
 
   return (
-    <section id="usage" className="frame scroll-mt-32 mt-16 md:mt-24">
+    <section id="usage" className="frame scroll-mt-40 mt-16 md:mt-24">
       <Reveal>
         <p className="font-mono text-[10px] uppercase tracking-[0.22em] text-gold">Daily protocol</p>
         <h2 className="mt-2.5 text-[1.5rem] font-light leading-[1.12] tracking-tight text-ink md:text-[1.9rem]">
@@ -147,7 +147,7 @@ export function ProductSpecifications({
   if (!groups.length) return null;
 
   return (
-    <section id="specifications" className="frame scroll-mt-32 mt-16 md:mt-24">
+    <section id="specifications" className="frame scroll-mt-40 mt-16 md:mt-24">
       <Reveal>
         <p className="font-mono text-[10px] uppercase tracking-[0.22em] text-ink-faint">For the record</p>
         <h2 className="mt-2.5 text-[1.15rem] font-light tracking-tight text-ink md:text-[1.35rem]">

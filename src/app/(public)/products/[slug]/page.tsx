@@ -61,8 +61,8 @@ export async function generateMetadata({
   };
 }
 
-/* Spacing system: sections sit on a 64 / 96px rhythm; header → content is 24 / 32px. */
-const SECTION = "frame scroll-mt-32 mt-16 md:mt-24";
+/* Spacing system: sections sit on a 64 / 96px rhythm; scroll margin clears both sticky bars. */
+const SECTION = "frame scroll-mt-40 mt-16 md:mt-24";
 
 function SectionHeader({
   eyebrow,

@@ -23,9 +23,6 @@ type Props = {
   };
 };
 
-/** Header (4.5rem) + nav bar itself — used as the smooth-scroll offset. */
-const SCROLL_OFFSET = -118;
-
 /**
  * Sticky in-page nav: section tabs with an animated underline that tracks the
  * current section, plus a persistent price + Buy CTA. Tabs scroll smoothly
@@ -37,6 +34,7 @@ export function ProductSectionNav({ sections, priceLabel, available, product }: 
   const router = useRouter();
   const [active, setActive] = useState<string>(sections[0]?.id ?? "");
   const listRef = useRef<HTMLDivElement>(null);
+  const navRef = useRef<HTMLElement>(null);
   // While a click-scroll animates, don't let the observer flicker through
   // the sections it passes.
   const lockUntil = useRef(0);
@@ -61,23 +59,53 @@ export function ProductSectionNav({ sections, priceLabel, available, product }: 
     return () => observer.disconnect();
   }, [sections]);
 
-  // Keep the active tab in view when the list overflows on phones.
+  // Keep the active tab visible in the horizontal strip — never scroll the PAGE
+  // (Element.scrollIntoView on a sticky child fights Lenis and jumps to the header).
   useEffect(() => {
-    const el = listRef.current?.querySelector<HTMLElement>(`[data-section="${active}"]`);
-    el?.scrollIntoView({ block: "nearest", inline: "nearest", behavior: "smooth" });
+    const container = listRef.current;
+    const el = container?.querySelector<HTMLElement>(`[data-section="${active}"]`);
+    if (!container || !el) return;
+    const left = el.offsetLeft - container.clientWidth / 2 + el.clientWidth / 2;
+    container.scrollTo({ left: Math.max(0, left), behavior: "smooth" });
   }, [active]);
+
+  function stickyOffset(): number {
+    const productNavH = navRef.current?.offsetHeight ?? 52;
+    // Site nav is a fixed floating pill (~4.5rem). Leave a little air below the
+    // product tab bar so the section heading isn't hidden under chrome.
+    const siteNavH = 72;
+    return -(siteNavH + productNavH + 12);
+  }
+
+  function revealSection(el: HTMLElement) {
+    // Wake Framer whileInView observers that Lenis jump-scrolls can miss.
+    el.querySelectorAll<HTMLElement>("[data-reveal]").forEach((node) => {
+      node.dispatchEvent(new Event("cb:reveal"));
+    });
+  }
 
   function goTo(event: React.MouseEvent<HTMLAnchorElement>, id: string) {
     event.preventDefault();
+    event.stopPropagation();
     const el = document.getElementById(id);
     if (!el) return;
     setActive(id);
-    lockUntil.current = performance.now() + 1100;
+    lockUntil.current = performance.now() + 1200;
+    const offset = stickyOffset();
+
     if (lenis) {
-      lenis.scrollTo(el, { offset: SCROLL_OFFSET, duration: 1 });
+      lenis.scrollTo(el, {
+        offset,
+        duration: 1,
+        onComplete: () => revealSection(el)
+      });
     } else {
-      el.scrollIntoView({ behavior: "smooth", block: "start" });
+      const top = el.getBoundingClientRect().top + window.scrollY + offset;
+      window.scrollTo({ top, behavior: "smooth" });
+      window.setTimeout(() => revealSection(el), 500);
     }
+    // Reveal early so the section isn't blank when the camera arrives.
+    window.setTimeout(() => revealSection(el), 180);
     window.history.replaceState(null, "", `#${id}`);
   }
 
@@ -91,6 +119,7 @@ export function ProductSectionNav({ sections, priceLabel, available, product }: 
 
   return (
     <nav
+      ref={navRef}
       aria-label="Product sections"
       className="sticky top-[4.5rem] z-30 border-b border-ink/8 bg-paper/95 backdrop-blur-md md:top-[4.75rem]"
     >
