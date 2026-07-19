@@ -8,22 +8,29 @@ import {
   Leaf,
   Lock,
   MapPin,
-  Microscope,
   Package,
-  ScrollText
+  ScrollText,
+  Users
 } from "lucide-react";
 import {
   getActiveProductBySlug,
   getProductAvailability,
+  listActiveProducts,
   listPatents
 } from "@/modules/cms/services/content.service";
 import { getShippingRates } from "@/modules/shop/services/order.service";
 import { ProductGallery } from "@/components/ui/product-gallery";
 import { AddToCart } from "@/components/shop/add-to-cart";
 import { ProductDetailAccordion } from "@/components/shop/product-detail-accordion";
-import { ProductInfoSections } from "@/components/shop/product-info-sections";
+import {
+  ProductHowToUse,
+  ProductSpecifications,
+  asRecord
+} from "@/components/shop/product-info-sections";
 import { ProductJsonLd } from "@/components/shop/product-json-ld";
 import { ProductPrice } from "@/components/shop/product-price";
+import { ProductSectionNav } from "@/components/shop/product-section-nav";
+import { ShopProductCard } from "@/components/shop/shop-product-card";
 import { Reveal } from "@/components/ui/reveal";
 import { sellingInrFromPaise } from "@/lib/pricing";
 import { getStockStatus } from "@/lib/pricing";
@@ -65,7 +72,7 @@ const PROCESS = [
 
 export default async function ProductDetailPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
-  const [product, patents, rates] = await Promise.all([
+  const [product, patents, rates, allProducts] = await Promise.all([
     getActiveProductBySlug(slug),
     listPatents().catch(() => []),
     getShippingRates().catch(() => ({
@@ -73,7 +80,8 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
       freeShippingThresholdInr: 999,
       freeThresholdCents: 99900,
       flatShippingCents: 6000
-    }))
+    })),
+    listActiveProducts().catch(() => [])
   ]);
   if (!product) notFound();
 
@@ -85,26 +93,69 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
   const patentCount = patents.length;
   const stockStatus = getStockStatus(availability.available, product.lowStockThreshold);
   const low = stockStatus === "low_stock";
+  const related = allProducts.filter((p) => p.id !== product.id).slice(0, 4);
 
   const leadLabel = `Ships ~${product.leadTimeDays}d`;
+  const cartProduct = {
+    productId: product.id,
+    slug: product.slug,
+    name: product.name,
+    sizeLabel: product.sizeLabel,
+    priceInr: sellingInr,
+    imageUrl: product.imageUrl
+  };
+
+  const specsData = asRecord(product.specs);
+  const usageData = asRecord(product.usage);
+  const otherData = asRecord(product.otherInfo);
+
+  // Data-driven benefit cards — only what this product can actually claim.
+  const benefits = [
+    { icon: Leaf, title: product.category, body: product.shortBenefit },
+    specsData?.specialIngredients
+      ? { icon: FlaskConical, title: "Key ingredients", body: specsData.specialIngredients }
+      : null,
+    usageData?.suitableFor || otherData?.suitableFor
+      ? { icon: Users, title: "Suitable for", body: usageData?.suitableFor ?? otherData!.suitableFor! }
+      : null,
+    {
+      icon: ScrollText,
+      title: patent ? `Patented · ${patent.patentCode}` : "Research model",
+      body: patent
+        ? patent.title
+        : "Developed under a faculty–student innovation model with SKUAST-K — IP-aware from the first assay."
+    }
+  ].filter((b): b is NonNullable<typeof b> => Boolean(b));
+
+  const hasUsageCards = Boolean(
+    usageData &&
+      ["directions", "recommendedUsage", "storageInstructions", "safetyInformation"].some(
+        (k) => usageData[k]
+      )
+  );
+  const hasSpecs = Boolean(
+    asRecord(product.measurements) ||
+      specsData ||
+      usageData ||
+      otherData ||
+      (product.customFields ?? []).some((f) => f.label.trim() && f.value.trim())
+  );
+
+  const navSections = [
+    { id: "research", label: "Research" },
+    { id: "benefits", label: "Benefits" },
+    ...(hasUsageCards ? [{ id: "usage", label: "How to use" }] : []),
+    { id: "story", label: "Process" },
+    ...(hasSpecs ? [{ id: "specifications", label: "Specs" }] : []),
+    { id: "faq", label: "FAQ" },
+    ...(related.length ? [{ id: "related", label: "More" }] : [])
+  ];
 
   const accordion = [
-    {
-      id: "research",
-      title: "Research & patents",
-      body: patent
-        ? `${patent.title}\n${patent.patentCode} · ${patent.jurisdiction} · ${patent.lifecycleStatus}\n\n${patent.summary}`
-        : `Cashmir Biotech formulations are developed under a faculty–student innovation model with SKUAST-K.\n\nAsk our team for the certificate of analysis and patent bibliography for ${product.name}.`
-    },
     {
       id: "details",
       title: "Full description",
       body: product.description
-    },
-    {
-      id: "origin",
-      title: "Origin & process",
-      body: `${product.name} is finished from botanical material sourced in the Kashmir Himalayas.\n\nEach lot is isolated for phytochemical density, documented through manufacturing, and verified by independent assay before release.`
     },
     {
       id: "shipping",
@@ -114,12 +165,12 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
   ];
 
   return (
-    <div className="bg-paper pb-16 sm:pb-24">
+    <div className="bg-paper pb-16 sm:pb-20">
       <ProductJsonLd product={product} available={availability.available} />
       {/* 58 / 42 hero — product left, buy panel supports */}
       <section className="frame scroll-mt-28 pt-[4.75rem] md:scroll-mt-32 md:pt-20 lg:pt-24">
         <div className="grid grid-cols-1 items-start gap-4 md:gap-8 lg:grid-cols-[minmax(0,1.05fr)_minmax(0,0.95fr)] lg:gap-12 xl:gap-16">
-          <Reveal y={24} className="w-full lg:sticky lg:top-28 lg:self-start">
+          <Reveal y={24} className="w-full lg:sticky lg:top-32 lg:self-start">
             <div className="relative">
               <Link
                 href="/products"
@@ -183,14 +234,7 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
               className="mt-5 sm:mt-6"
               available={availability.available}
               priceLabel={priceLabel}
-              product={{
-                productId: product.id,
-                slug: product.slug,
-                name: product.name,
-                sizeLabel: product.sizeLabel,
-                priceInr: sellingInr,
-                imageUrl: product.imageUrl
-              }}
+              product={cartProduct}
             />
 
             <ul className="mt-5 flex gap-x-4 gap-y-2 overflow-x-auto pb-0.5 [-ms-overflow-style:none] [scrollbar-width:none] sm:mt-7 sm:grid sm:grid-cols-4 sm:overflow-visible lg:grid-cols-2 xl:grid-cols-4 [&::-webkit-scrollbar]:hidden">
@@ -208,55 +252,24 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
             </ul>
 
             <div className="mt-3 sm:mt-4">
-              <ProductDetailAccordion sections={accordion} defaultOpenId="research" />
+              <ProductDetailAccordion sections={accordion} />
             </div>
           </Reveal>
         </div>
       </section>
 
-      <ProductInfoSections
-        measurements={product.measurements}
-        specs={product.specs}
-        usage={product.usage}
-        otherInfo={product.otherInfo}
-        customFields={product.customFields ?? []}
-      />
+      {/* Sticky section tabs + persistent price / Buy CTA */}
+      <div className="mt-10 md:mt-12">
+        <ProductSectionNav
+          sections={navSections}
+          priceLabel={priceLabel}
+          available={availability.available}
+          product={cartProduct}
+        />
+      </div>
 
-      {/* Emotional Kashmir beat — large / tiny rhythm */}
-      <section className="frame scroll-mt-28 mt-14 md:mt-16 lg:mt-20">
-        <div className="hairline-x mb-8 h-px w-full md:mb-10" />
-        <Reveal>
-          <p className="font-mono text-[10px] uppercase tracking-[0.22em] text-gold">From Kashmir</p>
-          <p className="mt-4 max-w-3xl text-[clamp(1.5rem,3.8vw,2.65rem)] font-light leading-[1.12] tracking-tight text-ink">
-            From forgotten medicinal plants. From years of research. From patented science — into daily nutrition.
-          </p>
-        </Reveal>
-      </section>
-
-      {/* Process timeline — not paragraphs */}
-      <section className="frame scroll-mt-28 mt-14 md:mt-16">
-        <Reveal>
-          <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-ink-faint">Why this formula</p>
-          <h2 className="mt-2 max-w-xl text-xl font-light tracking-tight text-ink md:text-2xl">
-            Molecule-first, end to end.
-          </h2>
-        </Reveal>
-
-        <ol className="mt-8 border-t border-ink/10">
-          {PROCESS.map((item, i) => (
-            <Reveal key={item.step} delay={0.04 * i}>
-              <li className="grid grid-cols-[3rem_1fr] gap-4 border-b border-ink/10 py-5 md:grid-cols-[4rem_12rem_1fr] md:gap-8 md:py-6">
-                <span className="font-mono text-[11px] text-gold">{item.step}</span>
-                <span className="text-[15px] font-medium tracking-tight text-ink md:text-base">{item.title}</span>
-                <span className="col-span-2 text-sm leading-relaxed text-ink-mute md:col-span-1">{item.body}</span>
-              </li>
-            </Reveal>
-          ))}
-        </ol>
-      </section>
-
-      {/* Patent band — signature differentiator */}
-      <section className="frame scroll-mt-28 mt-14 md:mt-16">
+      {/* Research first — the strongest differentiator, not a footnote */}
+      <section id="research" className="frame scroll-mt-32 mt-10 md:mt-12">
         <Reveal>
           <div className="grid grid-cols-1 items-end gap-8 border border-ink/10 bg-ink px-6 py-10 text-paper md:grid-cols-12 md:px-10 md:py-12">
             <div className="md:col-span-4">
@@ -273,6 +286,10 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
                 {patent
                   ? `This formula is linked to ${patent.patentCode}: ${patent.title}.`
                   : "Cashmir Biotech builds formulations inside an IP-aware pipeline with SKUAST-K — patents, assays, and claim language you can inspect."}
+              </p>
+              <p className="mt-3 text-[13px] leading-relaxed text-paper/50">
+                Certificates of analysis and batch documentation are retained for every released lot
+                of {product.name} — ask after purchase.
               </p>
             </div>
             <div className="flex flex-col gap-3 md:col-span-3 md:items-end">
@@ -293,60 +310,67 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
         </Reveal>
       </section>
 
-      {/* Differentiated credibility tiles */}
-      <section className="frame scroll-mt-28 mt-10 md:mt-14">
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-3 md:gap-5">
-          <Reveal>
-            <div className="flex h-full flex-col bg-pearl/80 px-6 py-8">
-              <Microscope className="h-7 w-7 text-gold" strokeWidth={1.25} />
-              <h3 className="mt-6 text-lg font-light tracking-tight text-ink">Assayed every lot</h3>
-              <p className="mt-2 flex-1 text-sm leading-relaxed text-ink-mute">
-                Independent verification against specification — before anything ships.
-              </p>
-              <p className="mt-6 font-mono text-[10px] uppercase tracking-[0.16em] text-ink-faint">Lab protocol</p>
-            </div>
-          </Reveal>
-          <Reveal delay={0.06}>
-            <div className="flex h-full flex-col border border-ink/10 px-6 py-8">
-              <Leaf className="h-7 w-7 text-gold" strokeWidth={1.25} />
-              <h3 className="mt-6 text-lg font-light tracking-tight text-ink">Kashmiri biodiversity</h3>
-              <p className="mt-2 flex-1 text-sm leading-relaxed text-ink-mute">
-                Altitude flora chosen for chemistry — not commodity fillers dressed as wellness.
-              </p>
-              <p className="mt-6 font-mono text-[10px] uppercase tracking-[0.16em] text-ink-faint">Provenance</p>
-            </div>
-          </Reveal>
-          <Reveal delay={0.1}>
-            <div className="flex h-full flex-col bg-ink px-6 py-8 text-paper">
-              <ScrollText className="h-7 w-7 text-gold-soft" strokeWidth={1.25} />
-              <h3 className="mt-6 text-lg font-light tracking-tight">
-                {patent ? patent.patentCode : "Research model"}
-              </h3>
-              <p className="mt-2 flex-1 text-sm leading-relaxed text-paper/65">
-                {patent
-                  ? patent.title
-                  : "Faculty–student innovation with SKUAST-K — IP-aware from the first assay."}
-              </p>
-              <Link
-                href={patent ? "/patents" : "/team"}
-                className="mt-6 inline-flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-[0.16em] text-gold-soft"
-              >
-                {patent ? "View patent" : "Meet the board"} <ArrowUpRight className="h-3 w-3" />
-              </Link>
-            </div>
-          </Reveal>
+      {/* Key benefits — scannable cards, only claims this product carries */}
+      <section id="benefits" className="frame scroll-mt-32 mt-10 md:mt-12">
+        <Reveal>
+          <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-ink-faint">Why this formula</p>
+          <h2 className="mt-2 text-xl font-light tracking-tight text-ink md:text-2xl">Key benefits</h2>
+        </Reveal>
+        <div className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-2 md:mt-6 lg:grid-cols-4">
+          {benefits.map(({ icon: Icon, title, body }, i) => (
+            <Reveal key={title} delay={0.04 * i}>
+              <div className="flex h-full flex-col border border-ink/10 px-5 py-5">
+                <Icon className="h-5 w-5 text-gold" strokeWidth={1.5} />
+                <h3 className="mt-3 text-[13px] font-medium tracking-tight text-ink">{title}</h3>
+                <p className="mt-1.5 text-[13px] leading-relaxed text-ink-mute">{body}</p>
+              </div>
+            </Reveal>
+          ))}
         </div>
       </section>
 
+      <ProductHowToUse usage={product.usage} />
+
+      {/* Origin story + process — one section, one rhythm change */}
+      <section id="story" className="frame scroll-mt-32 mt-10 md:mt-12">
+        <Reveal>
+          <p className="font-mono text-[10px] uppercase tracking-[0.22em] text-gold">From Kashmir</p>
+          <p className="mt-3 max-w-3xl text-[clamp(1.35rem,3.2vw,2.1rem)] font-light leading-[1.15] tracking-tight text-ink">
+            From forgotten medicinal plants. From years of research. From patented science — into
+            daily nutrition.
+          </p>
+        </Reveal>
+
+        <ol className="mt-8 border-t border-ink/10">
+          {PROCESS.map((item, i) => (
+            <Reveal key={item.step} delay={0.04 * i}>
+              <li className="grid grid-cols-[3rem_1fr] gap-4 border-b border-ink/10 py-4 md:grid-cols-[4rem_12rem_1fr] md:gap-8 md:py-5">
+                <span className="font-mono text-[11px] text-gold">{item.step}</span>
+                <span className="text-[15px] font-medium tracking-tight text-ink md:text-base">{item.title}</span>
+                <span className="col-span-2 text-sm leading-relaxed text-ink-mute md:col-span-1">{item.body}</span>
+              </li>
+            </Reveal>
+          ))}
+        </ol>
+      </section>
+
+      <ProductSpecifications
+        measurements={product.measurements}
+        specs={product.specs}
+        usage={product.usage}
+        otherInfo={product.otherInfo}
+        customFields={product.customFields ?? []}
+      />
+
       {/* Biotech FAQs */}
-      <section className="frame scroll-mt-28 mt-14 pb-4 md:mt-16">
+      <section id="faq" className="frame scroll-mt-32 mt-10 md:mt-12">
         <Reveal>
           <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-ink-faint">Documentation</p>
           <h2 className="mt-2 max-w-lg text-xl font-light tracking-tight text-ink md:text-2xl">
             Ask like a scientist.
           </h2>
         </Reveal>
-        <div className="mt-6 max-w-2xl md:mt-8">
+        <div className="mt-5 max-w-2xl md:mt-6">
           <ProductDetailAccordion
             sections={[
               {
@@ -375,6 +399,35 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
           />
         </div>
       </section>
+
+      {/* Related products — keep shopping instead of dead-ending at the footer */}
+      {related.length ? (
+        <section id="related" className="frame scroll-mt-32 mt-12 md:mt-14">
+          <Reveal>
+            <div className="flex items-end justify-between gap-4">
+              <div>
+                <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-ink-faint">Keep exploring</p>
+                <h2 className="mt-2 text-xl font-light tracking-tight text-ink md:text-2xl">
+                  More from the lab
+                </h2>
+              </div>
+              <Link
+                href="/products"
+                className="hidden items-center gap-1.5 text-[13px] text-ink-mute transition-colors hover:text-ink sm:inline-flex"
+              >
+                All formulas <ArrowUpRight className="h-3.5 w-3.5" />
+              </Link>
+            </div>
+          </Reveal>
+          <div className="mt-5 grid grid-cols-2 gap-x-2.5 gap-y-5 md:mt-6 lg:grid-cols-4">
+            {related.map((p, i) => (
+              <Reveal key={p.id} delay={0.04 * i}>
+                <ShopProductCard product={p} />
+              </Reveal>
+            ))}
+          </div>
+        </section>
+      ) : null}
     </div>
   );
 }

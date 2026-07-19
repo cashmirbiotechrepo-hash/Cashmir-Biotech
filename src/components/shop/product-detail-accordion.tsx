@@ -8,7 +8,8 @@ import { EASE_OUT_EXPO } from "@/lib/motion/ease";
 export type ProductDetailSection = {
   id: string;
   title: string;
-  body: string;
+  /** Plain text renders as a paragraph; a node renders as-is (e.g. spec tables). */
+  body: string | React.ReactNode;
 };
 
 export function ProductDetailAccordion({
@@ -60,7 +61,13 @@ export function ProductDetailAccordion({
                   transition={{ duration: 0.4, ease: EASE_OUT_EXPO }}
                   className="overflow-hidden"
                 >
-                  <p className="pb-5 text-sm leading-relaxed text-ink-mute whitespace-pre-line">{section.body}</p>
+                  {typeof section.body === "string" ? (
+                    <p className="pb-5 text-sm leading-relaxed text-ink-mute whitespace-pre-line">
+                      {section.body}
+                    </p>
+                  ) : (
+                    <div className="pb-5">{section.body}</div>
+                  )}
                 </motion.div>
               ) : null}
             </AnimatePresence>
