@@ -3,7 +3,7 @@ import { mkdir, writeFile } from "fs/promises";
 import path from "path";
 import type { NextRequest } from "next/server";
 import { adminErr, adminOk, requireAdminApi } from "@/lib/admin/api";
-import { CUTOUT_SUFFIX, cutoutWhiteBackground } from "@/lib/admin/product-cutout";
+import { CROP_SUFFIX, autoCropWhitespace } from "@/lib/admin/product-crop";
 import { deleteS3Object, getS3UploadConfig, putS3Object } from "@/lib/admin/s3-storage";
 import { detectImageType, detectPdf } from "@/lib/admin/upload-validation";
 import { db } from "@/lib/db";
@@ -60,21 +60,21 @@ export async function POST(req: NextRequest) {
     }
 
     let ext = isPdf ? "pdf" : detectedImage!;
-    let cutout = false;
+    let cropped = false;
 
-    // Product photos: strip the studio white backdrop so the storefront can
-    // stage the product on themed surfaces. Falls back to the original when
-    // the shot isn't recognisably product-on-white.
+    // Product photos: crop away wasted empty canvas around the subject so it
+    // fills the frame. The photograph itself (lighting, shadows, backdrop) is
+    // preserved — geometry only. Skipped when the shot is already tight.
     if (!isPdf && purpose === "product" && ext !== "gif") {
-      const processed = await cutoutWhiteBackground(bytes).catch(() => null);
+      const processed = await autoCropWhitespace(bytes).catch(() => null);
       if (processed) {
         bytes = processed.buffer;
         ext = processed.extension;
-        cutout = true;
+        cropped = true;
       }
     }
 
-    const fileName = cutout ? `${randomUUID()}${CUTOUT_SUFFIX}.${ext}` : `${randomUUID()}.${ext}`;
+    const fileName = cropped ? `${randomUUID()}${CROP_SUFFIX}.${ext}` : `${randomUUID()}.${ext}`;
     let url: string;
     const contentType = isPdf
       ? "application/pdf"

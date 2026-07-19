@@ -1,11 +1,16 @@
 /**
- * Client-safe helpers for product imagery. Cutout processing itself lives in
- * `@/lib/admin/product-cutout` (server-only, sharp).
+ * Client-safe helpers for product imagery. The crop processing itself lives in
+ * `@/lib/admin/product-crop` (server-only, sharp).
  */
 
-/** Transparent-background cutouts are tagged in the filename so the storefront can tell them from legacy flat photos. */
-export const CUTOUT_SUFFIX = "-cut";
+/**
+ * Auto-cropped photos are tagged in the filename so reprocessing can skip them.
+ * (Legacy `-cut.webp` cutouts from the retired background-removal pipeline are
+ * NOT tagged as processed — reprocessing flattens them back onto white.)
+ */
+export const CROP_SUFFIX = "-crop";
 
-export function isCutoutUrl(url: string): boolean {
-  return url.includes(`${CUTOUT_SUFFIX}.webp`);
+/** True when the URL points at an image this pipeline already produced. */
+export function isProcessedProductImageUrl(url: string): boolean {
+  return url.includes(`${CROP_SUFFIX}.webp`);
 }

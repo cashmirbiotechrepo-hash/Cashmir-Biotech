@@ -950,9 +950,11 @@ export async function addSubscriberAction(formData: FormData): Promise<ActionSta
 }
 
 /**
- * One-click migration: converts existing product photos (studio-on-white) into
- * transparent cutouts so cards render cleanly in both themes. Non-destructive —
- * original files stay in storage; product rows point at the new WebP.
+ * One-click migration: tightens existing product photos by cropping wasted
+ * whitespace around the subject. The photograph itself is untouched (geometry
+ * only). Legacy transparent cutouts are flattened back onto white and cropped.
+ * Non-destructive — original files stay in storage; product rows point at the
+ * new WebP.
  */
 export async function reprocessProductImagesAction(): Promise<ActionState> {
   const admin = await getCurrentAdmin();
@@ -962,8 +964,8 @@ export async function reprocessProductImagesAction(): Promise<ActionState> {
   }
 
   const { randomUUID } = await import("crypto");
-  const { cutoutWhiteBackground } = await import("@/lib/admin/product-cutout");
-  const { CUTOUT_SUFFIX, isCutoutUrl } = await import("@/lib/product-image");
+  const { autoCropWhitespace } = await import("@/lib/admin/product-crop");
+  const { CROP_SUFFIX, isProcessedProductImageUrl } = await import("@/lib/product-image");
   const { getS3UploadConfig, putS3Object } = await import("@/lib/admin/s3-storage");
 
   const s3Config = (() => {
@@ -989,8 +991,8 @@ export async function reprocessProductImagesAction(): Promise<ActionState> {
     }
   }
 
-  async function storeCutout(bytes: Buffer): Promise<string | null> {
-    const fileName = `${randomUUID()}${CUTOUT_SUFFIX}.webp`;
+  async function storeProcessed(bytes: Buffer): Promise<string | null> {
+    const fileName = `${randomUUID()}${CROP_SUFFIX}.webp`;
     try {
       if (s3Config) {
         return await putS3Object(s3Config, `uploads/${fileName}`, bytes, "image/webp");
@@ -1003,19 +1005,20 @@ export async function reprocessProductImagesAction(): Promise<ActionState> {
       await writeFile(path.join(dir, fileName), bytes);
       return `/uploads/${fileName}`;
     } catch (err) {
-      logger.error({ err, event: "cutout_store_failed" }, "failed to store product cutout");
+      logger.error({ err, event: "crop_store_failed" }, "failed to store cropped product photo");
       return null;
     }
   }
 
   /** Returns the replacement URL, or null when the image should stay as-is. */
   async function processUrl(url: string): Promise<string | null> {
-    if (!url || isCutoutUrl(url)) return null;
+    if (!url || isProcessedProductImageUrl(url)) return null;
     const bytes = await loadBytes(url);
     if (!bytes) return null;
-    const cut = await cutoutWhiteBackground(bytes).catch(() => null);
-    if (!cut) return null;
-    return storeCutout(cut.buffer);
+    // Legacy transparent cutouts are flattened onto white inside the crop step.
+    const cropResult = await autoCropWhitespace(bytes).catch(() => null);
+    if (!cropResult) return null;
+    return storeProcessed(cropResult.buffer);
   }
 
   try {
@@ -1064,7 +1067,7 @@ export async function reprocessProductImagesAction(): Promise<ActionState> {
       userEmail: String(admin.email),
       action: "update",
       entityType: "product_images",
-      entityId: `cutout:${converted}`
+      entityId: `crop:${converted}`
     });
 
     revalidatePath("/admin/products");
@@ -1074,12 +1077,12 @@ export async function reprocessProductImagesAction(): Promise<ActionState> {
     if (converted === 0) {
       return {
         ok: true,
-        message: "No photos needed conversion — they're either already cutouts or not studio-on-white shots."
+        message: "No photos needed cropping — they're already tightly framed."
       };
     }
     return {
       ok: true,
-      message: `Converted ${converted} photo${converted === 1 ? "" : "s"} to transparent cutouts (${skipped} left unchanged).`
+      message: `Tightened ${converted} photo${converted === 1 ? "" : "s"} (${skipped} already well framed).`
     };
   } catch (error) {
     logger.error({ err: error, event: "product_image_reprocess_failed" }, "product image reprocess failed");

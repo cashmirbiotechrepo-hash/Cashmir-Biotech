@@ -21,7 +21,7 @@ export function ProductCardImage({ src, alt, sizes, priority = false, className 
       <div
         aria-hidden
         className={cn(
-          "absolute inset-0 animate-pulse bg-ink/[0.045] transition-opacity duration-300",
+          "absolute inset-0 animate-pulse bg-black/[0.04] transition-opacity duration-300",
           loaded ? "pointer-events-none opacity-0" : "opacity-100"
         )}
       />
