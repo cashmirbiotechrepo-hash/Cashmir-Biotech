@@ -30,7 +30,7 @@ export function ProductPrice({ mrpInr, sellingInr, compact = false, className, s
           <span
             className={cn(
               "font-semibold text-[#CC0C39]",
-              compact ? "text-[13px]" : "text-[15px] sm:text-base"
+              compact ? "text-[12px]" : "text-[15px] sm:text-base"
             )}
           >
             -{discountPercent}%
@@ -39,7 +39,7 @@ export function ProductPrice({ mrpInr, sellingInr, compact = false, className, s
         <span
           className={cn(
             "font-light tracking-tight text-ink",
-            compact ? "text-[1.15rem]" : "text-[1.45rem] sm:text-[1.55rem]"
+            compact ? "text-[1.1rem]" : "text-[1.45rem] sm:text-[1.55rem]"
           )}
         >
           <span className={cn("relative -top-[0.35em] mr-0.5 font-normal", compact ? "text-[0.65em]" : "text-[0.55em]")}>
@@ -47,12 +47,16 @@ export function ProductPrice({ mrpInr, sellingInr, compact = false, className, s
           </span>
           {Math.round(sellingInr).toLocaleString("en-IN")}
         </span>
+        {/* Compact (cards): struck MRP inline so the saving reads in one glance. */}
+        {compact && showStruckMrp ? (
+          <span className="text-[11px] text-ink-faint line-through">{inr.format(mrpInr)}</span>
+        ) : null}
         {sizeLabel ? (
           <span className={cn("text-ink-faint", compact ? "text-[10px]" : "text-[12px]")}>{sizeLabel}</span>
         ) : null}
       </div>
-      {showStruckMrp ? (
-        <p className={cn("mt-0.5 text-ink-mute", compact ? "text-[11px]" : "text-[12px]")}>
+      {!compact && showStruckMrp ? (
+        <p className="mt-0.5 text-[12px] text-ink-mute">
           M.R.P.: <span className="line-through">{inr.format(mrpInr)}</span>
         </p>
       ) : null}

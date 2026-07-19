@@ -23,7 +23,12 @@ const ACCESS_COOKIE_MAX_AGE = 15 * 60; // 15 minutes in seconds
 
 const REFRESH_COOKIE_MAX_AGE = 90 * 24 * 60 * 60; // 90 days in seconds
 const CUSTOMER_REFRESH_EXPIRY_MS = 90 * 24 * 60 * 60 * 1000;
-const ROTATION_GRACE_MS = 10000;
+/**
+ * A revoked-token presentation within this window is treated as a benign race
+ * (second tab, or a reload that aborted the rotation fetch after the server
+ * committed but before the browser stored the new cookies), not a replay.
+ */
+const ROTATION_GRACE_MS = 60000;
 const OTP_EXPIRY_MS = 10 * 60 * 1000;
 const OTP_COOLDOWN_MS = 60 * 1000;
 const MAX_OTP_ATTEMPTS = 5;
@@ -416,7 +421,8 @@ export type CustomerRotateRefreshResult =
   | { status: "unavailable" };
 
 async function classifyRevokedCustomerToken(
-  sessionId: string
+  sessionId: string,
+  customer: { id: string; email: string; name: string | null; emailVerifiedAt: Date | null }
 ): Promise<CustomerRotateRefreshResult> {
   const newest = await db.customerRefreshToken.findFirst({
     where: { sessionId },
@@ -424,7 +430,17 @@ async function classifyRevokedCustomerToken(
     select: { createdAt: true }
   });
   if (newest && Date.now() - newest.createdAt.getTime() < ROTATION_GRACE_MS) {
-    return { status: "raced" };
+    // Benign race — heal the stranded client with fresh tokens instead of
+    // leaving it holding a dead refresh token that later reads as "reuse".
+    const refreshToken = await mintCustomerRefreshToken(sessionId);
+    const accessToken = await mintCustomerAccessToken({
+      id: customer.id,
+      email: customer.email,
+      name: customer.name,
+      sessionId,
+      emailVerified: Boolean(customer.emailVerifiedAt)
+    });
+    return { status: "rotated", accessToken, refreshToken };
   }
 
   logger.warn(
@@ -472,8 +488,6 @@ export async function rotateCustomerRefresh(encryptedRefreshCookie: string): Pro
     const stored = await db.customerRefreshToken.findUnique({ where: { tokenHash } });
     if (!stored) return { status: "invalid" };
 
-    if (stored.revoked) return classifyRevokedCustomerToken(stored.sessionId);
-
     const session = await db.customerSession.findUnique({ where: { id: payload.sessionId } });
     if (!session || session.isRevoked || session.expiresAt < new Date()) return { status: "invalid" };
 
@@ -485,6 +499,8 @@ export async function rotateCustomerRefresh(encryptedRefreshCookie: string): Pro
 
     const customer = await db.customer.findUnique({ where: { id: session.customerId } });
     if (!customer || !customer.active) return { status: "invalid" };
+
+    if (stored.revoked) return classifyRevokedCustomerToken(session.id, customer);
 
     // Pre-generate the JWT before occupying a database transaction lock.
     const newJti = randomUUID();
@@ -532,7 +548,7 @@ export async function rotateCustomerRefresh(encryptedRefreshCookie: string): Pro
 
     if (raced) {
       // Winner has already committed — newest token age is now trustworthy.
-      return classifyRevokedCustomerToken(stored.sessionId);
+      return classifyRevokedCustomerToken(session.id, customer);
     }
 
     const accessToken = await mintCustomerAccessToken({

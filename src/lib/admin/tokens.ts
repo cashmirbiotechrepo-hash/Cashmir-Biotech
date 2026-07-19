@@ -11,10 +11,12 @@ const REFRESH_TOKEN_EXPIRY = "30d";
 const REFRESH_TOKEN_EXPIRY_MS = 30 * 24 * 60 * 60 * 1000;
 /**
  * Concurrent refreshes (two tabs, mount + visibilitychange) can present the same
- * refresh token. If the token was rotated within this window, treat it as a
- * benign race instead of a stolen-token replay.
+ * refresh token. A page reload can also abort the rotation fetch after the server
+ * committed but before the browser stored the new cookies, leaving the client
+ * holding a just-revoked token. If the token was rotated within this window,
+ * treat it as a benign race instead of a stolen-token replay.
  */
-const ROTATION_GRACE_MS = 10000;
+const ROTATION_GRACE_MS = 60000;
 
 function jwtSecret() {
   return new TextEncoder().encode(env.JWT_SECRET);
@@ -97,10 +99,6 @@ export class AdminTokenService {
       const stored = await db.adminRefreshToken.findUnique({ where: { tokenHash: oldTokenHash } });
       if (!stored) return { status: "invalid" };
 
-      if (stored.revoked) {
-        return this.classifyRevokedToken(stored.sessionId);
-      }
-
       const session = await db.adminSession.findUnique({ where: { id: payload.sessionId } });
       if (!session || session.isRevoked || session.expiresAt < new Date()) return { status: "invalid" };
 
@@ -114,6 +112,10 @@ export class AdminTokenService {
         where: { id: session.userId, active: true }
       });
       if (!user) return { status: "invalid" };
+
+      if (stored.revoked) {
+        return this.classifyRevokedToken(session.id, user);
+      }
 
       // Pre-generate the JWT before occupying a database transaction lock.
       const jti = randomUUID();
@@ -159,7 +161,7 @@ export class AdminTokenService {
 
       if (raced) {
         // Winner has already committed — newest token age is now trustworthy.
-        return this.classifyRevokedToken(stored.sessionId);
+        return this.classifyRevokedToken(session.id, user);
       }
 
       const accessToken = await this.createAccessToken({
@@ -179,18 +181,32 @@ export class AdminTokenService {
 
   /**
    * A revoked token was presented. If it was rotated moments ago this is almost
-   * certainly a concurrent-refresh race (second tab, mount + visibilitychange),
-   * not a replay attack — leave the session alone. Outside the grace window,
-   * treat it as reuse and revoke the whole session.
+   * certainly a benign race — a second tab, or a page reload that aborted the
+   * rotation fetch after the server committed but before the browser stored the
+   * new cookies. In that case the client is stranded with a dead token, so heal
+   * it by minting fresh tokens instead of leaving a time bomb in the cookie jar.
+   * Outside the grace window, treat it as reuse and revoke the whole session.
    */
-  private static async classifyRevokedToken(sessionId: string): Promise<RotateRefreshResult> {
+  private static async classifyRevokedToken(
+    sessionId: string,
+    user: { id: string; email: string; name: string; role: string }
+  ): Promise<RotateRefreshResult> {
     const newest = await db.adminRefreshToken.findFirst({
       where: { sessionId },
       orderBy: { createdAt: "desc" },
       select: { createdAt: true }
     });
     if (newest && Date.now() - newest.createdAt.getTime() < ROTATION_GRACE_MS) {
-      return { status: "raced" };
+      const { token: refreshToken } = await this.createRefreshToken(sessionId);
+      const accessToken = await this.createAccessToken({
+        sub: user.id,
+        id: user.id,
+        email: user.email,
+        name: user.name,
+        role: user.role,
+        sessionId
+      });
+      return { status: "rotated", accessToken, refreshToken };
     }
 
     logger.warn({ event: "refresh_token_reuse", sessionId }, "token reuse detected");

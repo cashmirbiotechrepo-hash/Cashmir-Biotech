@@ -1,6 +1,13 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
-import { ADMIN_SESSION_COOKIE, CUSTOMER_SESSION_COOKIE } from "@/config/auth.constants";
+import {
+  ADMIN_REFRESH_COOKIE,
+  ADMIN_RESTORE_GUARD_COOKIE,
+  ADMIN_SESSION_COOKIE,
+  CUSTOMER_REFRESH_COOKIE,
+  CUSTOMER_RESTORE_GUARD_COOKIE,
+  CUSTOMER_SESSION_COOKIE
+} from "@/config/auth.constants";
 import { verifyAdminSessionToken, verifyCustomerSessionToken } from "@/lib/auth-edge";
 import {
   clientIpFromRequest,
@@ -88,6 +95,34 @@ function deny(request: NextRequest, nonce: string, status: number, body?: object
   const res = body
     ? NextResponse.json(body, { status })
     : new NextResponse(null, { status });
+  return attachSecurityHeaders(res, request, nonce);
+}
+
+/**
+ * Access cookie is gone (it lives 15 minutes) but a refresh cookie exists —
+ * bounce the navigation through the silent-restore endpoint instead of the
+ * login page. A short-lived guard cookie breaks redirect loops when restore
+ * fails to produce a verifiable session.
+ */
+function redirectToSessionRestore(
+  request: NextRequest,
+  nonce: string,
+  opts: { refreshCookie: string; guardCookie: string; restorePath: string }
+): NextResponse | null {
+  if (request.method !== "GET") return null;
+  if (!request.cookies.get(opts.refreshCookie)?.value) return null;
+  if (request.cookies.get(opts.guardCookie)?.value) return null;
+
+  const restore = new URL(opts.restorePath, request.url);
+  restore.searchParams.set("next", request.nextUrl.pathname + request.nextUrl.search);
+  const res = NextResponse.redirect(restore);
+  res.cookies.set(opts.guardCookie, "1", {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
+    path: "/",
+    maxAge: 15
+  });
   return attachSecurityHeaders(res, request, nonce);
 }
 
@@ -325,6 +360,13 @@ export async function middleware(request: NextRequest) {
     const token = request.cookies.get(CUSTOMER_SESSION_COOKIE)?.value;
     const payload = token ? await verifyCustomerSessionToken(token) : null;
     if (!payload) {
+      const restore = redirectToSessionRestore(request, nonce, {
+        refreshCookie: CUSTOMER_REFRESH_COOKIE,
+        guardCookie: CUSTOMER_RESTORE_GUARD_COOKIE,
+        restorePath: "/api/portal/auth/refresh"
+      });
+      if (restore) return restore;
+
       const login = new URL("/portal/login", request.url);
       login.searchParams.set("next", pathname + request.nextUrl.search);
       return attachSecurityHeaders(NextResponse.redirect(login), request, nonce);
@@ -351,6 +393,13 @@ export async function middleware(request: NextRequest) {
           error: { code: "unauthorized", message: "Admin session required." }
         });
       }
+      const restore = redirectToSessionRestore(request, nonce, {
+        refreshCookie: ADMIN_REFRESH_COOKIE,
+        guardCookie: ADMIN_RESTORE_GUARD_COOKIE,
+        restorePath: "/api/admin/auth/refresh"
+      });
+      if (restore) return restore;
+
       const login = new URL("/admin/login", request.url);
       login.searchParams.set("next", pathname + request.nextUrl.search);
       return attachSecurityHeaders(NextResponse.redirect(login), request, nonce);

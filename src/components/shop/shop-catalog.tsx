@@ -167,10 +167,10 @@ export function ShopCatalog({
                 onClick={() => setCategory("")}
                 aria-pressed={!category}
                 className={cn(
-                  "shrink-0 rounded-full border px-3 py-1 text-[12px] transition-colors",
+                  "shrink-0 rounded-full px-2.5 py-[3px] text-[11px] transition-colors",
                   !category
-                    ? "border-ink bg-ink text-paper"
-                    : "border-ink/12 bg-paper text-ink-mute hover:border-ink/30 active:bg-pearl"
+                    ? "bg-ink text-paper"
+                    : "bg-pearl text-ink-mute hover:bg-mist hover:text-ink"
                 )}
               >
                 All <span className={cn("tabular-nums", !category ? "text-paper/60" : "text-ink-faint")}>{totalCount}</span>
@@ -184,10 +184,10 @@ export function ShopCatalog({
                     onClick={() => setCategory(active ? "" : cat)}
                     aria-pressed={active}
                     className={cn(
-                      "shrink-0 rounded-full border px-3 py-1 text-[12px] transition-colors",
+                      "shrink-0 rounded-full px-2.5 py-[3px] text-[11px] transition-colors",
                       active
-                        ? "border-ink bg-ink text-paper"
-                        : "border-ink/12 bg-paper text-ink-mute hover:border-ink/30 active:bg-pearl"
+                        ? "bg-ink text-paper"
+                        : "bg-pearl text-ink-mute hover:bg-mist hover:text-ink"
                     )}
                   >
                     {chipLabel(cat)}{" "}
@@ -201,7 +201,7 @@ export function ShopCatalog({
           ) : null}
         </div>
 
-        <div className="grid grid-cols-2 gap-2.5 sm:gap-3 md:grid-cols-3 xl:grid-cols-4">
+        <div className="grid grid-cols-2 gap-x-2.5 gap-y-5 sm:gap-x-3 md:grid-cols-3 xl:grid-cols-4">
           {filtered.map((product, i) => (
             <Reveal key={product.id} delay={0.025 * (i % 4)} y={14}>
               <div

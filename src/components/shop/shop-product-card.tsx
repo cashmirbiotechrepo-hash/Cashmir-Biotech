@@ -30,7 +30,11 @@ type Props = {
   className?: string;
 };
 
-function CardBadges({
+/**
+ * One integrated chip, highest priority wins — stacking labels on a product
+ * photo reads like stickers, not merchandising.
+ */
+function CardBadge({
   product,
   stock,
   featured
@@ -39,28 +43,37 @@ function CardBadges({
   stock: ReturnType<typeof getStockStatus>;
   featured?: boolean;
 }) {
+  let label: string | null = null;
+  let tone: "urgent" | "premium" = "premium";
+
+  if (stock === "out_of_stock") {
+    label = "Out of stock";
+    tone = "urgent";
+  } else if (stock === "low_stock") {
+    label = "Low stock";
+    tone = "urgent";
+  } else if (featured) {
+    label = "Best seller";
+  } else if (product.patent) {
+    label = "Patented";
+  }
+
+  if (!label) return null;
+
   return (
-    <div className="pointer-events-none absolute left-2 top-2 z-10 flex flex-wrap gap-1">
-      {featured ? (
-        <span className="bg-ink px-2 py-0.5 text-[9px] font-medium uppercase tracking-[0.08em] text-paper">
-          Best seller
-        </span>
-      ) : null}
-      {product.patent ? (
-        <span className="bg-gold/90 px-2 py-0.5 text-[9px] font-medium uppercase tracking-[0.08em] text-paper">
-          Patented
-        </span>
-      ) : null}
-      {stock === "out_of_stock" ? (
-        <span className="bg-[#CC0C39] px-2 py-0.5 text-[9px] font-medium uppercase tracking-[0.08em] text-paper">
-          Out of stock
-        </span>
-      ) : stock === "low_stock" ? (
-        <span className="bg-paper/90 px-2 py-0.5 text-[9px] font-medium uppercase tracking-[0.08em] text-[#CC0C39]">
-          Low stock
-        </span>
-      ) : null}
-    </div>
+    <span
+      className={cn(
+        "pointer-events-none absolute right-2 top-2 z-10 inline-flex items-center gap-1.5 rounded-full",
+        "bg-paper/85 px-2.5 py-1 font-mono text-[8.5px] uppercase tracking-[0.12em] backdrop-blur-sm",
+        tone === "urgent" ? "text-[#CC0C39]" : "text-ink"
+      )}
+    >
+      <span
+        aria-hidden
+        className={cn("h-1 w-1 rounded-full", tone === "urgent" ? "bg-[#CC0C39]" : "bg-gold")}
+      />
+      {label}
+    </span>
   );
 }
 
@@ -86,23 +99,27 @@ export function ShopProductCard({ product, featured = false, className }: Props)
         href={href}
         data-cursor="Open"
         className={cn(
-          "group relative grid overflow-hidden bg-paper transition-[transform,box-shadow,border-color] duration-300 ease-out",
-          "border border-ink/10 active:scale-[0.99] md:grid-cols-[minmax(0,300px)_1fr]",
-          "md:hover:-translate-y-1 md:hover:border-ink/20 md:hover:shadow-premium",
+          "group relative grid overflow-hidden rounded-sm bg-paper shadow-sm transition-[transform,box-shadow] duration-300 ease-out",
+          "active:scale-[0.99] md:grid-cols-[minmax(0,300px)_1fr]",
+          "md:hover:-translate-y-1 md:hover:shadow-premium",
           className
         )}
       >
-        <div className="relative aspect-square bg-pearl md:aspect-auto md:min-h-[240px]">
+        <div className="relative aspect-square overflow-hidden bg-gradient-to-b from-pearl to-mist md:aspect-auto md:min-h-[240px]">
           {product.imageUrl ? (
             <ProductCardImage
               src={product.imageUrl}
               alt={product.name}
               sizes="(max-width: 768px) 100vw, 300px"
               priority
-              className="object-contain object-center p-4 transition-transform duration-700 ease-expo group-hover:scale-105"
+              className="scale-[1.16] object-contain object-center transition-transform duration-700 ease-expo group-hover:scale-[1.22]"
             />
           ) : null}
-          <CardBadges product={product} stock={stock} featured />
+          <div
+            aria-hidden
+            className="pointer-events-none absolute inset-0 bg-gradient-to-t from-ink/[0.05] via-transparent to-transparent"
+          />
+          <CardBadge product={product} stock={stock} featured />
         </div>
 
         <div className="flex flex-col justify-center gap-2 px-4 py-4 sm:px-5 md:gap-2.5 md:py-5">
@@ -122,7 +139,7 @@ export function ShopProductCard({ product, featured = false, className }: Props)
             ))}
           </ul>
 
-          <div className="mt-1.5 flex flex-wrap items-center justify-between gap-3 border-t border-ink/8 pt-3">
+          <div className="mt-1.5 flex flex-wrap items-center justify-between gap-3 pt-2">
             <ProductPrice
               mrpInr={product.mrpInr}
               sellingInr={sellingInr}
@@ -147,40 +164,50 @@ export function ShopProductCard({ product, featured = false, className }: Props)
       href={href}
       data-cursor="Open"
       className={cn(
-        "group relative flex h-full flex-col overflow-hidden bg-paper transition-[transform,box-shadow,border-color] duration-300 ease-out",
-        "border border-ink/10 active:scale-[0.985]",
-        "md:hover:-translate-y-1 md:hover:border-ink/20 md:hover:shadow-premium",
+        "group relative flex h-full flex-col overflow-hidden rounded-sm bg-paper transition-[transform,box-shadow] duration-300 ease-out",
+        "active:scale-[0.985] md:hover:-translate-y-1 md:hover:shadow-premium",
         className
       )}
     >
-      <div className="relative aspect-square bg-pearl">
+      {/* Warm frame + zoom past the photo's dead margins so the product dominates. */}
+      <div className="relative aspect-square overflow-hidden bg-gradient-to-b from-pearl to-mist">
         {product.imageUrl ? (
           <ProductCardImage
             src={product.imageUrl}
             alt={product.name}
             sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
-            className="object-contain object-center p-3 transition-transform duration-700 ease-expo group-hover:scale-105"
+            className="scale-[1.28] object-contain object-center transition-transform duration-700 ease-expo group-hover:scale-[1.34]"
           />
         ) : null}
-        <CardBadges product={product} stock={stock} />
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-0 bg-gradient-to-t from-ink/[0.05] via-transparent to-transparent"
+        />
+        <CardBadge product={product} stock={stock} />
       </div>
 
-      <div className="flex flex-1 flex-col gap-1 px-3 pb-3 pt-2.5">
-        <p className="truncate text-[10px] uppercase tracking-[0.1em] text-ink-soft">
-          {product.category}
-          {product.sizeLabel ? (
-            <span className="normal-case tracking-normal text-ink-faint"> · {product.sizeLabel}</span>
-          ) : null}
-        </p>
-
-        <h2 className="line-clamp-2 text-[14px] font-medium leading-snug tracking-tight text-ink">
+      <div className="flex flex-1 flex-col px-3 pb-3 pt-2.5">
+        <h2 className="line-clamp-1 text-[14px] font-medium leading-snug tracking-tight text-ink">
           {product.name}
         </h2>
-        <p className="line-clamp-1 text-[11.5px] leading-snug text-ink-mute">{blurb}</p>
+        <p className="mt-0.5 line-clamp-1 text-[11.5px] leading-snug text-ink-mute">
+          {blurb}
+          {product.sizeLabel ? <span className="text-ink-faint"> · {product.sizeLabel}</span> : null}
+        </p>
+        {product.patent ? (
+          <p className="mt-1 inline-flex items-center gap-1 text-[10.5px] text-gold">
+            <Check className="h-2.5 w-2.5 shrink-0" strokeWidth={2.5} aria-hidden />
+            Patent-backed
+          </p>
+        ) : null}
 
         <div className="mt-auto flex items-end justify-between gap-2 pt-2">
           <ProductPrice mrpInr={product.mrpInr} sellingInr={sellingInr} compact />
-          <CardQuickAdd product={quickAddProduct} available={product.stockQty} />
+          <CardQuickAdd
+            product={quickAddProduct}
+            available={product.stockQty}
+            className="md:opacity-70 md:transition-opacity md:group-hover:opacity-100"
+          />
         </div>
       </div>
     </Link>
