@@ -79,12 +79,14 @@ export function ProductHowToUse({ usage }: { usage: unknown }) {
   if (!cards.length) return null;
 
   return (
-    <section id="usage" className="frame scroll-mt-32 mt-10 md:mt-12">
+    <section id="usage" className="frame scroll-mt-32 mt-16 md:mt-24">
       <Reveal>
-        <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-ink-faint">Daily protocol</p>
-        <h2 className="mt-2 text-xl font-light tracking-tight text-ink md:text-2xl">How to use</h2>
+        <p className="font-mono text-[10px] uppercase tracking-[0.22em] text-gold">Daily protocol</p>
+        <h2 className="mt-2.5 text-[1.5rem] font-light leading-[1.12] tracking-tight text-ink md:text-[1.9rem]">
+          How to use
+        </h2>
       </Reveal>
-      <div className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-2 md:mt-6 lg:grid-cols-4">
+      <div className="mt-6 grid grid-cols-1 gap-3 sm:grid-cols-2 md:mt-8 lg:grid-cols-4">
         {cards.map(({ key, label, icon: Icon }, i) => (
           <Reveal key={key} delay={0.04 * i}>
             <div className="flex h-full flex-col bg-pearl/70 px-5 py-5">
@@ -145,15 +147,18 @@ export function ProductSpecifications({
   if (!groups.length) return null;
 
   return (
-    <section id="specifications" className="frame scroll-mt-32 mt-10 md:mt-12">
+    <section id="specifications" className="frame scroll-mt-32 mt-16 md:mt-24">
       <Reveal>
-        <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-ink-faint">For the record</p>
-        <h2 className="mt-2 text-xl font-light tracking-tight text-ink md:text-2xl">Specifications</h2>
-        <p className="mt-1.5 text-[13px] text-ink-mute">
-          Full technical, manufacturer, and regulatory information.
+        <p className="font-mono text-[10px] uppercase tracking-[0.22em] text-ink-faint">For the record</p>
+        <h2 className="mt-2.5 text-[1.15rem] font-light tracking-tight text-ink md:text-[1.35rem]">
+          Specifications
+        </h2>
+        <p className="mt-2 text-[13px] text-ink-mute">
+          Full technical, manufacturer, and regulatory information — collapsed so it never gets in
+          the way of deciding.
         </p>
       </Reveal>
-      <div className="mt-4 max-w-3xl md:mt-5">
+      <div className="mt-5 max-w-3xl md:mt-6">
         <ProductDetailAccordion
           sections={groups.map((g) => ({
             id: g.id,
