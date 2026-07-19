@@ -3,6 +3,7 @@ import { mkdir, writeFile } from "fs/promises";
 import path from "path";
 import type { NextRequest } from "next/server";
 import { adminErr, adminOk, requireAdminApi } from "@/lib/admin/api";
+import { deleteS3Object, getS3UploadConfig, putS3Object } from "@/lib/admin/s3-storage";
 import { detectImageType, detectPdf } from "@/lib/admin/upload-validation";
 import { db } from "@/lib/db";
 import { logger } from "@/lib/logger";
@@ -73,8 +74,20 @@ export async function POST(req: NextRequest) {
                 ? "image/avif"
                 : `image/${ext}`;
 
-    // CRIT-05: If Vercel Blob is configured (or in serverless production), use Vercel Blob storage.
-    if (process.env.BLOB_READ_WRITE_TOKEN) {
+    // Serverless filesystems are ephemeral — files must go to cloud object storage.
+    // Preferred: AWS S3 (S3_UPLOAD_BUCKET). Legacy: Vercel Blob (BLOB_READ_WRITE_TOKEN).
+    const s3Config = getS3UploadConfig();
+    let s3Key: string | null = null;
+    if (s3Config) {
+      s3Key = `uploads/${fileName}`;
+      url = await putS3Object(
+        s3Config,
+        s3Key,
+        bytes,
+        contentType,
+        isPdf ? "inline" : undefined
+      );
+    } else if (process.env.BLOB_READ_WRITE_TOKEN) {
       const { put } = await import("@vercel/blob");
       const blob = await put(`uploads/${fileName}`, bytes, {
         access: "public",
@@ -82,7 +95,9 @@ export async function POST(req: NextRequest) {
       });
       url = blob.url;
     } else if (process.env.NODE_ENV === "production") {
-      throw new Error("BLOB_READ_WRITE_TOKEN is required in production for cloud file uploads.");
+      throw new Error(
+        "S3_UPLOAD_BUCKET (or BLOB_READ_WRITE_TOKEN) is required in production for cloud file uploads."
+      );
     } else {
       // Local dev fallback
       const uploadDir = path.join(process.cwd(), "public", "uploads");
@@ -93,18 +108,39 @@ export async function POST(req: NextRequest) {
 
     const altText = form.get("altText");
 
-    await db.mediaAsset.create({
-      data: {
-        url,
-        type: isPdf ? "document" : "image",
-        altText: typeof altText === "string" ? altText.slice(0, 300) : "",
-        uploadedBy: String(admin.email)
+    try {
+      await db.mediaAsset.create({
+        data: {
+          url,
+          type: isPdf ? "document" : "image",
+          altText: typeof altText === "string" ? altText.slice(0, 300) : "",
+          uploadedBy: String(admin.email)
+        }
+      });
+    } catch (dbErr) {
+      // Compensating delete — don't strand an untracked object in S3.
+      if (s3Config && s3Key) {
+        await deleteS3Object(s3Config, s3Key).catch((cleanupErr) =>
+          logger.error(
+            { err: cleanupErr, key: s3Key, event: "s3_rollback_failed" },
+            "failed to roll back orphaned S3 object after DB error"
+          )
+        );
       }
-    });
+      throw dbErr;
+    }
 
     return adminOk({ url });
   } catch (err) {
-    logger.error({ err, event: "admin_upload_failed" }, "admin image upload failed");
+    logger.error(
+      {
+        err,
+        errName: err instanceof Error ? err.name : undefined,
+        errMessage: err instanceof Error ? err.message : String(err),
+        event: "admin_upload_failed"
+      },
+      "admin image upload failed"
+    );
     return adminErr("upload_failed", "Couldn't save the uploaded image. Please try again.", 500);
   }
 }

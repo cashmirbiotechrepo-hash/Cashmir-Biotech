@@ -50,6 +50,14 @@ const KEYS = [
   "INVENTORY_ALERT_EMAIL",
   "CUSTOMER_JWT_SECRET",
   "BLOB_READ_WRITE_TOKEN",
+  "S3_UPLOAD_BUCKET",
+  "S3_UPLOAD_REGION",
+  "S3_PUBLIC_BASE_URL",
+  // App-specific credential names — Amplify reserves the AWS_ prefix, and the
+  // build container's AWS_ACCESS_KEY_ID is a temporary STS credential that
+  // must never be baked into the runtime snapshot.
+  "S3_UPLOAD_ACCESS_KEY_ID",
+  "S3_UPLOAD_SECRET_ACCESS_KEY",
   "SENTRY_DSN",
   "NEXT_PUBLIC_SENTRY_DSN"
 ];

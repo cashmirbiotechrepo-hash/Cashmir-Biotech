@@ -59,10 +59,34 @@ const serverEnvSchema = z
     RAZORPAY_KEY_SECRET: z.string().min(1).optional(),
     RAZORPAY_WEBHOOK_SECRET: z.string().min(1).optional(),
     BLOB_READ_WRITE_TOKEN: z.string().min(1).optional(),
+    /** S3 bucket for admin image/document uploads (preferred on AWS). */
+    S3_UPLOAD_BUCKET: z.string().min(1).optional(),
+    /** Region of S3_UPLOAD_BUCKET; falls back to AWS_REGION. */
+    S3_UPLOAD_REGION: z.string().min(1).optional(),
+    /** Optional CDN/base URL serving the bucket (e.g. CloudFront). */
+    S3_PUBLIC_BASE_URL: optionalHttpUrl,
+    /** Explicit S3 credentials (Amplify reserves the AWS_ prefix). Optional when an execution role grants access. */
+    S3_UPLOAD_ACCESS_KEY_ID: z.string().min(1).optional(),
+    S3_UPLOAD_SECRET_ACCESS_KEY: z.string().min(1).optional(),
     SENTRY_DSN: z.string().min(1).optional(),
     NEXT_PUBLIC_SENTRY_DSN: z.string().min(1).optional()
   })
   .superRefine((val, ctx) => {
+    // Fail at boot, not on the first upload: a bucket without a resolvable
+    // region would only crash when an admin tries to upload.
+    if (
+      val.S3_UPLOAD_BUCKET &&
+      !val.S3_UPLOAD_REGION &&
+      !process.env.AWS_REGION &&
+      !process.env.AWS_DEFAULT_REGION
+    ) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "S3_UPLOAD_REGION (or AWS_REGION) is required when S3_UPLOAD_BUCKET is set.",
+        path: ["S3_UPLOAD_REGION"]
+      });
+    }
+
     // During `next build`, NODE_ENV is production — don't demand live money/redis providers
     // while Amplify/Vercel are still compiling (AWS_BRANCH=main is set at build time too).
     if (process.env.NODE_ENV !== "production") return;
@@ -94,7 +118,14 @@ const serverEnvSchema = z
       require("RAZORPAY_KEY_ID", "RAZORPAY_KEY_ID is required in production.");
       require("RAZORPAY_KEY_SECRET", "RAZORPAY_KEY_SECRET is required in production.");
       require("RAZORPAY_WEBHOOK_SECRET", "RAZORPAY_WEBHOOK_SECRET is required in production.");
-      require("BLOB_READ_WRITE_TOKEN", "BLOB_READ_WRITE_TOKEN is required in production.");
+      if (!val.S3_UPLOAD_BUCKET && !val.BLOB_READ_WRITE_TOKEN) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message:
+            "S3_UPLOAD_BUCKET (or BLOB_READ_WRITE_TOKEN) is required in production for uploads.",
+          path: ["S3_UPLOAD_BUCKET"]
+        });
+      }
       require("SENTRY_DSN", "SENTRY_DSN is required in production.");
       require("NEXT_PUBLIC_SENTRY_DSN", "NEXT_PUBLIC_SENTRY_DSN is required in production.");
     }

@@ -16,26 +16,124 @@ function slugify(name: string) {
     .slice(0, 80);
 }
 
-const schema = z.object({
+const saveSchema = z.object({
+  id: z.string().trim().optional(),
   name: z.string().trim().min(1).max(80),
-  sortOrder: z.coerce.number().int().min(0).max(9999).default(0)
+  slug: z
+    .string()
+    .trim()
+    .max(80)
+    .optional()
+    .transform((v) => (v && v.length > 0 ? v : undefined)),
+  sortOrder: z.coerce.number().int().min(0).max(9999).default(0),
+  active: z
+    .union([z.literal("on"), z.literal("true"), z.literal("1"), z.literal("")])
+    .optional()
+    .transform((v) => v === "on" || v === "true" || v === "1")
 });
 
 export async function saveCategoryAction(formData: FormData): Promise<ActionState> {
   const admin = await requireAdminSession();
   if (!hasAdminRole(admin.role, OPERATIONS_ROLES)) return { error: "Insufficient permissions." };
-  const parsed = schema.safeParse(Object.fromEntries(formData.entries()));
+
+  const raw = Object.fromEntries(formData.entries());
+  const parsed = saveSchema.safeParse(raw);
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Invalid category." };
 
-  const slug = slugify(parsed.data.name);
-  await db.category.upsert({
-    where: { slug },
-    create: { name: parsed.data.name, slug, sortOrder: parsed.data.sortOrder },
-    update: { name: parsed.data.name, sortOrder: parsed.data.sortOrder, active: true }
+  const slug = parsed.data.slug ? slugify(parsed.data.slug) : slugify(parsed.data.name);
+  if (!slug) return { error: "Slug cannot be empty." };
+
+  const conflict = await db.category.findFirst({
+    where: {
+      slug,
+      ...(parsed.data.id ? { NOT: { id: parsed.data.id } } : {})
+    },
+    select: { id: true }
   });
+  if (conflict) return { error: `Slug “${slug}” is already in use.` };
+
+  if (parsed.data.id) {
+    const existing = await db.category.findUnique({ where: { id: parsed.data.id } });
+    if (!existing) return { error: "Category not found." };
+
+    await db.category.update({
+      where: { id: parsed.data.id },
+      data: {
+        name: parsed.data.name,
+        slug,
+        sortOrder: parsed.data.sortOrder,
+        active: parsed.data.active
+      }
+    });
+  } else {
+    await db.category.create({
+      data: {
+        name: parsed.data.name,
+        slug,
+        sortOrder: parsed.data.sortOrder,
+        active: parsed.data.active
+      }
+    });
+  }
+
   revalidatePath("/admin/categories");
   revalidatePath("/products");
   return { ok: true, message: `Saved ${parsed.data.name}.` };
+}
+
+export async function deleteCategoryAction(formData: FormData): Promise<ActionState> {
+  const admin = await requireAdminSession();
+  if (!hasAdminRole(admin.role, OPERATIONS_ROLES)) return { error: "Insufficient permissions." };
+
+  const id = String(formData.get("id") ?? "").trim();
+  if (!id) return { error: "Missing category." };
+
+  const category = await db.category.findUnique({ where: { id } });
+  if (!category) return { error: "Category not found." };
+
+  const productCount = await db.product.count({ where: { category: category.name } });
+  if (productCount > 0) {
+    return {
+      error: `Cannot delete — ${productCount} product${productCount === 1 ? "" : "s"} still use “${category.name}”. Reassign or hide them first.`
+    };
+  }
+
+  await db.category.delete({ where: { id } });
+  revalidatePath("/admin/categories");
+  revalidatePath("/products");
+  return { ok: true, message: `Deleted ${category.name}.` };
+}
+
+export async function duplicateCategoryAction(formData: FormData): Promise<ActionState> {
+  const admin = await requireAdminSession();
+  if (!hasAdminRole(admin.role, OPERATIONS_ROLES)) return { error: "Insufficient permissions." };
+
+  const id = String(formData.get("id") ?? "").trim();
+  if (!id) return { error: "Missing category." };
+
+  const source = await db.category.findUnique({ where: { id } });
+  if (!source) return { error: "Category not found." };
+
+  const baseName = `${source.name} (copy)`.slice(0, 80);
+  let slug = slugify(baseName);
+  let attempt = 2;
+  while (await db.category.findUnique({ where: { slug } })) {
+    slug = `${slugify(source.name)}-copy-${attempt}`.slice(0, 80);
+    attempt += 1;
+    if (attempt > 50) return { error: "Could not allocate a unique slug." };
+  }
+
+  await db.category.create({
+    data: {
+      name: baseName,
+      slug,
+      sortOrder: source.sortOrder + 1,
+      active: false
+    }
+  });
+
+  revalidatePath("/admin/categories");
+  return { ok: true, message: `Duplicated as ${baseName}.` };
 }
 
 export async function syncCategoriesFromProductsAction(): Promise<ActionState> {

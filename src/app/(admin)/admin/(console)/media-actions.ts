@@ -6,6 +6,7 @@ import path from "path";
 import { z } from "zod";
 import { getCurrentAdmin, requireAdminSession } from "@/lib/auth";
 import { countMediaUrlReferences } from "@/lib/admin/media-refs";
+import { deleteS3ObjectByUrl } from "@/lib/admin/s3-storage";
 import { DESTRUCTIVE_ROLES, hasAdminRole } from "@/lib/admin/rbac";
 import { db } from "@/lib/db";
 import { writeAuditLog } from "@/modules/admin/services/audit.service";
@@ -62,6 +63,9 @@ export async function deleteMediaAssetAction(formData: FormData): Promise<Action
   if (asset.url.startsWith("/uploads/")) {
     const filePath = path.join(process.cwd(), "public", asset.url);
     await unlink(filePath).catch(() => undefined);
+  } else {
+    // Best-effort: remove the backing S3 object so deletes don't leak storage.
+    await deleteS3ObjectByUrl(asset.url);
   }
 
   await db.mediaAsset.delete({ where: { id } });

@@ -27,6 +27,7 @@
     "test:e2e:install": "playwright install chromium"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.1090.0",
     "@base-ui/react": "^1.6.0",
     "@gsap/react": "^2.1.2",
     "@paper-design/shaders-react": "^0.0.77",

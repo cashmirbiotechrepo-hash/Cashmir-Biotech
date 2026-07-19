@@ -12,7 +12,10 @@ const nextConfig: NextConfig = {
   images: {
     remotePatterns: [
       { protocol: "https", hostname: "images.unsplash.com" },
-      { protocol: "https", hostname: "*.public.blob.vercel-storage.com" }
+      { protocol: "https", hostname: "*.public.blob.vercel-storage.com" },
+      // S3 uploads (S3_UPLOAD_BUCKET) — direct bucket URLs and CloudFront
+      { protocol: "https", hostname: "**.amazonaws.com" },
+      { protocol: "https", hostname: "*.cloudfront.net" }
     ]
   }
 };
