@@ -25,20 +25,19 @@ async function studioShot(opts: {
 }
 
 describe("autoCropWhitespace", () => {
-  it("crops wasted whitespace so the subject fills ~75-85% of the frame", async () => {
+  it("crops to a 1:1 square where the subject fills ~75-85% of its dominant axis", async () => {
     const input = await studioShot({ canvas: 1000, subjectW: 300, subjectH: 500 });
     const result = await autoCropWhitespace(input);
     expect(result).not.toBeNull();
 
     const meta = await sharp(result!.buffer).metadata();
-    // Subject 300x500 + 8% padding per side => ~348 x ~580.
-    expect(meta.width).toBeGreaterThanOrEqual(340);
-    expect(meta.width).toBeLessThanOrEqual(360);
+    // Subject 500 tall + 8% padding per side => ~580, expanded to a 580x580 square.
+    expect(meta.width).toBe(meta.height);
     expect(meta.height).toBeGreaterThanOrEqual(570);
     expect(meta.height).toBeLessThanOrEqual(590);
-    // Subject share of the cropped frame lands in the requested 75-85% band.
-    expect(300 / meta.width!).toBeGreaterThan(0.75);
+    // Dominant axis lands in the requested 75-85% band.
     expect(500 / meta.height!).toBeGreaterThan(0.75);
+    expect(500 / meta.height!).toBeLessThan(0.9);
   });
 
   it("preserves the photograph: opaque output, backdrop stays white, subject color unchanged", async () => {

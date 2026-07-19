@@ -8,7 +8,9 @@ import sharp from "sharp";
  * lighting, shadows, reflections, exposure, white backdrop — is preserved
  * pixel-for-pixel. We only find where the product is and cut away the wasted
  * empty canvas around it, leaving a small margin so the subject fills roughly
- * 75–85% of the frame.
+ * 75–85% of the frame. The crop is expanded to a 1:1 square (using the photo's
+ * own surrounding pixels) so storefront cards can show it edge-to-edge with no
+ * letterboxing.
  *
  * Transparent inputs (including cutouts from the retired background-removal
  * pipeline) are flattened onto white first, which restores a clean studio
@@ -87,7 +89,22 @@ export async function autoCropWhitespace(input: Buffer): Promise<CropResult | nu
   const cropW = Math.min(width - left, subjectW + padX * 2);
   const cropH = Math.min(height - top, subjectH + padY * 2);
 
-  const meaningfulCrop = (cropW * cropH) / (width * height) <= 1 - MIN_AREA_SAVING;
+  // Storefront frames are 1:1, so grow the crop to a square using REAL photo
+  // pixels (the shot's own backdrop) — never synthetic fill. Centered on the
+  // subject, clamped to the image, and never cutting into the padded subject.
+  const side = Math.max(cropW, cropH);
+  const sqW = Math.min(side, width);
+  const sqH = Math.min(side, height);
+  let sqLeft = Math.round((minX + maxX) / 2 - sqW / 2);
+  let sqTop = Math.round((minY + maxY) / 2 - sqH / 2);
+  sqLeft = Math.min(Math.max(sqLeft, 0), width - sqW);
+  sqTop = Math.min(Math.max(sqTop, 0), height - sqH);
+  if (sqLeft > left) sqLeft = left;
+  if (sqLeft + sqW < left + cropW) sqLeft = left + cropW - sqW;
+  if (sqTop > top) sqTop = top;
+  if (sqTop + sqH < top + cropH) sqTop = top + cropH - sqH;
+
+  const meaningfulCrop = (sqW * sqH) / (width * height) <= 1 - MIN_AREA_SAVING;
 
   // Opaque photo that is already framed well — keep the original file untouched.
   if (!hasTransparency && (alreadyTight || !meaningfulCrop)) return null;
@@ -95,7 +112,7 @@ export async function autoCropWhitespace(input: Buffer): Promise<CropResult | nu
   try {
     let pipeline = sharp(data, { raw: { width, height, channels: 4 } });
     if (!alreadyTight && meaningfulCrop) {
-      pipeline = pipeline.extract({ left, top, width: cropW, height: cropH });
+      pipeline = pipeline.extract({ left: sqLeft, top: sqTop, width: sqW, height: sqH });
     }
     const buffer = await pipeline
       .flatten({ background: "#ffffff" })

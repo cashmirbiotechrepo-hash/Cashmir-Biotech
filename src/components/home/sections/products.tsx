@@ -231,14 +231,15 @@ function HomeProductCard({ product }: { product: ProductCard }) {
         )}
       />
 
-      <div className="relative aspect-[5/4] overflow-hidden bg-white">
+      {/* Square frame, photo edge-to-edge — no white letterbox around the shot. */}
+      <div className="relative aspect-square overflow-hidden">
         {realImage ? (
           <Image
             src={product.imageUrl!}
             alt={product.name}
             fill
             sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
-            className="object-contain object-center p-5 transition-transform duration-700 ease-out group-hover:scale-[1.06]"
+            className="object-cover object-center transition-transform duration-700 ease-out group-hover:scale-[1.06]"
           />
         ) : (
           <div className="absolute inset-0 flex flex-col items-center justify-center bg-gradient-to-b from-white to-pearl/80">

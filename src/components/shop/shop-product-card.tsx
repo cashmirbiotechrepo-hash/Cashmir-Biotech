@@ -107,16 +107,15 @@ export function ShopProductCard({ product, featured = false, className }: Props)
           className
         )}
       >
-        {/* The photograph is shown as shot — white studio backdrop and all. Letterbox
-            areas are white so the frame reads as one seamless studio plate. */}
-        <div className="relative aspect-square overflow-hidden bg-white md:aspect-auto md:min-h-[240px]">
+        {/* The photograph fills the frame edge-to-edge — no letterbox plate. */}
+        <div className="relative aspect-square overflow-hidden md:aspect-auto md:min-h-[240px]">
           {product.imageUrl ? (
             <ProductCardImage
               src={product.imageUrl}
               alt={product.name}
               sizes="(max-width: 768px) 100vw, 300px"
               priority
-              className="object-contain object-center transition-transform duration-700 ease-expo group-hover:scale-[1.03]"
+              className="object-cover object-center transition-transform duration-700 ease-expo group-hover:scale-[1.03]"
             />
           ) : null}
           <CardBadge product={product} stock={stock} featured />
@@ -169,15 +168,15 @@ export function ShopProductCard({ product, featured = false, className }: Props)
         className
       )}
     >
-      {/* Untouched studio photograph, cropped tight at upload time. White letterbox
-          matches the photo's backdrop so the image area reads as one clean plate. */}
-      <div className="relative aspect-square overflow-hidden bg-white">
+      {/* Untouched studio photograph, cropped square at upload time — fills the
+          1:1 frame edge-to-edge with no letterbox plate. */}
+      <div className="relative aspect-square overflow-hidden">
         {product.imageUrl ? (
           <ProductCardImage
             src={product.imageUrl}
             alt={product.name}
             sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
-            className="object-contain object-center transition-transform duration-700 ease-expo group-hover:scale-[1.03]"
+            className="object-cover object-center transition-transform duration-700 ease-expo group-hover:scale-[1.03]"
           />
         ) : null}
         <CardBadge product={product} stock={stock} />
