@@ -17,9 +17,10 @@ const ASPECTS: { label: string; value: number | null }[] = [
 
 const FRAME_MAX = 320;
 
-async function uploadBlob(data: Blob, filename: string): Promise<string> {
+async function uploadBlob(data: Blob, filename: string, purpose?: string): Promise<string> {
   const fd = new FormData();
   fd.append("file", data, filename);
+  if (purpose) fd.append("purpose", purpose);
   const res = await fetch("/api/admin/upload", { method: "POST", body: fd });
   const json = await res.json().catch(() => null);
   if (!res.ok) {
@@ -238,7 +239,8 @@ export function ImageUploadField({
   defaultValue = "",
   aspect = null,
   helpText,
-  required = false
+  required = false,
+  purpose
 }: {
   name: string;
   label: string;
@@ -246,6 +248,8 @@ export function ImageUploadField({
   aspect?: number | null;
   helpText?: string;
   required?: boolean;
+  /** "product" enables automatic white-background removal server-side. */
+  purpose?: string;
 }) {
   const [url, setUrl] = useState(defaultValue);
   const [pending, setPending] = useState<File | null>(null);
@@ -259,7 +263,7 @@ export function ImageUploadField({
     setBusy(true);
     setErr(null);
     try {
-      const uploaded = await uploadBlob(data, filename);
+      const uploaded = await uploadBlob(data, filename, purpose);
       setUrl(uploaded);
     } catch (e) {
       setErr(e instanceof Error ? e.message : "Upload failed.");
@@ -373,7 +377,8 @@ export function GalleryUploadField({
   defaultValue = [],
   aspect = 1,
   helpText,
-  max = 8
+  max = 8,
+  purpose
 }: {
   name: string;
   label: string;
@@ -381,6 +386,8 @@ export function GalleryUploadField({
   aspect?: number | null;
   helpText?: string;
   max?: number;
+  /** "product" enables automatic white-background removal server-side. */
+  purpose?: string;
 }) {
   const [urls, setUrls] = useState<string[]>(defaultValue);
   const [pending, setPending] = useState<File | null>(null);
@@ -393,7 +400,7 @@ export function GalleryUploadField({
     setBusy(true);
     setErr(null);
     try {
-      const uploaded = await uploadBlob(data, filename);
+      const uploaded = await uploadBlob(data, filename, purpose);
       setUrls((prev) => [...prev, uploaded].slice(0, max));
     } catch (e) {
       setErr(e instanceof Error ? e.message : "Upload failed.");

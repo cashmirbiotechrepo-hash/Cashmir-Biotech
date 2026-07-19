@@ -4,6 +4,7 @@ import { AdminPageHeader } from "@/components/admin/page-header";
 import { ProductsTable } from "@/components/admin/products-table";
 import { AdminListToolbar } from "@/components/admin/list-toolbar";
 import { AdminPagination } from "@/components/admin/pagination";
+import { ReprocessImagesButton } from "@/components/admin/reprocess-images-button";
 
 export const metadata = { title: "Products" };
 
@@ -61,6 +62,7 @@ export default async function AdminProductsPage({
       <AdminPageHeader
         title="Products"
         description="Catalog workspace — keep the list open, edit details beside it, adjust stock inline."
+        actions={<ReprocessImagesButton />}
       />
 
       <AdminListToolbar

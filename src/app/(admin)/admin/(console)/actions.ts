@@ -949,6 +949,144 @@ export async function addSubscriberAction(formData: FormData): Promise<ActionSta
   }
 }
 
+/**
+ * One-click migration: converts existing product photos (studio-on-white) into
+ * transparent cutouts so cards render cleanly in both themes. Non-destructive —
+ * original files stay in storage; product rows point at the new WebP.
+ */
+export async function reprocessProductImagesAction(): Promise<ActionState> {
+  const admin = await getCurrentAdmin();
+  if (!admin) return { error: "Session expired." };
+  if (!hasAdminRole(admin.role, OPERATIONS_ROLES)) {
+    return { error: "You don't have permission to reprocess product images." };
+  }
+
+  const { randomUUID } = await import("crypto");
+  const { cutoutWhiteBackground } = await import("@/lib/admin/product-cutout");
+  const { CUTOUT_SUFFIX, isCutoutUrl } = await import("@/lib/product-image");
+  const { getS3UploadConfig, putS3Object } = await import("@/lib/admin/s3-storage");
+
+  const s3Config = (() => {
+    try {
+      return getS3UploadConfig();
+    } catch {
+      return null;
+    }
+  })();
+
+  async function loadBytes(url: string): Promise<Buffer | null> {
+    try {
+      if (url.startsWith("/")) {
+        const { readFile } = await import("fs/promises");
+        const path = await import("path");
+        return await readFile(path.join(process.cwd(), "public", url.replace(/^\/+/, "")));
+      }
+      const res = await fetch(url, { cache: "no-store" });
+      if (!res.ok) return null;
+      return Buffer.from(await res.arrayBuffer());
+    } catch {
+      return null;
+    }
+  }
+
+  async function storeCutout(bytes: Buffer): Promise<string | null> {
+    const fileName = `${randomUUID()}${CUTOUT_SUFFIX}.webp`;
+    try {
+      if (s3Config) {
+        return await putS3Object(s3Config, `uploads/${fileName}`, bytes, "image/webp");
+      }
+      if (process.env.NODE_ENV === "production") return null;
+      const { mkdir, writeFile } = await import("fs/promises");
+      const path = await import("path");
+      const dir = path.join(process.cwd(), "public", "uploads");
+      await mkdir(dir, { recursive: true });
+      await writeFile(path.join(dir, fileName), bytes);
+      return `/uploads/${fileName}`;
+    } catch (err) {
+      logger.error({ err, event: "cutout_store_failed" }, "failed to store product cutout");
+      return null;
+    }
+  }
+
+  /** Returns the replacement URL, or null when the image should stay as-is. */
+  async function processUrl(url: string): Promise<string | null> {
+    if (!url || isCutoutUrl(url)) return null;
+    const bytes = await loadBytes(url);
+    if (!bytes) return null;
+    const cut = await cutoutWhiteBackground(bytes).catch(() => null);
+    if (!cut) return null;
+    return storeCutout(cut.buffer);
+  }
+
+  try {
+    const products = await db.product.findMany({
+      select: { id: true, imageUrl: true, images: true }
+    });
+
+    let converted = 0;
+    let skipped = 0;
+
+    for (const product of products) {
+      const data: { imageUrl?: string; images?: string[] } = {};
+
+      const nextCover = await processUrl(product.imageUrl);
+      if (nextCover) {
+        data.imageUrl = nextCover;
+        converted++;
+      } else {
+        skipped++;
+      }
+
+      const gallery = Array.isArray(product.images) ? (product.images as string[]) : [];
+      if (gallery.length > 0) {
+        let galleryChanged = false;
+        const nextGallery: string[] = [];
+        for (const g of gallery) {
+          const next = await processUrl(g);
+          if (next) {
+            nextGallery.push(next);
+            galleryChanged = true;
+            converted++;
+          } else {
+            nextGallery.push(g);
+            skipped++;
+          }
+        }
+        if (galleryChanged) data.images = nextGallery;
+      }
+
+      if (data.imageUrl || data.images) {
+        await db.product.update({ where: { id: product.id }, data });
+      }
+    }
+
+    await writeAuditLog({
+      userEmail: String(admin.email),
+      action: "update",
+      entityType: "product_images",
+      entityId: `cutout:${converted}`
+    });
+
+    revalidatePath("/admin/products");
+    revalidatePath("/products");
+    revalidatePath("/");
+
+    if (converted === 0) {
+      return {
+        ok: true,
+        message: "No photos needed conversion — they're either already cutouts or not studio-on-white shots."
+      };
+    }
+    return {
+      ok: true,
+      message: `Converted ${converted} photo${converted === 1 ? "" : "s"} to transparent cutouts (${skipped} left unchanged).`
+    };
+  } catch (error) {
+    logger.error({ err: error, event: "product_image_reprocess_failed" }, "product image reprocess failed");
+    return { error: "Couldn't reprocess product images. Check the logs and try again." };
+  }
+}
+
 export async function signOutAction() {
   const { getCurrentAdmin, clearAdminSessionCookies } = await import("@/lib/auth");
   const { AdminAuthService } = await import("@/lib/admin/auth-service");

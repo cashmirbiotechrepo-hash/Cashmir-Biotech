@@ -3,6 +3,7 @@ import { mkdir, writeFile } from "fs/promises";
 import path from "path";
 import type { NextRequest } from "next/server";
 import { adminErr, adminOk, requireAdminApi } from "@/lib/admin/api";
+import { CUTOUT_SUFFIX, cutoutWhiteBackground } from "@/lib/admin/product-cutout";
 import { deleteS3Object, getS3UploadConfig, putS3Object } from "@/lib/admin/s3-storage";
 import { detectImageType, detectPdf } from "@/lib/admin/upload-validation";
 import { db } from "@/lib/db";
@@ -42,8 +43,9 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const bytes = Buffer.from(await file.arrayBuffer());
-    const allowPdf = String(form.get("purpose") ?? "") === "document";
+    let bytes: Buffer = Buffer.from(await file.arrayBuffer());
+    const purpose = String(form.get("purpose") ?? "");
+    const allowPdf = purpose === "document";
     const detectedImage = detectImageType(bytes);
     const isPdf = allowPdf && detectPdf(bytes);
 
@@ -57,8 +59,22 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const ext = isPdf ? "pdf" : detectedImage!;
-    const fileName = `${randomUUID()}.${ext}`;
+    let ext = isPdf ? "pdf" : detectedImage!;
+    let cutout = false;
+
+    // Product photos: strip the studio white backdrop so the storefront can
+    // stage the product on themed surfaces. Falls back to the original when
+    // the shot isn't recognisably product-on-white.
+    if (!isPdf && purpose === "product" && ext !== "gif") {
+      const processed = await cutoutWhiteBackground(bytes).catch(() => null);
+      if (processed) {
+        bytes = processed.buffer;
+        ext = processed.extension;
+        cutout = true;
+      }
+    }
+
+    const fileName = cutout ? `${randomUUID()}${CUTOUT_SUFFIX}.${ext}` : `${randomUUID()}.${ext}`;
     let url: string;
     const contentType = isPdf
       ? "application/pdf"

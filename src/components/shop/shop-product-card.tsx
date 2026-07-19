@@ -4,7 +4,28 @@ import { ProductPrice } from "@/components/shop/product-price";
 import { CardQuickAdd } from "@/components/shop/card-quick-add";
 import { ProductCardImage } from "@/components/shop/product-card-image";
 import { getStockStatus, sellingInrFromPaise } from "@/lib/pricing";
+import { isCutoutUrl } from "@/lib/product-image";
 import { cn } from "@/lib/utils";
+
+/**
+ * Theme-aware "studio" behind the product: a soft ink-based spotlight (reads as
+ * a subtle vignette in light mode and a faint glow in dark mode) plus a floor
+ * shadow that grounds transparent cutouts. No framed white box.
+ */
+function StudioBackdrop() {
+  return (
+    <>
+      <div
+        aria-hidden
+        className="absolute inset-0 bg-[radial-gradient(ellipse_62%_54%_at_50%_44%,rgb(var(--ink)/0.05),transparent_74%)]"
+      />
+      <div
+        aria-hidden
+        className="absolute bottom-[7%] left-1/2 h-[4.5%] w-[46%] -translate-x-1/2 rounded-[100%] bg-ink/15 blur-[7px]"
+      />
+    </>
+  );
+}
 
 export type ShopCardProduct = {
   id: string;
@@ -83,6 +104,7 @@ export function ShopProductCard({ product, featured = false, className }: Props)
   const blurb = product.shortBenefit.replace(/\s+/g, " ").trim();
   const sellingInr = sellingInrFromPaise(product.pricePaise, product.mrpInr);
   const stock = getStockStatus(product.stockQty, product.lowStockThreshold ?? 5);
+  const cutout = isCutoutUrl(product.imageUrl);
 
   const quickAddProduct = {
     productId: product.id,
@@ -105,20 +127,22 @@ export function ShopProductCard({ product, featured = false, className }: Props)
           className
         )}
       >
-        <div className="relative aspect-square overflow-hidden bg-gradient-to-b from-pearl to-mist md:aspect-auto md:min-h-[240px]">
+        <div className="relative aspect-square overflow-hidden md:aspect-auto md:min-h-[240px]">
+          <StudioBackdrop />
           {product.imageUrl ? (
             <ProductCardImage
               src={product.imageUrl}
               alt={product.name}
               sizes="(max-width: 768px) 100vw, 300px"
               priority
-              className="scale-[1.16] object-contain object-center transition-transform duration-700 ease-expo group-hover:scale-[1.22]"
+              className={cn(
+                "object-contain object-center transition-transform duration-700 ease-expo",
+                cutout
+                  ? "p-[10%] pb-[12%] [filter:drop-shadow(0_14px_16px_rgb(var(--ink)/0.16))] group-hover:scale-[1.04]"
+                  : "scale-[1.16] mix-blend-multiply group-hover:scale-[1.22] dark:mix-blend-normal"
+              )}
             />
           ) : null}
-          <div
-            aria-hidden
-            className="pointer-events-none absolute inset-0 bg-gradient-to-t from-ink/[0.05] via-transparent to-transparent"
-          />
           <CardBadge product={product} stock={stock} featured />
         </div>
 
@@ -169,20 +193,22 @@ export function ShopProductCard({ product, featured = false, className }: Props)
         className
       )}
     >
-      {/* Warm frame + zoom past the photo's dead margins so the product dominates. */}
-      <div className="relative aspect-square overflow-hidden bg-gradient-to-b from-pearl to-mist">
+      {/* The card *is* the studio: no framed image box, product staged on the card surface. */}
+      <div className="relative aspect-square overflow-hidden">
+        <StudioBackdrop />
         {product.imageUrl ? (
           <ProductCardImage
             src={product.imageUrl}
             alt={product.name}
             sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
-            className="scale-[1.28] object-contain object-center transition-transform duration-700 ease-expo group-hover:scale-[1.34]"
+            className={cn(
+              "object-contain object-center transition-transform duration-700 ease-expo",
+              cutout
+                ? "p-[9%] pb-[12%] [filter:drop-shadow(0_12px_14px_rgb(var(--ink)/0.16))] group-hover:scale-[1.04]"
+                : "scale-[1.28] mix-blend-multiply group-hover:scale-[1.34] dark:mix-blend-normal"
+            )}
           />
         ) : null}
-        <div
-          aria-hidden
-          className="pointer-events-none absolute inset-0 bg-gradient-to-t from-ink/[0.05] via-transparent to-transparent"
-        />
         <CardBadge product={product} stock={stock} />
       </div>
 

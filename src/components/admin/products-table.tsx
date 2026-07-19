@@ -560,6 +560,8 @@ function ProductEditor({
                     defaultValue={product?.imageUrl ?? ""}
                     aspect={1}
                     required
+                    purpose="product"
+                    helpText="Studio shots on white get the backdrop removed automatically for the storefront."
                   />
                   <GalleryUploadField
                     name="images"
@@ -567,6 +569,7 @@ function ProductEditor({
                     defaultValue={product?.images ?? []}
                     aspect={1}
                     max={8}
+                    purpose="product"
                   />
                 </div>
               </div>
