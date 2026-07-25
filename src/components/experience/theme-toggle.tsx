@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { Moon, Sun } from "lucide-react";
+import { motion } from "framer-motion";
 import {
   applyTheme,
   persistTheme,
@@ -11,16 +12,15 @@ import {
   type ThemePreference
 } from "@/lib/theme";
 import { cn } from "@/lib/utils";
+import { EASE_OUT_EXPO } from "@/lib/motion/ease";
 
-/**
- * Header theme toggle — sun when light is active, moon when dark is active.
- * Persists to localStorage; syncs across tabs; follows system only until first manual choice.
- */
-export function ThemeToggle({ className }: { className?: string }) {
+function useThemePreference() {
   const [theme, setTheme] = useState<ThemePreference>("light");
+  const [ready, setReady] = useState(false);
 
   useEffect(() => {
     setTheme(resolveTheme());
+    setReady(true);
 
     const onStorage = (e: StorageEvent) => {
       if (e.key !== THEME_STORAGE_KEY || !e.newValue) return;
@@ -46,24 +46,90 @@ export function ThemeToggle({ className }: { className?: string }) {
     };
   }, []);
 
-  function onToggle() {
-    const next: ThemePreference = theme === "dark" ? "light" : "dark";
+  function setPreference(next: ThemePreference) {
     persistTheme(next);
     setTheme(next);
   }
 
+  function toggle() {
+    setPreference(theme === "dark" ? "light" : "dark");
+  }
+
+  return { theme, ready, setPreference, toggle };
+}
+
+/**
+ * Header theme toggle — sun when light is active, moon when dark is active.
+ * Persists to localStorage; syncs across tabs; follows system only until first manual choice.
+ */
+export function ThemeToggle({ className }: { className?: string }) {
+  const { theme, toggle } = useThemePreference();
   const label = theme === "dark" ? "Switch to light mode" : "Switch to dark mode";
 
   return (
     <button
       type="button"
       className={cn("theme-toggle", className)}
-      onClick={onToggle}
+      onClick={toggle}
       aria-label={label}
       title={label}
     >
       <Sun className="theme-toggle__icon theme-toggle__icon--sun h-4 w-4" strokeWidth={1.6} aria-hidden />
       <Moon className="theme-toggle__icon theme-toggle__icon--moon h-4 w-4" strokeWidth={1.6} aria-hidden />
     </button>
+  );
+}
+
+/**
+ * Mobile-menu theme control — a soft Day / Night segment with a sliding gold
+ * thumb. No nested borders; reads as one instrument, not a button inside a pill.
+ */
+export function ThemeSegment({ className }: { className?: string }) {
+  const { theme, ready, setPreference } = useThemePreference();
+  const isDark = theme === "dark";
+
+  return (
+    <div
+      className={cn("flex items-center justify-between gap-4", className)}
+      role="group"
+      aria-label="Appearance"
+    >
+      <span className="font-mono text-[10px] uppercase tracking-[0.18em] text-ink-faint">Theme</span>
+      <div className="relative grid h-11 w-[11.5rem] grid-cols-2 rounded-full bg-ink/[0.06] p-1">
+        {ready ? (
+          <motion.span
+            aria-hidden
+            initial={false}
+            animate={{ x: isDark ? "100%" : "0%" }}
+            transition={{ duration: 0.35, ease: EASE_OUT_EXPO }}
+            className="absolute inset-y-1 left-1 w-[calc(50%-4px)] rounded-full bg-mist shadow-[0_1px_4px_rgb(0_0_0/0.12)] ring-1 ring-ink/10"
+          />
+        ) : null}
+        <button
+          type="button"
+          onClick={() => setPreference("light")}
+          aria-pressed={!isDark}
+          className={cn(
+            "relative z-[1] inline-flex items-center justify-center gap-1.5 rounded-full text-[12px] font-medium tracking-tight transition-colors duration-300",
+            !isDark ? "text-ink" : "text-ink-mute"
+          )}
+        >
+          <Sun className="h-3.5 w-3.5" strokeWidth={1.75} aria-hidden />
+          Day
+        </button>
+        <button
+          type="button"
+          onClick={() => setPreference("dark")}
+          aria-pressed={isDark}
+          className={cn(
+            "relative z-[1] inline-flex items-center justify-center gap-1.5 rounded-full text-[12px] font-medium tracking-tight transition-colors duration-300",
+            isDark ? "text-ink" : "text-ink-mute"
+          )}
+        >
+          <Moon className="h-3.5 w-3.5" strokeWidth={1.75} aria-hidden />
+          Night
+        </button>
+      </div>
+    </div>
   );
 }
