@@ -199,7 +199,7 @@ export function SiteNav({
             "grid w-full max-w-frame grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-6 rounded-full border transition-[height,padding,background-color,box-shadow,backdrop-filter,border-color] duration-500 ease-expo",
             condensed
               ? "glass-strong h-[72px] border-ink/10 px-5 shadow-[0_16px_48px_-28px_rgb(17_17_17/0.35)]"
-              : "h-[92px] border-ink/[0.08] bg-paper/35 px-7 backdrop-blur-md"
+              : "h-[92px] border-ink/10 bg-paper/35 px-7 backdrop-blur-md"
           )}
         >
           {/* Brand */}
@@ -297,7 +297,7 @@ export function SiteNav({
             <Link
               href={CONTACT_HREF}
               data-cursor="Email"
-              className="nav-cta focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold/50 focus-visible:ring-offset-2 focus-visible:ring-offset-paper"
+              className="nav-cta group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold/50 focus-visible:ring-offset-2 focus-visible:ring-offset-paper"
             >
               <span className="relative z-10 transition-colors duration-500 group-hover:text-paper">
                 Contact

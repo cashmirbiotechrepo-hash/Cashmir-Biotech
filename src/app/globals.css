@@ -357,19 +357,19 @@
   }
 
   .theme-toggle {
-    @apply relative flex h-[46px] w-[46px] shrink-0 items-center justify-center rounded-full border border-ink/12 text-ink transition-[background-color,border-color,color] duration-200 hover:border-ink/35 hover:bg-ink/[0.03];
+    @apply relative flex h-[46px] w-[46px] shrink-0 items-center justify-center rounded-full border border-ink/15 text-ink transition-[background-color,border-color,color] duration-200 hover:border-ink/30 hover:bg-ink/5;
   }
 
   .nav-utility {
-    @apply relative flex h-[46px] w-[46px] shrink-0 items-center justify-center rounded-full border border-ink/12 text-ink transition-[background-color,border-color,color] duration-200 hover:border-ink/35 hover:bg-ink/[0.03];
+    @apply relative flex h-[46px] w-[46px] shrink-0 items-center justify-center rounded-full border border-ink/15 text-ink transition-[background-color,border-color,color] duration-200 hover:border-ink/30 hover:bg-ink/5;
   }
 
   .nav-utility-account {
-    @apply inline-flex h-[46px] shrink-0 items-center gap-2 rounded-full border border-ink/12 px-3.5 text-ink transition-[background-color,border-color,color] duration-200 hover:border-ink/35 hover:bg-ink/[0.03];
+    @apply inline-flex h-[46px] shrink-0 items-center gap-2 rounded-full border border-ink/15 px-3.5 text-ink transition-[background-color,border-color,color] duration-200 hover:border-ink/30 hover:bg-ink/5;
   }
 
   .nav-cta {
-    @apply group relative inline-flex h-[46px] shrink-0 items-center overflow-hidden rounded-full border border-ink/20 px-4 font-mono text-[10px] uppercase tracking-[0.12em] text-ink transition-colors hover:border-ink;
+    @apply relative inline-flex h-[46px] shrink-0 items-center overflow-hidden rounded-full border border-ink/20 px-4 font-mono text-[10px] uppercase tracking-[0.12em] text-ink transition-colors hover:border-ink;
   }
 
   .theme-toggle__icon {
