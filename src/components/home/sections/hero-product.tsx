@@ -8,7 +8,6 @@ import {
   useMotionValue,
   useSpring,
   useTransform,
-  type MotionValue,
   type Variants
 } from "framer-motion";
 import { EASE_IN_OUT, EASE_OUT_EXPO } from "@/lib/motion/ease";
@@ -28,14 +27,6 @@ const PRODUCTS = [
   "/products/9.png",
   "/products/10.png",
   "/products/11.png"
-];
-
-type Chip = { label: string; className: string; depth: number };
-
-const CHIPS: Chip[] = [
-  { label: "Compound purity Δ0.03", className: "left-2 top-6 lg:left-0 lg:top-8", depth: 26 },
-  { label: "LC-MS verified batch", className: "right-2 top-[42%] lg:-right-2 lg:top-1/2", depth: 40 },
-  { label: "Alpine origin · Kashmir", className: "bottom-6 left-4 lg:bottom-10 lg:left-6", depth: 32 }
 ];
 
 /**
@@ -59,27 +50,6 @@ const slideVariants: Variants = {
   }
 };
 
-function FloatingChip({
-  chip,
-  mx,
-  my
-}: {
-  chip: Chip;
-  mx: MotionValue<number>;
-  my: MotionValue<number>;
-}) {
-  const x = useTransform(mx, (v) => v * chip.depth);
-  const y = useTransform(my, (v) => v * chip.depth);
-  return (
-    <motion.div
-      style={{ x, y }}
-      className={`glass absolute z-30 hidden rounded-xl px-3 py-2 font-mono text-[10px] uppercase tracking-[0.14em] text-ink-mute lg:block ${chip.className}`}
-    >
-      {chip.label}
-    </motion.div>
-  );
-}
-
 export function HeroProduct({ ready }: { ready: boolean }) {
   const ref = useRef<HTMLDivElement>(null);
   const [index, setIndex] = useState(0);
@@ -90,7 +60,6 @@ export function HeroProduct({ ready }: { ready: boolean }) {
   const mx = useSpring(rawX, { stiffness: 120, damping: 18, mass: 0.6 });
   const my = useSpring(rawY, { stiffness: 120, damping: 18, mass: 0.6 });
 
-  // Product drifts further than the chips for a layered parallax feel.
   const px = useTransform(mx, (v) => v * 55);
   const py = useTransform(my, (v) => v * 55);
   const rotateY = useTransform(mx, [-0.5, 0.5], [10, -10]);
@@ -169,10 +138,6 @@ export function HeroProduct({ ready }: { ready: boolean }) {
           className="absolute -bottom-4 left-1/2 h-6 w-2/3 -translate-x-1/2 rounded-[100%] bg-ink/15 blur-xl"
         />
       </motion.div>
-
-      {CHIPS.map((chip) => (
-        <FloatingChip key={chip.label} chip={chip} mx={mx} my={my} />
-      ))}
     </div>
   );
 }
