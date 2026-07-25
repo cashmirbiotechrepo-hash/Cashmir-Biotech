@@ -178,7 +178,7 @@ export function SiteNav({
         </nav>
       </motion.header>
 
-      {/* ── Desktop header: Brand | Nav | Utilities (+ Contact CTA) ─────── */}
+      {/* ── Desktop header: full bar at top → floating pill on scroll ───── */}
       <motion.header
         initial={{ y: -140, opacity: 0 }}
         animate={
@@ -189,17 +189,17 @@ export function SiteNav({
         transition={{ duration: 0.55, ease: EASE_OUT_EXPO }}
         style={{ willChange: "transform, opacity" }}
         className={cn(
-          "fixed inset-x-0 top-0 z-50 hidden justify-center transition-[padding] duration-500 ease-expo md:flex",
-          condensed ? "px-6 pt-3 lg:px-8" : "px-5 pt-4 lg:px-6"
+          "fixed inset-x-0 top-0 z-50 hidden transition-[padding] duration-500 ease-expo md:flex",
+          condensed ? "justify-center px-6 pt-3 lg:px-8" : "justify-stretch px-0 pt-0"
         )}
       >
         <nav
           aria-label="Primary"
           className={cn(
-            "grid w-full max-w-frame grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-6 rounded-full border transition-[height,padding,background-color,box-shadow,backdrop-filter,border-color] duration-500 ease-expo",
+            "grid w-full grid-cols-[auto_minmax(0,1fr)_auto] items-center transition-[max-width,height,padding,border-radius,background-color,box-shadow,backdrop-filter,border-color] duration-500 ease-expo",
             condensed
-              ? "glass-strong h-[72px] border-ink/10 px-5 shadow-[0_16px_48px_-28px_rgb(17_17_17/0.35)]"
-              : "h-[92px] border-ink/10 bg-paper/35 px-7 backdrop-blur-md"
+              ? "max-w-frame gap-5 rounded-full border border-ink/10 glass-strong h-[72px] px-5 shadow-[0_16px_48px_-28px_rgb(17_17_17/0.35)]"
+              : "max-w-none gap-8 rounded-none border-0 border-b border-ink/10 bg-transparent h-[88px] px-8 lg:px-14 xl:px-16"
           )}
         >
           {/* Brand */}
@@ -213,14 +213,19 @@ export function SiteNav({
                 priority
                 className={cn(
                   "w-auto transition-all duration-500 ease-expo",
-                  condensed ? "h-10" : "h-12"
+                  condensed ? "h-10" : "h-11"
                 )}
               />
             </span>
           </Link>
 
-          {/* Primary navigation — fixed gap, quiet states */}
-          <ul className="flex items-center justify-center gap-8 justify-self-center">
+          {/* Primary navigation */}
+          <ul
+            className={cn(
+              "flex items-center justify-self-center",
+              condensed ? "gap-7" : "gap-9"
+            )}
+          >
             {LINKS.map((link, i) => {
               const active = isActive(pathname, link.href);
               return (
@@ -253,8 +258,13 @@ export function SiteNav({
             })}
           </ul>
 
-          {/* Utilities family + Contact CTA */}
-          <div className="flex items-center justify-self-end gap-2 border-l border-ink/10 pl-4">
+          {/* Utilities + Contact CTA */}
+          <div
+            className={cn(
+              "flex items-center justify-self-end",
+              condensed ? "gap-2 border-l border-ink/10 pl-4" : "gap-2.5"
+            )}
+          >
             <ThemeToggle />
 
             <Link
