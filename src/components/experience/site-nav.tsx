@@ -5,7 +5,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
-import { ShoppingBag, X } from "lucide-react";
+import { ShoppingBag, User, X } from "lucide-react";
 import { EASE_OUT_EXPO } from "@/lib/motion/ease";
 import { useIntro } from "@/components/experience/intro-context";
 import { useCart } from "@/components/shop/cart-context";
@@ -178,7 +178,7 @@ export function SiteNav({
         </nav>
       </motion.header>
 
-      {/* ── Desktop header (unchanged capsule language) ──────────────────── */}
+      {/* ── Desktop header: Brand | Nav | Utilities (+ Contact CTA) ─────── */}
       <motion.header
         initial={{ y: -140, opacity: 0 }}
         animate={
@@ -188,15 +188,22 @@ export function SiteNav({
         }
         transition={{ duration: 0.55, ease: EASE_OUT_EXPO }}
         style={{ willChange: "transform, opacity" }}
-        className="fixed inset-x-0 top-0 z-50 hidden justify-center px-4 pt-4 md:flex"
+        className={cn(
+          "fixed inset-x-0 top-0 z-50 hidden justify-center transition-[padding] duration-500 ease-expo md:flex",
+          condensed ? "px-6 pt-3 lg:px-8" : "px-5 pt-4 lg:px-6"
+        )}
       >
         <nav
+          aria-label="Primary"
           className={cn(
-            "flex w-full max-w-frame items-center justify-between rounded-full px-7 transition-[padding,background-color,box-shadow,backdrop-filter] duration-500 ease-expo",
-            condensed ? "glass-strong py-2.5 shadow-premium" : "py-4"
+            "grid w-full max-w-frame grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-6 rounded-full border transition-[height,padding,background-color,box-shadow,backdrop-filter,border-color] duration-500 ease-expo",
+            condensed
+              ? "glass-strong h-[72px] border-ink/10 px-5 shadow-[0_16px_48px_-28px_rgb(17_17_17/0.35)]"
+              : "h-[92px] border-ink/[0.08] bg-paper/35 px-7 backdrop-blur-md"
           )}
         >
-          <Link href="/" className="flex items-center" aria-label="Cashmir Biotech home">
+          {/* Brand */}
+          <Link href="/" className="flex items-center justify-self-start" aria-label="Cashmir Biotech home">
             <span className="logo-plate">
               <Image
                 src="/logo.png"
@@ -206,13 +213,14 @@ export function SiteNav({
                 priority
                 className={cn(
                   "w-auto transition-all duration-500 ease-expo",
-                  condensed ? "h-9" : "h-11"
+                  condensed ? "h-10" : "h-12"
                 )}
               />
             </span>
           </Link>
 
-          <ul className="flex items-center gap-9">
+          {/* Primary navigation — fixed gap, quiet states */}
+          <ul className="flex items-center justify-center gap-8 justify-self-center">
             {LINKS.map((link, i) => {
               const active = isActive(pathname, link.href);
               return (
@@ -227,8 +235,8 @@ export function SiteNav({
                       data-cursor="View"
                       aria-current={active ? "page" : undefined}
                       className={cn(
-                        "group relative font-mono text-[11px] uppercase tracking-[0.16em] transition-colors hover:text-ink",
-                        active ? "text-ink" : "text-ink-mute"
+                        "group relative bg-transparent font-mono text-[11px] font-medium uppercase tracking-[0.12em] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold/50 focus-visible:ring-offset-2 focus-visible:ring-offset-paper",
+                        active ? "text-ink" : "text-ink-mute hover:text-ink"
                       )}
                     >
                       {link.label}
@@ -245,43 +253,51 @@ export function SiteNav({
             })}
           </ul>
 
-          <div className="flex items-center gap-3.5">
+          {/* Utilities family + Contact CTA */}
+          <div className="flex items-center justify-self-end gap-2 border-l border-ink/10 pl-4">
             <ThemeToggle />
+
             <Link
               href={accountHref}
               data-cursor={accountCursor}
               aria-label={customer ? "Account" : "Sign in"}
-              className="inline-flex items-center gap-2 font-mono text-[11px] uppercase tracking-[0.16em] text-ink-mute transition-colors hover:text-ink"
+              className="nav-utility-account focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold/50 focus-visible:ring-offset-2 focus-visible:ring-offset-paper"
             >
               {accountInitials ? (
                 <span
-                  className="grid h-8 w-8 place-items-center rounded-full border border-ink/15 bg-ink text-[10px] font-medium tracking-normal text-paper"
+                  className="grid h-6 w-6 place-items-center rounded-full bg-ink text-[9px] font-medium tracking-normal text-paper"
                   aria-hidden
                 >
                   {accountInitials}
                 </span>
-              ) : null}
-              <span>{accountLabel}</span>
+              ) : (
+                <User className="h-4 w-4 shrink-0" strokeWidth={1.6} aria-hidden />
+              )}
+              <span className="font-mono text-[10px] uppercase tracking-[0.12em] text-ink-mute">
+                {accountLabel}
+              </span>
             </Link>
+
             <Link
               href="/cart"
               data-cursor="Cart"
               aria-label={
                 cartReady && count > 0 ? `Cart, ${count} item${count === 1 ? "" : "s"}` : "Cart"
               }
-              className="relative flex h-10 w-10 items-center justify-center rounded-full border border-ink/15 text-ink transition-colors hover:border-ink"
+              className="nav-utility focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold/50 focus-visible:ring-offset-2 focus-visible:ring-offset-paper"
             >
               <ShoppingBag className="h-4 w-4" strokeWidth={1.6} />
               {cartReady && count > 0 ? (
-                <span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-gold px-1 font-mono text-[9px] font-semibold text-ink">
+                <span className="absolute -right-0.5 -top-0.5 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-gold/90 px-1 font-mono text-[9px] font-semibold leading-none text-ink">
                   {count > 99 ? "99+" : count}
                 </span>
               ) : null}
             </Link>
+
             <Link
               href={CONTACT_HREF}
               data-cursor="Email"
-              className="group relative inline-flex items-center gap-2 overflow-hidden rounded-full border border-ink/15 px-5 py-2.5 font-mono text-[11px] uppercase tracking-[0.16em] text-ink transition-colors hover:border-ink"
+              className="nav-cta focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold/50 focus-visible:ring-offset-2 focus-visible:ring-offset-paper"
             >
               <span className="relative z-10 transition-colors duration-500 group-hover:text-paper">
                 Contact
