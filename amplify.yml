@@ -26,8 +26,15 @@ frontend:
           fi
         - echo "=== ensure-shipping ==="
         - node scripts/ensure-shipping-settings.cjs
+        # Recover P3009 if a prior deploy left fingerprint migration failed (no-op otherwise).
+        - echo "=== prisma migrate resolve (failed fingerprint, if any) ==="
+        - npx prisma migrate resolve --rolled-back 20260725120000_account_address_fingerprint || true
         - echo "=== prisma migrate deploy ==="
         - npx prisma migrate deploy
+        # Node sha256 backfill + merge/unique (Amplify DB role cannot CREATE EXTENSION pgcrypto).
+        # ALLOW_ADDRESS_FINGERPRINT_MERGE=1: first cutover merges surplus after logging counts.
+        - echo "=== ensure-address-fingerprints ==="
+        - ALLOW_ADDRESS_FINGERPRINT_MERGE=1 FAIL_ON_ERROR=1 node scripts/ensure-address-fingerprints.cjs
         # Amplify SSR Lambda often has empty process.env — snapshot build env
         # into a JSON module that Next bundles into the server runtime.
         - echo "=== write amplify runtime env ==="

@@ -115,12 +115,16 @@ describe("§8.4 automated — phone / nav / sync / marketing", () => {
       ),
       "utf8"
     );
-    expect(backfill).toMatch(/OPERATIONAL GATE/);
-    expect(backfill).not.toMatch(/DELETE FROM "CustomerAddress"/);
-    expect(backfill).not.toMatch(/UNIQUE INDEX.*fingerprint/i);
-    expect(merge).toMatch(/GATE/);
-    expect(merge).toMatch(/DELETE FROM "CustomerAddress"/);
-    expect(merge).toMatch(/UNIQUE INDEX.*fingerprint/i);
+    const ensure = readFileSync(
+      path.join(process.cwd(), "scripts/ensure-address-fingerprints.cjs"),
+      "utf8"
+    );
+    expect(backfill).not.toMatch(/^CREATE EXTENSION/m);
+    expect(backfill).not.toMatch(/\bdigest\s*\(/);
+    expect(backfill).toMatch(/fingerprint/);
+    expect(merge).toMatch(/ensure-address-fingerprints/);
+    expect(ensure).toMatch(/createHash\("sha256"\)/);
+    expect(ensure).toMatch(/ALLOW_ADDRESS_FINGERPRINT_MERGE/);
   });
 
   it("overview does not link guest orders on every read", () => {

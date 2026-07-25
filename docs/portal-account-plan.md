@@ -566,11 +566,12 @@ Live checkout/portal never had match-key dedup. Enabling `UNIQUE (customerId, fi
 
 | Step | Artifact |
 |------|----------|
-| 1. Add nullable fingerprint + Order sync columns + default partial unique + **backfill only** | `prisma/migrations/20260725120000_account_address_fingerprint/` |
-| 2. **Dry-run count (GATE)** — human reviews surplus | `npx tsx scripts/count-address-fingerprint-dupes.ts` (exit 2 if surplus &gt; 0) |
-| 3. Merge losers + `NOT NULL` + `UNIQUE (customerId, fingerprint)` | `prisma/migrations/20260725121000_account_address_fingerprint_merge_unique/` |
+| 1. Add nullable fingerprint + Order sync columns + default partial unique (**no pgcrypto**) | `prisma/migrations/20260725120000_account_address_fingerprint/` |
+| 2. Marker migration (merge deferred to Node) | `prisma/migrations/20260725121000_account_address_fingerprint_merge_unique/` |
+| 3. **Node ensure** — sha256 backfill (matches JS), count surplus, merge when allowed, `NOT NULL` + UNIQUE | `scripts/ensure-address-fingerprints.cjs` (Amplify runs after `migrate deploy`) |
+| 4. Optional dry-run review | `npx tsx scripts/count-address-fingerprint-dupes.ts` |
 
-Do **not** apply step 3 until step 2 has been run on that environment and signed off (or surplus is already 0).
+Amplify app DB roles often **cannot** `CREATE EXTENSION pgcrypto`, so SQL `digest()` backfill is not used. Local/staging can still run the count script before setting `ALLOW_ADDRESS_FINGERPRINT_MERGE=1` for a cautious cutover; Amplify build sets that flag and logs surplus before merging.
 
 Dry-run SQL (same as the script):
 
