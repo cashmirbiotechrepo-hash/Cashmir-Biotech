@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { CheckoutView } from "@/components/shop/checkout-view";
 import { getCurrentCustomer } from "@/lib/customer/auth";
-import { getCustomerAddresses } from "@/lib/customer/portal";
+import { getCustomerAddresses, getCustomerSecurityProfile } from "@/lib/customer/portal";
 import { getShippingRates } from "@/modules/shop/services/order.service";
 
 export const metadata: Metadata = {
@@ -12,15 +12,19 @@ export const metadata: Metadata = {
 
 export default async function CheckoutPage() {
   const customer = await getCurrentCustomer();
-  const [addresses, rates] = await Promise.all([
+  const [addresses, rates, profile] = await Promise.all([
     customer ? getCustomerAddresses(customer.id) : Promise.resolve([]),
-    getShippingRates()
+    getShippingRates(),
+    customer ? getCustomerSecurityProfile(customer.id) : Promise.resolve(null)
   ]);
 
   return (
     <div>
       <CheckoutView
+        loggedIn={Boolean(customer)}
         prefillEmail={customer?.email ?? ""}
+        prefillName={profile?.name ?? customer?.name ?? ""}
+        prefillPhone={profile?.phone ?? ""}
         flatShippingInr={rates.flatShippingInr}
         freeShippingThresholdInr={rates.freeShippingThresholdInr}
         savedAddresses={addresses.map((a) => ({

@@ -178,6 +178,14 @@ export async function notifyCustomerShipped(orderId: string) {
   });
   if (!order?.customerEmail) return false;
 
+  if (order.customerId) {
+    const prefs = await db.customer.findUnique({
+      where: { id: order.customerId },
+      select: { notifyOrderUpdates: true }
+    });
+    if (prefs && prefs.notifyOrderUpdates === false) return false;
+  }
+
   const { buildOrderShippedMail } = await import("@/lib/email/transactional");
   const { sendTransactionalMail } = await import("@/lib/admin/mail");
 

@@ -70,6 +70,7 @@ model Product {
   certificates         CertificateOfAnalysis[]
   customFields         ProductCustomField[]
   patent               Patent?              @relation(fields: [patentId], references: [id], onDelete: SetNull)
+  wishlistItems        CustomerWishlistItem[]
 
   @@index([patentId])
   @@unique([sku])
@@ -223,6 +224,14 @@ model Order {
   customerId      String?
   /// Opaque secret required to view public confirmation / invoice pages.
   confirmationToken String    @default("")
+  /// Consent: persist shipping address to CustomerAddress after payment (logged-in / claimed).
+  saveAddressToAccount Boolean @default(false)
+  /// Label to apply when saveAddressToAccount is true (Home / Work / custom).
+  accountAddressLabel  String  @default("Home")
+  /// Checkout chip id when user started from a saved address (server re-validates match).
+  selectedAddressId    String?
+  /// Set when account sync (profile + optional address) completed successfully.
+  accountSyncedAt      DateTime?
   createdAt       DateTime    @default(now())
   updatedAt       DateTime    @updatedAt
   items           OrderItem[]
@@ -674,6 +683,12 @@ model Customer {
   active              Boolean            @default(true)
   failedLoginAttempts Int                @default(0)
   lockedUntil         DateTime?
+  /// §6.8 — set when user dismisses guest address claim banner.
+  addressClaimPromptDismissedAt DateTime?
+  /// Transactional order emails (confirmation, shipped).
+  notifyOrderUpdates  Boolean            @default(true)
+  /// Marketing / Circle alerts (no sender yet — prefs persist for future).
+  notifyMarketing     Boolean            @default(false)
   createdAt           DateTime           @default(now())
   updatedAt           DateTime           @updatedAt
   orders              Order[]
@@ -683,6 +698,7 @@ model Customer {
   supportTickets      SupportTicket[]
   organizationMembers OrganizationMember[]
   circleSubscriptions ResearchCircleSubscription[]
+  wishlistItems       CustomerWishlistItem[]
 }
 
 /// Research Circle membership plan (annual / multi-month).
@@ -737,6 +753,18 @@ model SupportTicket {
   @@index([status, createdAt])
 }
 
+model CustomerWishlistItem {
+  id         String   @id @default(cuid())
+  customerId String
+  customer   Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  productId  String
+  product    Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  createdAt  DateTime @default(now())
+
+  @@unique([customerId, productId])
+  @@index([customerId, createdAt])
+}
+
 model CustomerSession {
   id            String                 @id @default(cuid())
   customerId    String
@@ -779,22 +807,30 @@ model CustomerOtp {
   @@index([email, purpose])
 }
 
+/// Address book row. Match-key dedup via @@unique([customerId, fingerprint]).
+/// ALSO enforced (manual SQL, Prisma cannot express partial unique): 
+///   CREATE UNIQUE INDEX "CustomerAddress_customerId_isDefault_uidx"
+///   ON "CustomerAddress" ("customerId") WHERE "isDefault" = true;
+/// Do not drop that index in a future migrate diff — preserve it.
 model CustomerAddress {
-  id         String   @id @default(cuid())
-  customerId String
-  customer   Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
-  label      String   @default("Home")
-  fullName   String   @default("")
-  phone      String   @default("")
-  line1      String
-  line2      String   @default("")
-  city       String
-  state      String
-  postalCode String
-  country    String   @default("India")
-  isDefault  Boolean  @default(false)
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+  id          String   @id @default(cuid())
+  customerId  String
+  customer    Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  label       String   @default("Home")
+  fullName    String   @default("")
+  phone       String   @default("")
+  line1       String
+  line2       String   @default("")
+  city        String
+  state       String
+  postalCode  String
+  country     String   @default("India")
+  isDefault   Boolean  @default(false)
+  /// SHA-256 of normalized match-key fields; UNIQUE with customerId after dedupe migration.
+  fingerprint String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
+  @@unique([customerId, fingerprint])
   @@index([customerId])
 }

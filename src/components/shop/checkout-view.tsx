@@ -20,6 +20,8 @@ import {
 } from "lucide-react";
 import { useCart } from "@/components/shop/cart-context";
 import { EASE_OUT_EXPO } from "@/lib/motion/ease";
+import { parseIndianMobile } from "@/lib/customer/phone-in";
+import { addressesMatch } from "@/lib/customer/address-match";
 import { cn } from "@/lib/utils";
 
 const inr = new Intl.NumberFormat("en-IN", {
@@ -163,9 +165,8 @@ function validateField(key: FieldKey, form: FormState): string | undefined {
     case "email":
       return !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v) ? "Enter a valid email" : undefined;
     case "phone": {
-      const digits = v.replace(/\D/g, "");
-      if (digits.length < 10) return "Enter a 10-digit mobile number";
-      return undefined;
+      const parsed = parseIndianMobile(v);
+      return parsed.ok ? undefined : parsed.error;
     }
     case "line1":
       return v.length < 3 ? "Enter your street address" : undefined;
@@ -229,12 +230,18 @@ export type SavedCheckoutAddress = {
 
 export function CheckoutView({
   savedAddresses = [],
+  loggedIn = false,
   prefillEmail = "",
+  prefillName = "",
+  prefillPhone = "",
   flatShippingInr = 60,
   freeShippingThresholdInr = 999
 }: {
   savedAddresses?: SavedCheckoutAddress[];
+  loggedIn?: boolean;
   prefillEmail?: string;
+  prefillName?: string;
+  prefillPhone?: string;
   flatShippingInr?: number;
   freeShippingThresholdInr?: number;
 }) {
@@ -248,7 +255,9 @@ export function CheckoutView({
   const [quote, setQuote] = useState<ServerCartQuote | null>(null);
   const [form, setForm] = useState<FormState>(() => ({
     ...EMPTY,
-    email: prefillEmail
+    email: prefillEmail,
+    fullName: prefillName,
+    phone: prefillPhone
   }));
   const [touched, setTouched] = useState<Partial<Record<FieldKey, boolean>>>({});
   const [attempted, setAttempted] = useState(false);
@@ -256,8 +265,22 @@ export function CheckoutView({
   const [error, setError] = useState<string | null>(null);
   const [pinStatus, setPinStatus] = useState<"idle" | "loading" | "ok" | "miss">("idle");
   const [openStep, setOpenStep] = useState<StepId>("contact");
+  const isLoggedIn = loggedIn;
+  const [saveAddress, setSaveAddress] = useState(true);
+  const [labelPreset, setLabelPreset] = useState<"Home" | "Work" | "Other">("Home");
+  const [labelCustom, setLabelCustom] = useState("");
+  const [selectedAddressId, setSelectedAddressId] = useState<string | null>(null);
+  const selectedSnapshotRef = useRef<SavedCheckoutAddress | null>(null);
 
   const shipsBy = useMemo(() => shipsByLabel(), []);
+
+  useEffect(() => {
+    if (!selectedAddressId || !selectedSnapshotRef.current) return;
+    if (!addressesMatch(form, selectedSnapshotRef.current)) {
+      setSelectedAddressId(null);
+      selectedSnapshotRef.current = null;
+    }
+  }, [form, selectedAddressId]);
 
   useEffect(() => {
     mountedRef.current = true;
@@ -416,6 +439,16 @@ export function CheckoutView({
     setError(null);
 
     try {
+      const addressLabel =
+        labelPreset === "Other" ? labelCustom.trim() : labelPreset;
+      if (isLoggedIn && saveAddress && labelPreset === "Other" && !labelCustom.trim()) {
+        setError("Enter a custom label for “Other”, or pick Home / Work.");
+        setSubmitting(false);
+        submitLockRef.current = false;
+        setOpenStep("delivery");
+        return;
+      }
+
       const res = await fetch("/api/checkout", {
         method: "POST",
         headers: {
@@ -424,7 +457,10 @@ export function CheckoutView({
         },
         body: JSON.stringify({
           items: items.map((i) => ({ productId: i.productId, quantity: i.quantity })),
-          address: form
+          address: form,
+          saveAddress: isLoggedIn ? saveAddress : false,
+          addressLabel: addressLabel || "Home",
+          selectedAddressId: isLoggedIn ? selectedAddressId : null
         })
       });
       const data = await res.json();
@@ -682,6 +718,14 @@ export function CheckoutView({
                         key={a.id}
                         type="button"
                         onClick={() => {
+                          selectedSnapshotRef.current = a;
+                          setSelectedAddressId(a.id);
+                          setLabelPreset(
+                            a.label === "Home" || a.label === "Work" ? a.label : "Other"
+                          );
+                          setLabelCustom(
+                            a.label === "Home" || a.label === "Work" ? "" : a.label
+                          );
                           setForm((f) => ({
                             ...f,
                             fullName: a.fullName || f.fullName,
@@ -704,7 +748,12 @@ export function CheckoutView({
                             country: true
                           }));
                         }}
-                        className="border border-ink/12 bg-ivory px-3 py-2 text-left text-[12px] text-ink active:bg-pearl"
+                        className={cn(
+                          "border px-3 py-2 text-left text-[12px] text-ink active:bg-pearl",
+                          selectedAddressId === a.id
+                            ? "border-ink bg-ivory"
+                            : "border-ink/12 bg-ivory"
+                        )}
                       >
                         <span className="font-medium">{a.label}</span>
                         {a.isDefault ? <span className="ml-1 text-gold">default</span> : null}
@@ -714,6 +763,87 @@ export function CheckoutView({
                       </button>
                     ))}
                   </div>
+                  {selectedAddressId ? (
+                    <div className="flex flex-wrap items-center gap-3 pt-1 text-[12px]">
+                      <p className="text-ink-mute">
+                        Using:{" "}
+                        <span className="font-medium text-ink">
+                          {savedAddresses.find((x) => x.id === selectedAddressId)?.label ?? "Saved"}
+                        </span>
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSelectedAddressId(null);
+                          selectedSnapshotRef.current = null;
+                          setForm((f) => ({
+                            ...f,
+                            line1: "",
+                            line2: "",
+                            city: "",
+                            state: "",
+                            postalCode: "",
+                            country: "India"
+                          }));
+                        }}
+                        className="text-ink underline-offset-4 hover:underline"
+                      >
+                        Use a different address
+                      </button>
+                    </div>
+                  ) : null}
+                </div>
+              ) : null}
+
+              {isLoggedIn ? (
+                <div className="mb-4 space-y-3 border border-ink/10 bg-pearl/40 p-3">
+                  <label className="flex items-start gap-2.5 text-[13px] text-ink">
+                    <input
+                      type="checkbox"
+                      checked={saveAddress}
+                      onChange={(e) => setSaveAddress(e.target.checked)}
+                      className="mt-0.5 rounded border-ink/20"
+                    />
+                    <span>
+                      Save this address to my account
+                      <span className="mt-0.5 block text-[12px] text-ink-mute">
+                        We’ll keep your name and phone on your account for future orders.
+                      </span>
+                    </span>
+                  </label>
+                  {saveAddress ? (
+                    <div className="space-y-2 pl-6">
+                      <p className="text-[11px] font-medium uppercase tracking-[0.12em] text-ink-faint">
+                        Label
+                      </p>
+                      <div className="flex flex-wrap gap-2">
+                        {(["Home", "Work", "Other"] as const).map((p) => (
+                          <button
+                            key={p}
+                            type="button"
+                            onClick={() => setLabelPreset(p)}
+                            className={cn(
+                              "rounded-full px-3 py-1 text-[12px]",
+                              labelPreset === p
+                                ? "bg-ink text-paper"
+                                : "border border-ink/15 text-ink-mute"
+                            )}
+                          >
+                            {p}
+                          </button>
+                        ))}
+                      </div>
+                      {labelPreset === "Other" ? (
+                        <input
+                          value={labelCustom}
+                          onChange={(e) => setLabelCustom(e.target.value)}
+                          placeholder="e.g. Mom’s house"
+                          maxLength={40}
+                          className="w-full border border-ink/15 bg-ivory px-3 py-2 text-[13px] outline-none ring-gold/30 focus:ring-2"
+                        />
+                      ) : null}
+                    </div>
+                  ) : null}
                 </div>
               ) : null}
 

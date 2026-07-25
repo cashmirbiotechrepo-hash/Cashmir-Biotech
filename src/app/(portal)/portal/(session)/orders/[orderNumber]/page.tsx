@@ -2,10 +2,13 @@ import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { Download, Package } from "lucide-react";
+import { Download, ExternalLink, Package } from "lucide-react";
 import { requireCustomerSession } from "@/lib/customer/auth";
 import { getCustomerOrderDetail } from "@/lib/customer/portal";
 import { PORTAL_STATUS_LABEL, toCustomerTimeline } from "@/lib/customer/portal-ui";
+import { trackingHref } from "@/lib/shipping/tracking-url";
+import { getOrderCoaLines } from "@/lib/customer/portal-extras";
+import { BuyAgainButton } from "@/components/portal/buy-again-button";
 import { cn } from "@/lib/utils";
 
 export const metadata: Metadata = {
@@ -37,6 +40,11 @@ function pipelineIndex(status: string): number {
   }
 }
 
+function priceInrFromProduct(p: { pricePaise: number | null; mrpInr: number }) {
+  if (p.pricePaise && p.pricePaise > 0) return Math.round(p.pricePaise / 100);
+  return p.mrpInr;
+}
+
 export default async function PortalOrderDetailPage({
   params
 }: {
@@ -46,6 +54,7 @@ export default async function PortalOrderDetailPage({
   const { orderNumber } = await params;
   const detail = await getCustomerOrderDetail(session.id, orderNumber);
   if (!detail) notFound();
+  const coaLines = (await getOrderCoaLines(session.id, orderNumber)) ?? [];
 
   const { order, timeline } = detail;
   const activeIdx = pipelineIndex(order.status);
@@ -54,6 +63,29 @@ export default async function PortalOrderDetailPage({
     order.items.length === 1
       ? order.items[0]!.productName
       : `${order.items[0]?.productName ?? "Order"} +${order.items.length - 1}`;
+
+  const trackUrl = trackingHref(order.carrier, order.trackingNumber);
+  const canCancelRequest = ["pending", "paid", "processing"].includes(order.status);
+  const canReturnRequest = ["shipped", "delivered"].includes(order.status);
+
+  const buyAgainFixed = order.items
+    .filter((item) => item.product?.id)
+    .map((item) => {
+      const p = item.product!;
+      const maxCap = p.maxOrderQty ?? 20;
+      const maxQty = Math.max(1, Math.min(maxCap, 20));
+      return {
+        productId: p.id,
+        slug: p.slug,
+        name: p.name || item.productName,
+        sizeLabel: p.sizeLabel || "",
+        priceInr: priceInrFromProduct(p),
+        imageUrl: p.imageUrl || "",
+        quantity: Math.min(Math.max(1, item.quantity), maxQty),
+        maxQty,
+        available: Boolean(p.active && p.slug)
+      };
+    });
 
   return (
     <div className="mx-auto max-w-2xl space-y-6">
@@ -92,6 +124,39 @@ export default async function PortalOrderDetailPage({
           <p className="mt-3 border border-ink/10 bg-pearl/60 px-3 py-2 text-[13px] text-ink-mute" role="status">
             Refunded so far: {inr.format(order.refundedCents / 100)}
           </p>
+        ) : null}
+      </div>
+
+      {/* Invoice / track above the fold on mobile (§6.11) */}
+      <div className="grid gap-2 sm:grid-cols-2">
+        {order.invoices[0]?.pdfUrl ? (
+          <a
+            href={order.invoices[0].pdfUrl}
+            className="inline-flex min-h-11 items-center justify-center gap-2 border border-ink/12 bg-paper text-[13px] font-medium text-ink"
+          >
+            <Download className="h-4 w-4" />
+            Download invoice
+          </a>
+        ) : null}
+        {order.trackingNumber ? (
+          trackUrl ? (
+            <a
+              href={trackUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex min-h-11 items-center justify-center gap-2 bg-ink text-[13px] font-medium text-paper"
+            >
+              Track package
+              <ExternalLink className="h-3.5 w-3.5" />
+            </a>
+          ) : (
+            <div className="inline-flex min-h-11 flex-col items-center justify-center border border-ink/12 bg-paper px-3 text-center text-[12px] text-ink-mute">
+              <span className="font-medium text-ink">
+                {order.carrier ? `${order.carrier} · ` : ""}
+                {order.trackingNumber}
+              </span>
+            </div>
+          )
         ) : null}
       </div>
 
@@ -136,29 +201,29 @@ export default async function PortalOrderDetailPage({
       </section>
 
       <div className="grid gap-2 sm:grid-cols-2">
-        {order.invoices[0]?.pdfUrl ? (
-          <a
-            href={order.invoices[0].pdfUrl}
-            className="inline-flex min-h-11 items-center justify-center gap-2 border border-ink/12 bg-paper text-[13px] font-medium text-ink"
+        <BuyAgainButton lines={buyAgainFixed} />
+        {canCancelRequest ? (
+          <Link
+            href={`/portal/support?order=${encodeURIComponent(order.orderNumber)}&intent=cancel`}
+            className="inline-flex min-h-11 items-center justify-center border border-ink/12 bg-paper text-[13px] font-medium text-ink"
           >
-            <Download className="h-4 w-4" />
-            Download invoice
-          </a>
+            Request cancel
+          </Link>
+        ) : null}
+        {canReturnRequest ? (
+          <Link
+            href={`/portal/support?order=${encodeURIComponent(order.orderNumber)}&intent=return`}
+            className="inline-flex min-h-11 items-center justify-center border border-ink/12 bg-paper text-[13px] font-medium text-ink"
+          >
+            Request return
+          </Link>
         ) : null}
         <Link
-          href="/portal/support"
+          href={`/portal/support?order=${encodeURIComponent(order.orderNumber)}`}
           className="inline-flex min-h-11 items-center justify-center border border-ink/12 bg-paper text-[13px] font-medium text-ink"
         >
           Contact support
         </Link>
-        {order.items[0]?.product?.slug ? (
-          <Link
-            href={`/products/${order.items[0].product.slug}`}
-            className="inline-flex min-h-11 items-center justify-center bg-ink text-[13px] font-medium text-paper sm:col-span-2"
-          >
-            Reorder
-          </Link>
-        ) : null}
       </div>
 
       <section>
@@ -178,10 +243,20 @@ export default async function PortalOrderDetailPage({
                 ) : null}
               </div>
               <div className="min-w-0 flex-1">
-                <p className="text-[14px] font-medium text-ink">{item.productName}</p>
+                {item.product?.slug ? (
+                  <Link
+                    href={`/products/${item.product.slug}`}
+                    className="text-[14px] font-medium text-ink hover:underline"
+                  >
+                    {item.productName}
+                  </Link>
+                ) : (
+                  <p className="text-[14px] font-medium text-ink">{item.productName}</p>
+                )}
                 <p className="mt-0.5 text-[12px] text-ink-mute">
                   Qty {item.quantity}
                   {item.product?.sizeLabel ? ` · ${item.product.sizeLabel}` : ""}
+                  {item.lotCodes ? ` · Lot ${item.lotCodes}` : ""}
                 </p>
               </div>
               <p className="text-[13px] tabular-nums text-ink">
@@ -191,6 +266,44 @@ export default async function PortalOrderDetailPage({
           ))}
         </ul>
       </section>
+
+      {coaLines.length > 0 ? (
+        <section>
+          <h2 className="mb-2 text-[13px] font-medium text-ink-mute">Certificates of Analysis</h2>
+          <ul className="space-y-2 border border-ink/10 bg-paper p-3">
+            {coaLines.map((line) => (
+              <li key={line.productId} className="text-[13px]">
+                <p className="font-medium text-ink">{line.productName}</p>
+                {line.lotCodes.length > 0 ? (
+                  <p className="text-[12px] text-ink-mute">Lot {line.lotCodes.join(", ")}</p>
+                ) : (
+                  <p className="text-[12px] text-ink-mute">Lot assigned at shipment</p>
+                )}
+                {line.certificates.length > 0 ? (
+                  <div className="mt-1.5 flex flex-wrap gap-2">
+                    {line.certificates.map((c) => (
+                      <a
+                        key={c.id}
+                        href={c.fileUrl}
+                        className="inline-flex min-h-9 items-center border border-ink/12 px-3 text-[12px] font-medium text-ink"
+                      >
+                        Download · {c.lotCode}
+                      </a>
+                    ))}
+                  </div>
+                ) : (
+                  <Link
+                    href={`/portal/support?order=${encodeURIComponent(order.orderNumber)}&intent=coa`}
+                    className="mt-1.5 inline-flex min-h-9 items-center text-[12px] font-medium text-ink underline-offset-4 hover:underline"
+                  >
+                    Request CoA
+                  </Link>
+                )}
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
 
       {customerEvents.length > 0 ? (
         <section>

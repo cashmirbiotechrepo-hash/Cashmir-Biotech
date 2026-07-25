@@ -9,6 +9,8 @@ import {
 } from "@/modules/shop/services/order.service";
 import { createRazorpayOrder, razorpayConfigured, razorpayPublicKey } from "@/lib/payments/razorpay";
 import { requireJsonContent } from "@/lib/api-utils";
+import { getCurrentCustomer } from "@/lib/customer/auth";
+import { parseIndianMobile } from "@/lib/customer/phone-in";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -24,6 +26,9 @@ const checkoutSchema = z.object({
     .min(1)
     .max(50),
   couponCode: z.string().optional().nullable(),
+  saveAddress: z.boolean().optional().default(false),
+  addressLabel: z.string().trim().min(1).max(40).optional().default("Home"),
+  selectedAddressId: z.string().cuid().optional().nullable(),
   address: z.object({
     fullName: z.string().min(2).max(120),
     email: z.string().email(),
@@ -184,6 +189,24 @@ export async function POST(request: Request) {
     if (existingResponse) return existingResponse;
   }
 
+  const phone = parseIndianMobile(parsed.data.address.phone);
+  if (!phone.ok) {
+    return NextResponse.json({ ok: false, error: phone.error }, { status: 422 });
+  }
+
+  const sessionCustomer = await getCurrentCustomer().catch(() => null);
+  const saveAddress = Boolean(sessionCustomer && parsed.data.saveAddress);
+  let selectedAddressId: string | null = parsed.data.selectedAddressId ?? null;
+  if (selectedAddressId && sessionCustomer) {
+    const owned = await db.customerAddress.findFirst({
+      where: { id: selectedAddressId, customerId: sessionCustomer.id },
+      select: { id: true }
+    });
+    if (!owned) selectedAddressId = null;
+  } else {
+    selectedAddressId = null;
+  }
+
   const priced = await priceCart(parsed.data.items, parsed.data.couponCode ?? undefined);
   if (!priced.ok) {
     return NextResponse.json({ ok: false, error: priced.error }, { status: 409 });
@@ -191,8 +214,12 @@ export async function POST(request: Request) {
 
   const created = await createPendingOrder({
     cart: priced.cart,
-    address: parsed.data.address,
-    idempotencyKey
+    address: { ...parsed.data.address, phone: phone.digits },
+    idempotencyKey,
+    customerId: sessionCustomer?.id ?? null,
+    saveAddressToAccount: saveAddress,
+    accountAddressLabel: parsed.data.addressLabel || "Home",
+    selectedAddressId
   });
   if (!created.ok) {
     if (idempotencyKey) {

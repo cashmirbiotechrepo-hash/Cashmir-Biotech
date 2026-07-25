@@ -1,4 +1,5 @@
 import { requireCustomerSession } from "@/lib/customer/auth";
+import Link from "next/link";
 import { listOrgMembershipsForCustomer } from "@/modules/shop/services/org-invite.service";
 import { inviteOrgMemberAction, type ActionMsg } from "@/app/(portal)/portal/(session)/org-circle-actions";
 import { OrgInviteForm } from "@/components/portal/org-invite-form";
@@ -27,10 +28,18 @@ export default async function PortalOrganizationPage({
       </div>
 
       {memberships.length === 0 ? (
-        <p className="text-sm text-muted-foreground">
-          You are not on an organisation yet. Ask an admin to invite {session.email}, or have ops create one
-          under Admin → B2B.
-        </p>
+        <div className="border border-dashed border-ink/15 bg-paper/60 px-4 py-8 text-center">
+          <p className="text-[15px] text-ink">No organisation yet</p>
+          <p className="mt-1 text-[13px] text-ink-mute">
+            Ask a lab admin to invite {session.email}, or contact support for B2B setup.
+          </p>
+          <Link
+            href="/portal/support?intent=question"
+            className="mt-5 inline-flex min-h-11 items-center justify-center bg-ink px-6 text-[13px] font-medium text-paper"
+          >
+            Contact support
+          </Link>
+        </div>
       ) : (
         memberships.map((m) => {
           const canInvite = m.role === "admin" || m.role === "owner";

@@ -33,6 +33,9 @@ import { ShopProductCard } from "@/components/shop/shop-product-card";
 import { Reveal } from "@/components/ui/reveal";
 import { sellingInrFromPaise } from "@/lib/pricing";
 import { getStockStatus } from "@/lib/pricing";
+import { getCurrentCustomer } from "@/lib/customer/auth";
+import { isProductWishlisted } from "@/lib/customer/wishlist";
+import { WishlistToggle } from "@/components/shop/wishlist-toggle";
 
 export const revalidate = 300;
 
@@ -122,7 +125,7 @@ const COMPARISON = [
 
 export default async function ProductDetailPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
-  const [product, patents, rates, allProducts] = await Promise.all([
+  const [product, patents, rates, allProducts, customer] = await Promise.all([
     getActiveProductBySlug(slug),
     listPatents().catch(() => []),
     getShippingRates().catch(() => ({
@@ -131,11 +134,15 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
       freeThresholdCents: 99900,
       flatShippingCents: 6000
     })),
-    listActiveProducts().catch(() => [])
+    listActiveProducts().catch(() => []),
+    getCurrentCustomer().catch(() => null)
   ]);
   if (!product) notFound();
 
   const availability = await getProductAvailability(product);
+  const wishlisted = customer
+    ? await isProductWishlisted(customer.id, product.id).catch(() => false)
+    : false;
   const inStock = availability.available > 0;
   const patent = product.patent;
   const sellingInr = sellingInrFromPaise(product.pricePaise, product.mrpInr);
@@ -296,6 +303,14 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
               available={availability.available}
               priceLabel={priceLabel}
               product={cartProduct}
+            />
+
+            <WishlistToggle
+              className="mt-3 w-full"
+              productId={product.id}
+              initialWishlisted={wishlisted}
+              loggedIn={Boolean(customer)}
+              loginHref={`/portal/login?next=${encodeURIComponent(`/products/${product.slug}`)}`}
             />
 
             <p className="mt-4 text-[12px] text-ink-mute">

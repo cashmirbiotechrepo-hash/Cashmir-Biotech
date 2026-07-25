@@ -51,10 +51,7 @@ export async function getPortalOverview(customerId: string, opts?: PaginationOpt
   });
   if (!customer) return null;
 
-  if (customer.emailVerifiedAt) {
-    const { linkGuestOrdersToCustomer } = await import("@/lib/customer/auth");
-    await linkGuestOrdersToCustomer(customer.id, customer.email);
-  }
+  // Guest-order linking runs on OTP verify success (auth.verifyCustomerOtp), not on every overview read.
 
   const { skip, take, page, pageSize } = normalizePagination(opts);
 
@@ -180,9 +177,16 @@ export async function getCustomerOrderDetail(customerId: string, orderNumber: st
         include: {
           product: {
             select: {
+              id: true,
               slug: true,
+              name: true,
               sizeLabel: true,
               imageUrl: true,
+              active: true,
+              stockQty: true,
+              mrpInr: true,
+              pricePaise: true,
+              maxOrderQty: true,
               patent: { select: { title: true, applicationNumber: true } }
             }
           }
@@ -241,6 +245,14 @@ export async function getCustomerDocuments(customerId: string, opts?: Pagination
       orders.flatMap((o) => o.items.map((i) => i.productId).filter((id): id is string => Boolean(id)))
     )
   ];
+  const orderedLotCodes = [
+    ...new Set(orders.flatMap((o) => o.items.flatMap((i) => {
+      const raw = i.lotCodes?.trim();
+      if (!raw) return [] as string[];
+      return raw.split(/[,;|/]+/).map((s) => s.trim()).filter(Boolean);
+    })))
+  ];
+
   const certificates =
     productIds.length === 0
       ? []
@@ -248,8 +260,16 @@ export async function getCustomerDocuments(customerId: string, opts?: Pagination
           where: { productId: { in: productIds }, active: true },
           include: { product: { select: { name: true } } },
           orderBy: { issuedAt: "desc" },
-          take: 40
+          take: 60
         });
+
+  const coaRanked = (() => {
+    if (orderedLotCodes.length === 0) return certificates.slice(0, 40);
+    const lotSet = new Set(orderedLotCodes.map((c) => c.toLowerCase()));
+    const matched = certificates.filter((c) => lotSet.has(c.lotCode.toLowerCase()));
+    const rest = certificates.filter((c) => !lotSet.has(c.lotCode.toLowerCase()));
+    return [...matched, ...rest].slice(0, 40);
+  })();
 
   const patents = new Map<
     string,
@@ -287,7 +307,7 @@ export async function getCustomerDocuments(customerId: string, opts?: Pagination
         at: o.createdAt,
         href: `/api/order/${o.orderNumber}/packing.pdf?t=${o.confirmationToken}`
       })),
-    certificates: certificates.map((c) => ({
+    certificates: coaRanked.map((c) => ({
       kind: "coa" as const,
       label: `${c.title} · Lot ${c.lotCode}`,
       productName: c.product.name,

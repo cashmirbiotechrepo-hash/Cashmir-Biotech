@@ -56,6 +56,10 @@ export async function createPendingOrder(input: {
   cart: PricedCart;
   address: ShippingAddress;
   idempotencyKey?: string | null;
+  customerId?: string | null;
+  saveAddressToAccount?: boolean;
+  accountAddressLabel?: string;
+  selectedAddressId?: string | null;
 }): Promise<
   { ok: true; orderId: string; orderNumber: string; confirmationToken: string } | { ok: false; error: string }
 > {
@@ -98,6 +102,7 @@ export async function createPendingOrder(input: {
             customerEmail: normalizedEmail,
             customerName: address.fullName,
             customerPhone: address.phone,
+            customerId: input.customerId || null,
             status: "pending",
             subtotalCents: cart.subtotalCents,
             taxCents: cart.taxCents,
@@ -107,6 +112,9 @@ export async function createPendingOrder(input: {
             couponCode: cart.couponCode ?? "",
             adminNotes,
             idempotencyKey: input.idempotencyKey || null,
+            saveAddressToAccount: Boolean(input.saveAddressToAccount),
+            accountAddressLabel: (input.accountAddressLabel || "Home").slice(0, 40),
+            selectedAddressId: input.selectedAddressId || null,
             shippingAddress: {
               ...address,
               couponCode: cart.couponCode,

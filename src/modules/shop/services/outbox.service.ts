@@ -300,40 +300,51 @@ async function runPostPaymentSideEffects(orderId: string) {
 
   if (order.customerEmail && !emailAlreadySent) {
     try {
-      const { buildOrderConfirmedMail } = await import("@/lib/email/transactional");
-      const { sendTransactionalMail } = await import("@/lib/admin/mail");
-      const addr = (order.shippingAddress ?? null) as {
-        fullName?: string;
-        line1?: string;
-        line2?: string;
-        city?: string;
-        state?: string;
-        postalCode?: string;
-        phone?: string;
-      } | null;
-      const mail = buildOrderConfirmedMail({
-        customerName: order.customerName,
-        orderNumber: order.orderNumber,
-        confirmationToken: order.confirmationToken,
-        items: order.items.map((i) => ({
-          productName: i.productName,
-          quantity: i.quantity,
-          unitPriceCents: i.unitPriceCents,
-          imageUrl: i.product?.imageUrl,
-          sizeLabel: i.product?.sizeLabel
-        })),
-        shippingAddress: addr,
-        shippingCents: order.shippingCents,
-        discountCents: order.discountCents ?? 0,
-        totalCents: order.totalCents
-      });
-      await sendTransactionalMail({ to: order.customerEmail, mail });
-      await recordOrderEvent({
-        orderId,
-        type: "confirmation_email_sent",
-        title: "Order confirmation email sent",
-        detail: order.customerEmail
-      });
+      let allowEmail = true;
+      if (order.customerId) {
+        const prefs = await db.customer.findUnique({
+          where: { id: order.customerId },
+          select: { notifyOrderUpdates: true }
+        });
+        if (prefs && prefs.notifyOrderUpdates === false) allowEmail = false;
+      }
+
+      if (allowEmail) {
+        const { buildOrderConfirmedMail } = await import("@/lib/email/transactional");
+        const { sendTransactionalMail } = await import("@/lib/admin/mail");
+        const addr = (order.shippingAddress ?? null) as {
+          fullName?: string;
+          line1?: string;
+          line2?: string;
+          city?: string;
+          state?: string;
+          postalCode?: string;
+          phone?: string;
+        } | null;
+        const mail = buildOrderConfirmedMail({
+          customerName: order.customerName,
+          orderNumber: order.orderNumber,
+          confirmationToken: order.confirmationToken,
+          items: order.items.map((i) => ({
+            productName: i.productName,
+            quantity: i.quantity,
+            unitPriceCents: i.unitPriceCents,
+            imageUrl: i.product?.imageUrl,
+            sizeLabel: i.product?.sizeLabel
+          })),
+          shippingAddress: addr,
+          shippingCents: order.shippingCents,
+          discountCents: order.discountCents ?? 0,
+          totalCents: order.totalCents
+        });
+        await sendTransactionalMail({ to: order.customerEmail, mail });
+        await recordOrderEvent({
+          orderId,
+          type: "confirmation_email_sent",
+          title: "Order confirmation email sent",
+          detail: order.customerEmail
+        });
+      }
     } catch (err) {
       logger.error({ err, orderId, event: "outbox_email_failed" }, "outbox confirmation email failed");
       throw err;

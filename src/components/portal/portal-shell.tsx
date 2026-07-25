@@ -7,24 +7,27 @@ import { cn } from "@/lib/utils";
 import { CustomerSessionKeepalive } from "@/components/portal/customer-session-keepalive";
 import { ThemeToggle } from "@/components/experience/theme-toggle";
 
-const NAV = [
-  { href: "/portal", label: "Overview", exact: true },
+const NAV_BASE = [
+  { href: "/portal", label: "Overview", exact: true as const },
   { href: "/portal/orders", label: "Orders" },
   { href: "/portal/documents", label: "Invoices" },
-  { href: "/portal/organization", label: "Organisation" },
-  { href: "/portal/circle", label: "Research Circle" },
+  { href: "/portal/account", label: "Account details" },
+  { href: "/portal/wishlist", label: "Wishlist" },
   { href: "/portal/addresses", label: "Addresses" },
+  { href: "/portal/organization", label: "Organisation", gate: "org" as const },
+  { href: "/portal/circle", label: "Research Circle", gate: "circle" as const },
   { href: "/portal/security", label: "Security" },
   { href: "/portal/support", label: "Support" }
-] as const;
+];
 
 const MOBILE = [
-  { href: "/portal", label: "Home", icon: Home, exact: true },
+  { href: "/portal", label: "Overview", icon: Home, exact: true },
   { href: "/portal/orders", label: "Orders", icon: Package },
   { href: "/portal/documents", label: "Invoices", icon: FileText },
-  { href: "/portal/addresses", label: "Account", icon: UserRound },
+  { href: "/portal/account", label: "Account", icon: UserRound },
   { href: "/portal/support", label: "Help", icon: LifeBuoy }
 ] as const;
+
 
 function active(pathname: string, href: string, exact?: boolean) {
   if (exact) return pathname === href;
@@ -41,17 +44,26 @@ function initials(name: string) {
 export function PortalShell({
   children,
   customerName,
-  customerEmail
+  customerEmail,
+  hasOrg = false,
+  hasCircle = false
 }: {
   children: React.ReactNode;
   customerName?: string | null;
   customerEmail: string;
+  hasOrg?: boolean;
+  hasCircle?: boolean;
 }) {
   const pathname = usePathname();
   const router = useRouter();
   const firstName = (customerName ?? customerEmail.split("@")[0] ?? "there").split(" ")[0];
   const mark = initials(customerName?.trim() || firstName);
   const isHome = pathname === "/portal";
+  const NAV = NAV_BASE.filter((item) => {
+    if ("gate" in item && item.gate === "org") return hasOrg;
+    if ("gate" in item && item.gate === "circle") return hasCircle;
+    return true;
+  });
 
   async function logout() {
     await fetch("/api/portal/auth/logout", { method: "POST" });
@@ -109,17 +121,16 @@ export function PortalShell({
 
         <div className="flex min-w-0 flex-1 flex-col pb-[4.75rem] md:pb-0">
           <header className="sticky top-0 z-30 flex items-center justify-between border-b border-ink/8 bg-ivory/90 px-4 py-3 backdrop-blur md:hidden">
-            <Link href="/portal" className="flex items-center gap-2.5">
-              <span className="grid h-8 w-8 place-items-center rounded-full bg-ink text-[11px] font-medium text-paper">
-                {mark}
-              </span>
-              {!isHome ? (
-                <span className="text-[14px] font-medium text-ink">Cashmir</span>
-              ) : (
-                <span className="text-[14px] font-medium text-ink">Portal</span>
-              )}
+            <Link href="/" className="flex min-h-10 items-center gap-2" aria-label="Store home">
+              <span className="font-mono text-[11px] uppercase tracking-[0.16em] text-gold">Store</span>
+              <span className="text-[14px] font-medium text-ink">Cashmir</span>
             </Link>
             <div className="flex items-center gap-1">
+              {!isHome ? (
+                <span className="mr-1 max-w-[7rem] truncate text-[12px] text-ink-mute" aria-hidden>
+                  {firstName}
+                </span>
+              ) : null}
               <ThemeToggle />
               <button
                 type="button"

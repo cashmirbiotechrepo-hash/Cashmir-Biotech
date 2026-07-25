@@ -10,8 +10,13 @@ export const metadata: Metadata = {
   robots: { index: false, follow: false }
 };
 
-export default async function PortalSupportPage() {
+export default async function PortalSupportPage({
+  searchParams
+}: {
+  searchParams: Promise<{ order?: string; intent?: string }>;
+}) {
   const session = await requireCustomerSession();
+  const sp = await searchParams;
   const [orders, tickets] = await Promise.all([
     getCustomerOrders(session.id),
     db.supportTicket.findMany({
@@ -21,6 +26,12 @@ export default async function PortalSupportPage() {
     })
   ]);
   const recent = orders.slice(0, 8);
+  const presetOrder =
+    sp.order && recent.some((o) => o.orderNumber === sp.order)
+      ? sp.order
+      : sp.order && orders.some((o) => o.orderNumber === sp.order)
+        ? sp.order
+        : "";
 
   return (
     <div className="mx-auto max-w-2xl space-y-6">
@@ -36,6 +47,8 @@ export default async function PortalSupportPage() {
           orderNumber: o.orderNumber,
           label: `${o.items[0]?.productName ?? "Order"} · ${o.orderNumber}`
         }))}
+        presetOrderNumber={presetOrder}
+        intent={sp.intent}
       />
 
       <section>

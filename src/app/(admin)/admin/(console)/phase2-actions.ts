@@ -490,18 +490,17 @@ export async function sendCampaignAction(formData: FormData): Promise<void> {
     const campaign = await db.emailCampaign.findUnique({ where: { id } });
     if (!campaign || campaign.status === "sent") return;
 
-    const recipients = await db.subscriber.findMany({
-      where: { status: "subscribed" },
-      select: { email: true }
-    });
+    const recipients = await (
+      await import("@/lib/customer/marketing-prefs")
+    ).listMarketingRecipientEmails();
 
     let delivered = 0;
     const unsubscribeHint =
       "\n\n———\nTo unsubscribe from Cashmir Biotech emails, reply with UNSUBSCRIBE or write to support@cashmirbiotech.com.";
 
-    for (const recipient of recipients) {
+    for (const email of recipients) {
       const ok = await sendAdminMail({
-        to: recipient.email,
+        to: email,
         subject: campaign.subject,
         text: `${campaign.body}${unsubscribeHint}`
       });

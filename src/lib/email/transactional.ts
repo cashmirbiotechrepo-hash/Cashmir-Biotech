@@ -7,6 +7,7 @@ import {
   type BuiltMail,
   type Section
 } from "@/lib/email/brand";
+import { trackingHref } from "@/lib/shipping/tracking-url";
 
 export type OrderMailItem = {
   productName: string;
@@ -35,21 +36,6 @@ function addressLines(addr: ShippingAddress | null | undefined, fallbackName?: s
     [addr.city, addr.state, addr.postalCode].filter(Boolean).join(", "),
     addr.phone ? `Tel ${addr.phone}` : ""
   ].filter((l): l is string => Boolean(l && String(l).trim()));
-}
-
-function trackingHref(carrier: string, trackingNumber: string): string | null {
-  const t = encodeURIComponent(trackingNumber.trim());
-  if (!t) return null;
-  const c = carrier.toLowerCase();
-  if (c.includes("blue dart") || c.includes("bluedart")) {
-    return `https://www.bluedart.com/web/guest/trackdartresultthirdparty?trackFor=0&trackNo=${t}`;
-  }
-  if (c.includes("delhivery")) return `https://www.delhivery.com/track/package/${t}`;
-  if (c.includes("dtdc")) return `https://www.dtdc.in/tracking/tracking_results.asp?Ttype=awb_no&strCnno=${t}`;
-  if (c.includes("india post") || c.includes("speed post")) {
-    return `https://www.indiapost.gov.in/_layouts/15/dop.portal.tracking/trackconsignment.aspx`;
-  }
-  return null;
 }
 
 function estimateDeliveryWindow(daysMin = 4, daysMax = 7): string {

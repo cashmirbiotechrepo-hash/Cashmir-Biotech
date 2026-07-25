@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { requireCustomerSession } from "@/lib/customer/auth";
 import { getCustomerSecurityProfile } from "@/lib/customer/portal";
 import { revokePortalSession } from "../actions";
@@ -18,25 +19,20 @@ export default async function PortalSecurityPage() {
       <header>
         <p className="font-mono text-[11px] uppercase tracking-[0.2em] text-gold">Access</p>
         <h1 className="mt-2 text-3xl font-light tracking-tight text-ink">Security</h1>
+        <p className="mt-2 max-w-lg text-sm text-ink-mute">
+          Devices and sign-in sessions. Edit name and phone on{" "}
+          <Link href="/portal/account" className="text-ink underline-offset-4 hover:underline">
+            Account
+          </Link>
+          .
+        </p>
       </header>
 
       <dl className="max-w-lg space-y-5 border-y border-ink/10 py-6">
         <div>
-          <dt className="font-mono text-[10px] uppercase tracking-[0.14em] text-ink-faint">Email</dt>
+          <dt className="font-mono text-[10px] uppercase tracking-[0.14em] text-ink-faint">Sign-in email</dt>
           <dd className="mt-1 text-sm text-ink">{profile.email}</dd>
-          <dd className="mt-1 text-xs text-ink-mute">
-            {profile.emailVerifiedAt
-              ? `Verified ${profile.emailVerifiedAt.toLocaleDateString("en-IN")}`
-              : "Verify via OTP to claim guest orders"}
-          </dd>
-        </div>
-        <div>
-          <dt className="font-mono text-[10px] uppercase tracking-[0.14em] text-ink-faint">Phone</dt>
-          <dd className="mt-1 text-sm text-ink">{profile.phone || "Not set"}</dd>
-        </div>
-        <div>
-          <dt className="font-mono text-[10px] uppercase tracking-[0.14em] text-ink-faint">Sign-in</dt>
-          <dd className="mt-1 text-sm text-ink-mute">Passwordless — email one-time code only.</dd>
+          <dd className="mt-1 text-xs text-ink-mute">Passwordless — email one-time code only.</dd>
         </div>
       </dl>
 

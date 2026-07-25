@@ -9,7 +9,7 @@ import { ShoppingBag } from "lucide-react";
 import { EASE_OUT_EXPO } from "@/lib/motion/ease";
 import { useIntro } from "@/components/experience/intro-context";
 import { useCart } from "@/components/shop/cart-context";
-import { ThemeToggle } from "@/components/experience/theme-toggle";
+import { ThemeSegment, ThemeToggle } from "@/components/experience/theme-toggle";
 import { cn } from "@/lib/utils";
 import { SITE_CONTACT } from "@/lib/site-contact";
 
@@ -44,9 +44,17 @@ export function SiteNav({
   const firstName = customer
     ? (customer.name ?? customer.email.split("@")[0] ?? "Account").split(" ")[0]
     : null;
-  const accountHref = customer ? "/portal" : "/portal/login";
+  const accountHref = customer ? "/portal" : "/portal/login?next=/portal";
   const accountLabel = customer ? (firstName ? firstName : "Account") : "Sign in";
   const accountCursor = customer ? "Account" : "Sign in";
+  const accountInitials = (() => {
+    if (!customer) return null;
+    const source = (customer.name ?? firstName ?? "A").trim();
+    const parts = source.split(/\s+/).filter(Boolean);
+    if (parts.length === 0) return "A";
+    if (parts.length === 1) return parts[0]!.slice(0, 1).toUpperCase();
+    return `${parts[0]!.slice(0, 1)}${parts[1]!.slice(0, 1)}`.toUpperCase();
+  })();
 
   // Keep the latest menu state in a ref so the scroll handler never re-subscribes.
   const menuOpenRef = useRef(menuOpen);
@@ -158,13 +166,34 @@ export function SiteNav({
           </ul>
 
           <div className="flex items-center gap-3 md:gap-3.5">
-            <ThemeToggle />
+            {/* Hide the icon toggle while the drawer is open — theme lives in the
+                Day/Night segment below, so two moons don't stack. */}
+            <div className={cn(menuOpen && "invisible pointer-events-none md:visible md:pointer-events-auto")}>
+              <ThemeToggle />
+            </div>
             <Link
               href={accountHref}
               data-cursor={accountCursor}
-              className="hidden font-mono text-[11px] uppercase tracking-[0.16em] text-ink-mute transition-colors hover:text-ink lg:inline-flex lg:items-center lg:px-1"
+              aria-label={customer ? "Account" : "Sign in"}
+              className="inline-flex items-center gap-2 font-mono text-[11px] uppercase tracking-[0.16em] text-ink-mute transition-colors hover:text-ink"
             >
-              {accountLabel}
+              {accountInitials ? (
+                <span
+                  className="grid h-8 w-8 place-items-center rounded-full border border-ink/15 bg-ink text-[10px] font-medium tracking-normal text-paper"
+                  aria-hidden
+                >
+                  {accountInitials}
+                </span>
+              ) : (
+                <span className="hidden sm:inline">{accountLabel}</span>
+              )}
+              {!accountInitials ? (
+                <span className="sm:hidden rounded-full border border-ink/15 px-3 py-2 text-[11px] text-ink">
+                  Sign in
+                </span>
+              ) : (
+                <span className="hidden lg:inline">{accountLabel}</span>
+              )}
             </Link>
             <Link
               href="/cart"
@@ -253,37 +282,48 @@ export function SiteNav({
                 </motion.li>
               ))}
             </ul>
-            <div className="mt-auto flex flex-col gap-4">
-              <div className="flex items-center justify-between rounded-full border border-ink/15 px-4 py-2">
-                <span className="font-mono text-[11px] uppercase tracking-[0.16em] text-ink-mute">Appearance</span>
-                <ThemeToggle />
+            <motion.div
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5, delay: 0.35, ease: EASE_OUT_EXPO }}
+              className="mt-auto flex flex-col"
+            >
+              <ThemeSegment className="pb-5" />
+
+              <div className="hairline-x mb-5 h-px w-full" />
+
+              <div className="grid grid-cols-2 gap-2.5">
+                <Link
+                  href="/cart"
+                  className="flex items-center justify-center gap-2 rounded-full bg-ink/[0.05] py-3.5 text-[13px] font-medium text-ink transition-colors active:bg-ink/[0.09]"
+                >
+                  <ShoppingBag className="h-4 w-4" strokeWidth={1.6} />
+                  Cart
+                  {cartReady && count > 0 ? (
+                    <span className="font-mono text-[11px] text-gold">{count}</span>
+                  ) : null}
+                </Link>
+                <Link
+                  href={accountHref}
+                  className="flex items-center justify-center rounded-full bg-ink py-3.5 text-[13px] font-medium text-paper"
+                >
+                  {customer ? accountLabel : "Sign in"}
+                </Link>
               </div>
-              <Link
-                href="/cart"
-                className="flex items-center justify-center gap-2 rounded-full border border-ink/20 py-4 text-sm text-ink"
-              >
-                <ShoppingBag className="h-4 w-4" strokeWidth={1.6} />
-                Cart{cartReady && count > 0 ? ` (${count})` : ""}
-              </Link>
-              <Link
-                href={accountHref}
-                className="flex items-center justify-center rounded-full border border-ink/20 py-4 font-mono text-[12px] uppercase tracking-[0.16em] text-ink"
-              >
-                {customer ? `Account · ${accountLabel}` : "Sign in"}
-              </Link>
+
               <Link
                 href={CONTACT_HREF}
-                className="flex items-center justify-center rounded-full bg-ink py-4 text-sm text-paper"
+                className="mt-3 flex items-center justify-center py-3 text-[13px] text-ink-mute transition-colors hover:text-ink"
               >
                 Contact us
               </Link>
               <Link
                 href="/admin/login"
-                className="text-center font-mono text-[11px] uppercase tracking-[0.16em] text-ink-faint"
+                className="pt-1 text-center font-mono text-[10px] uppercase tracking-[0.16em] text-ink-faint"
               >
                 Admin console
               </Link>
-            </div>
+            </motion.div>
           </motion.div>
         ) : null}
       </AnimatePresence>

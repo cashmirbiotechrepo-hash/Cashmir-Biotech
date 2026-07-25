@@ -1,10 +1,12 @@
 import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
-import { ChevronRight, FileText, Package, ShoppingBag, Truck } from "lucide-react";
+import { ChevronRight, FileText, Heart, Package, ShoppingBag, Truck } from "lucide-react";
 import { requireCustomerSession } from "@/lib/customer/auth";
 import { getPortalOverview } from "@/lib/customer/portal";
+import { listClaimableAddressSnapshots } from "@/lib/customer/address-claim";
 import { PORTAL_STATUS_LABEL, timeOfDayGreeting } from "@/lib/customer/portal-ui";
+import { AddressClaimBanner } from "@/components/portal/address-claim-banner";
 import { cn } from "@/lib/utils";
 
 export const metadata: Metadata = {
@@ -18,16 +20,13 @@ const inr = new Intl.NumberFormat("en-IN", {
   maximumFractionDigits: 0
 });
 
-const QUICK = [
-  { href: "/portal/orders", label: "Orders", icon: Package },
-  { href: "/portal/orders", label: "Tracking", icon: Truck },
-  { href: "/portal/documents", label: "Invoices", icon: FileText },
-  { href: "/products", label: "Shop again", icon: ShoppingBag }
-] as const;
 
 export default async function PortalOverviewPage() {
   const session = await requireCustomerSession();
-  const data = await getPortalOverview(session.id);
+  const [data, claimable] = await Promise.all([
+    getPortalOverview(session.id),
+    listClaimableAddressSnapshots(session.id)
+  ]);
   if (!data) return null;
 
   const firstName = (data.customer.name ?? data.customer.email.split("@")[0] ?? "there").split(
@@ -50,6 +49,18 @@ export default async function PortalOverviewPage() {
   const canTrack =
     latest &&
     (latest.status === "shipped" || latest.status === "processing" || latest.status === "delivered");
+  const trackingHrefPath =
+    latest?.trackingNumber && canTrack
+      ? `/portal/orders/${latest.orderNumber}`
+      : "/portal/orders";
+
+  const QUICK = [
+    { href: "/portal/orders", label: "Orders", icon: Package },
+    { href: trackingHrefPath, label: "Tracking", icon: Truck },
+    { href: "/portal/wishlist", label: "Wishlist", icon: Heart },
+    { href: "/portal/documents", label: "Invoices", icon: FileText },
+    { href: "/products", label: "Shop again", icon: ShoppingBag }
+  ] as const;
 
   let contextLine = `${stats.orderCount} ${stats.orderCount === 1 ? "order" : "orders"}`;
   if (stats.spentCents > 0) contextLine += ` · ${inr.format(stats.spentCents / 100)} lifetime`;
@@ -67,6 +78,8 @@ export default async function PortalOverviewPage() {
         </h1>
         <p className="text-[13px] text-ink-mute">{contextLine}</p>
       </header>
+
+      <AddressClaimBanner count={claimable.length} />
 
       {latest && productTitle ? (
         <section className="border border-ink/12 bg-paper p-4 shadow-[0_8px_28px_-20px_rgba(17,17,17,0.45)] sm:p-5">
@@ -147,7 +160,7 @@ export default async function PortalOverviewPage() {
 
       <section>
         <h2 className="mb-2 text-[13px] font-medium text-ink-mute">Quick actions</h2>
-        <div className="grid grid-cols-2 gap-2">
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
           {QUICK.map(({ href, label, icon: Icon }) => (
             <Link
               key={label}
@@ -214,6 +227,10 @@ export default async function PortalOverviewPage() {
       ) : null}
 
       <p className="pb-2 text-center text-[13px]">
+        <Link href="/portal/account" className="font-medium text-ink-mute underline-offset-4 hover:text-ink hover:underline">
+          Account details
+        </Link>
+        <span className="mx-2 text-ink-faint">·</span>
         <Link href="/portal/support" className="font-medium text-ink-mute underline-offset-4 hover:text-ink hover:underline">
           Need help?
         </Link>

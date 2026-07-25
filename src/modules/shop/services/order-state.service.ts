@@ -152,6 +152,17 @@ export async function markOrderPaid(input: {
         await enqueuePostPaymentTask(input.orderId);
       }
 
+      // Idempotent account sync retry when accountSyncedAt is still null.
+      try {
+        const { syncWithBudget } = await import("@/lib/customer/addresses");
+        await syncWithBudget(input.orderId, { ms: 400 });
+      } catch (err) {
+        logger.error(
+          { err, orderId: input.orderId, event: "checkout_account_sync_failed", sync_status: "unknown" },
+          "account sync threw on already-paid path"
+        );
+      }
+
       return { ok: true, confirmationToken: existing.confirmationToken, alreadyPaid: true };
     }
     logger.error(
@@ -172,6 +183,17 @@ export async function markOrderPaid(input: {
 
   const { enqueuePostPaymentTask } = await import("@/modules/shop/services/outbox.service");
   await enqueuePostPaymentTask(input.orderId);
+
+  // Account sync: budgeted await on the paid transition (webhook / verify / reconciliation).
+  try {
+    const { syncWithBudget } = await import("@/lib/customer/addresses");
+    await syncWithBudget(input.orderId, { ms: 400 });
+  } catch (err) {
+    logger.error(
+      { err, orderId: input.orderId, event: "checkout_account_sync_failed", sync_status: "unknown" },
+      "account sync threw after paid"
+    );
+  }
 
   return { ok: true, confirmationToken: fulfillmentRes.confirmationToken };
 }
