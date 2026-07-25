@@ -81,8 +81,8 @@ export function ThemeToggle({ className }: { className?: string }) {
 }
 
 /**
- * Mobile-menu theme control — a soft Day / Night segment with a sliding gold
- * thumb. No nested borders; reads as one instrument, not a button inside a pill.
+ * Mobile-menu theme control — settings row with a compact Day / Night segment.
+ * Must stay in normal document flow (no absolute/z-index tricks over nav dividers).
  */
 export function ThemeSegment({ className }: { className?: string }) {
   const { theme, ready, setPreference } = useThemePreference();
@@ -90,12 +90,15 @@ export function ThemeSegment({ className }: { className?: string }) {
 
   return (
     <div
-      className={cn("flex items-center justify-between gap-4", className)}
+      className={cn(
+        "flex flex-col gap-3 min-[380px]:flex-row min-[380px]:items-center min-[380px]:justify-between",
+        className
+      )}
       role="group"
       aria-label="Appearance"
     >
-      <span className="font-mono text-[10px] uppercase tracking-[0.18em] text-ink-faint">Theme</span>
-      <div className="relative grid h-11 w-[11.5rem] grid-cols-2 rounded-full bg-ink/[0.06] p-1">
+      <span className="text-[15px] text-ink">Theme</span>
+      <div className="relative grid h-11 w-full max-w-[12.5rem] shrink-0 grid-cols-2 rounded-full bg-ink/[0.06] p-1 min-[380px]:w-[11.5rem]">
         {ready ? (
           <motion.span
             aria-hidden
@@ -114,7 +117,7 @@ export function ThemeSegment({ className }: { className?: string }) {
             !isDark ? "text-ink" : "text-ink-mute"
           )}
         >
-          <Sun className="h-3.5 w-3.5" strokeWidth={1.75} aria-hidden />
+          <Sun className="h-3.5 w-3.5 opacity-80" strokeWidth={1.75} aria-hidden />
           Day
         </button>
         <button
@@ -126,7 +129,7 @@ export function ThemeSegment({ className }: { className?: string }) {
             isDark ? "text-ink" : "text-ink-mute"
           )}
         >
-          <Moon className="h-3.5 w-3.5" strokeWidth={1.75} aria-hidden />
+          <Moon className="h-3.5 w-3.5 opacity-80" strokeWidth={1.75} aria-hidden />
           Night
         </button>
       </div>
