@@ -449,4 +449,22 @@
     background: #fff !important;
     color: #000 !important;
   }
+
+  /* Ops console chrome must never appear on packing slips / receipts / labels */
+  .admin-scope aside,
+  .admin-scope header,
+  .admin-scope nav[aria-label="Main navigation"],
+  .admin-scope [data-sonner-toaster] {
+    display: none !important;
+  }
+
+  .admin-scope,
+  .admin-scope > div,
+  .admin-scope main,
+  .admin-scope main > div {
+    margin: 0 !important;
+    max-width: none !important;
+    padding: 0 !important;
+    background: #fff !important;
+  }
 }

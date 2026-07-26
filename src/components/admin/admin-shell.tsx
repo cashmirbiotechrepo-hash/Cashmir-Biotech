@@ -80,7 +80,7 @@ export function AdminShell({ adminEmail, adminRole, children }: AdminShellProps)
         {!isMobile ? (
           <aside
             className={cn(
-              "sticky top-0 hidden h-svh shrink-0 flex-col border-r border-sidebar-border bg-sidebar md:flex",
+              "sticky top-0 hidden h-svh shrink-0 flex-col border-r border-sidebar-border bg-sidebar print:hidden md:flex",
               ADMIN_SIDEBAR_WIDTH_CLASS
             )}
           >
@@ -119,7 +119,7 @@ export function AdminShell({ adminEmail, adminRole, children }: AdminShellProps)
         ) : null}
 
         <div className="flex min-w-0 flex-1 flex-col">
-          <header className="sticky top-0 z-40 border-b border-border bg-background/95 backdrop-blur-md">
+          <header className="sticky top-0 z-40 border-b border-border bg-background/95 backdrop-blur-md print:hidden">
             <div className="flex h-11 items-center justify-between gap-3 px-3 md:px-5">
               <div className="flex min-w-0 items-center gap-2">
                 {isMobile ? (
@@ -177,13 +177,25 @@ export function AdminShell({ adminEmail, adminRole, children }: AdminShellProps)
             </div>
           </header>
 
-          <main className={cn("flex-1 px-3 py-4 md:px-6 md:py-5", isMobile ? "pb-24" : "")}>
-            <div className={cn("mx-auto w-full", wideContent ? "max-w-7xl" : "max-w-6xl")}>{children}</div>
+          <main
+            className={cn(
+              "flex-1 px-3 py-4 md:px-6 md:py-5 print:m-0 print:max-w-none print:bg-white print:p-0",
+              isMobile ? "pb-24 print:pb-0" : ""
+            )}
+          >
+            <div
+              className={cn(
+                "mx-auto w-full print:max-w-none",
+                wideContent ? "max-w-7xl" : "max-w-6xl"
+              )}
+            >
+              {children}
+            </div>
           </main>
 
           {isMobile ? (
             <nav
-              className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-background/95 backdrop-blur-md"
+              className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-background/95 backdrop-blur-md print:hidden"
               style={{ paddingBottom: "env(safe-area-inset-bottom, 0px)" }}
               aria-label="Main navigation"
             >

@@ -2,7 +2,7 @@ import Image from "next/image";
 import type { ReactNode } from "react";
 import { SITE_CONTACT } from "@/lib/site-contact";
 
-/** Shared Swiss/print document chrome for HTML invoice, packing slip, receipt. */
+/** Shared institutional print system for invoice, packing slip, receipt, label. */
 
 export function formatInrPrint(cents: number) {
   return new Intl.NumberFormat("en-IN", {
@@ -15,7 +15,7 @@ export function formatInrPrint(cents: number) {
 
 export function DocLabel({ children }: { children: ReactNode }) {
   return (
-    <p className="text-[8px] font-semibold uppercase tracking-[0.08em] text-ink-mute">{children}</p>
+    <p className="text-[7.5pt] font-semibold uppercase tracking-[0.07em] text-[#5c5c60]">{children}</p>
   );
 }
 
@@ -29,26 +29,39 @@ export function DocHeader({
   meta: string[];
 }) {
   return (
-    <header className="flex items-start justify-between gap-6 border-b border-ink pb-[14px]">
-      <div className="flex items-center gap-2.5">
-        <Image
-          src="/logo.png"
-          alt=""
-          width={72}
-          height={28}
-          className="h-7 w-auto object-contain"
-          unoptimized
-        />
-        <p className="text-[17px] font-semibold leading-none tracking-tight text-ink">Cashmir Biotech</p>
-      </div>
-      <div className="text-right">
-        <p className="text-[9px] font-semibold uppercase tracking-[0.08em] text-ink">{title}</p>
-        <p className="mt-1.5 text-[15px] font-semibold tabular-nums leading-none text-ink">{number}</p>
-        {meta.map((line) => (
-          <p key={line} className="mt-1 text-[8px] text-ink-mute">
-            {line}
+    <header className="border-b-[1.25pt] border-[#141416] pb-4">
+      <div className="flex items-start justify-between gap-6">
+        <div className="flex min-w-0 items-start gap-3">
+          <Image
+            src="/logo.png"
+            alt=""
+            width={88}
+            height={34}
+            className="mt-0.5 h-[34px] w-auto object-contain"
+            unoptimized
+          />
+          <div className="min-w-0 pt-0.5">
+            <p className="text-[16pt] font-semibold leading-none tracking-[-0.02em] text-[#141416]">
+              Cashmir Biotech
+            </p>
+            <p className="mt-1.5 max-w-[42mm] text-[7pt] leading-snug text-[#6b6b70]">
+              {SITE_CONTACT.addressLines[0]}
+              <br />
+              {SITE_CONTACT.addressLines[3]}, {SITE_CONTACT.addressLines[4]}
+            </p>
+          </div>
+        </div>
+        <div className="shrink-0 text-right">
+          <p className="text-[8pt] font-semibold uppercase tracking-[0.08em] text-[#141416]">{title}</p>
+          <p className="mt-2 text-[14pt] font-semibold tabular-nums leading-none tracking-tight text-[#141416]">
+            {number}
           </p>
-        ))}
+          {meta.map((line) => (
+            <p key={line} className="mt-1 text-[7.5pt] text-[#6b6b70]">
+              {line}
+            </p>
+          ))}
+        </div>
       </div>
     </header>
   );
@@ -56,17 +69,20 @@ export function DocHeader({
 
 export function DocFooter({ docLabel }: { docLabel: string }) {
   return (
-    <footer className="mt-10 border-t border-ink/20 pt-3 text-[8px] leading-snug text-ink-mute print:mt-8">
+    <footer className="mt-auto border-t border-[#d4d4d6] pt-3 text-[7.5pt] leading-snug text-[#5c5c60]">
       <div className="flex items-start justify-between gap-6">
         <div>
-          <p className="font-semibold text-ink">{SITE_CONTACT.company}</p>
+          <p className="font-semibold text-[#141416]">{SITE_CONTACT.company}</p>
           {SITE_CONTACT.addressLines.map((line) => (
             <p key={line}>{line}</p>
           ))}
+          <p className="mt-1">
+            {SITE_CONTACT.primaryEmail} · {SITE_CONTACT.phone}
+          </p>
         </div>
         <div className="shrink-0 text-right">
-          <p>{docLabel}</p>
-          <p className="mt-1 text-ink-faint">Page 1 of 1</p>
+          <p className="tabular-nums text-[#141416]">{docLabel}</p>
+          <p className="mt-1 text-[#8a8a8f]">Page 1 of 1</p>
         </div>
       </div>
     </footer>
@@ -81,19 +97,54 @@ export function DocShell({
   toolbar?: ReactNode;
 }) {
   return (
-    <div className="mx-auto max-w-[210mm] bg-white px-[16mm] py-[16mm] text-ink print:max-w-none print:px-[16mm] print:py-[16mm]">
-      {toolbar ? <div className="mb-6 flex items-center gap-3 print:hidden">{toolbar}</div> : null}
-      {children}
+    <div className="font-sans text-[#141416] antialiased print:bg-white">
+      {toolbar ? (
+        <div className="mx-auto mb-5 flex max-w-[210mm] items-center gap-3 px-4 print:hidden md:px-0">
+          {toolbar}
+        </div>
+      ) : null}
+      <article className="mx-auto flex min-h-[277mm] max-w-[210mm] flex-col bg-white px-[16mm] py-[15mm] shadow-sm print:min-h-0 print:max-w-none print:shadow-none print:px-[16mm] print:py-[15mm]">
+        {children}
+      </article>
     </div>
   );
 }
 
-/** Print-safe empty circle for pick / QC marks (~3 mm). */
+export function DocMetaRow({
+  label,
+  value,
+  strong
+}: {
+  label: string;
+  value: ReactNode;
+  strong?: boolean;
+}) {
+  return (
+    <div className="flex gap-3 text-[9.5pt] leading-snug">
+      <dt className="w-[22mm] shrink-0 text-[#6b6b70]">{label}</dt>
+      <dd className={`min-w-0 break-words tabular-nums ${strong ? "font-medium text-[#141416]" : "text-[#141416]"}`}>
+        {value}
+      </dd>
+    </div>
+  );
+}
+
+export function DocTableHead({ children }: { children: ReactNode }) {
+  return (
+    <thead>
+      <tr className="border-b-[1.1pt] border-[#141416] bg-[#f3f3f4] text-left text-[7.5pt] font-semibold uppercase tracking-[0.07em] text-[#5c5c60]">
+        {children}
+      </tr>
+    </thead>
+  );
+}
+
+/** Print-safe empty circle for pick marks (~3 mm). */
 export function MarkCircle({ className = "" }: { className?: string }) {
   return (
     <span
       aria-hidden
-      className={`inline-block h-[3mm] w-[3mm] shrink-0 rounded-full border-[0.7pt] border-ink align-middle ${className}`}
+      className={`inline-block h-[3mm] w-[3mm] shrink-0 rounded-full border-[0.7pt] border-[#141416] align-middle ${className}`}
     />
   );
 }

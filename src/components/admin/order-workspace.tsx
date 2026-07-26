@@ -356,10 +356,11 @@ export function OrderWorkspace({
             action={
               invoice ? (
                 <Link
-                  href={`/admin/finance/invoices/${invoice.id}`}
+                  href={`/admin/orders/${order.id}/print/invoice`}
+                  target="_blank"
                   className={cn(buttonVariants({ variant: "ghost", size: "sm" }), "h-7 px-2 text-xs")}
                 >
-                  Open
+                  Print
                 </Link>
               ) : (
                 <GenerateInvoiceButton orderId={order.id} />

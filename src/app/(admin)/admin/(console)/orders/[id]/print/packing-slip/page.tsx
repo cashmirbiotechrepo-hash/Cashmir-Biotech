@@ -7,7 +7,9 @@ import {
   DocFooter,
   DocHeader,
   DocLabel,
+  DocMetaRow,
   DocShell,
+  DocTableHead,
   MarkCircle
 } from "@/components/admin/order-print-doc";
 import { batchLabelForOrder } from "@/modules/shop/services/order-ops.service";
@@ -56,65 +58,56 @@ export default async function PackingSlipPage({ params }: { params: Promise<{ id
         ]}
       />
 
-      <div className="mt-8 grid gap-8 sm:grid-cols-2">
+      <div className="mt-8 grid grid-cols-2 gap-10">
         <div>
           <DocLabel>Ship to</DocLabel>
-          <div className="mt-2 space-y-0.5 text-[10px] leading-snug">
-            {addressLines({ ...addr, fullName: order.customerName ?? addr.fullName }).map((l) => (
-              <div
-                key={l}
-                className={
-                  l === (order.customerName ?? addr.fullName) ? "font-medium text-ink" : "text-ink-mute"
-                }
-              >
+          <div className="mt-2 space-y-0.5 text-[10pt] leading-snug">
+            {addressLines({ ...addr, fullName: order.customerName ?? addr.fullName }).map((l, i) => (
+              <p key={l} className={i === 0 ? "font-semibold text-[#141416]" : "text-[#5c5c60]"}>
                 {l}
-              </div>
+              </p>
             ))}
           </div>
         </div>
         <div>
           <DocLabel>Fulfilment</DocLabel>
-          <dl className="mt-2 space-y-1.5 text-[10px]">
-            <div className="flex gap-4">
-              <dt className="w-24 shrink-0 text-ink-mute">Lot</dt>
-              <dd className="tabular-nums text-ink">{batch}</dd>
-            </div>
-            <div className="flex gap-4">
-              <dt className="w-24 shrink-0 text-ink-mute">Packed by</dt>
-              <dd className="border-b border-ink/30 min-w-[8rem]">&nbsp;</dd>
-            </div>
-            <div className="flex gap-4">
-              <dt className="w-24 shrink-0 text-ink-mute">Checked by</dt>
-              <dd className="border-b border-ink/30 min-w-[8rem]">&nbsp;</dd>
-            </div>
+          <dl className="mt-2 space-y-2">
+            <DocMetaRow label="Lot" value={batch} strong />
+            <DocMetaRow
+              label="Courier"
+              value={order.carrier || "________________"}
+            />
+            <DocMetaRow
+              label="Tracking"
+              value={order.trackingNumber || "________________"}
+            />
+            <DocMetaRow label="Packed by" value="________________" />
           </dl>
         </div>
       </div>
 
-      <table className="mt-10 w-full table-fixed text-[10px]">
+      <table className="mt-9 w-full table-fixed text-[9.5pt]">
         <colgroup>
-          <col className="w-[6%]" />
-          <col className="w-[56%]" />
-          <col className="w-[28%]" />
-          <col className="w-[10%]" />
+          <col className="w-[8%]" />
+          <col className="w-[54%]" />
+          <col className="w-[26%]" />
+          <col className="w-[12%]" />
         </colgroup>
-        <thead>
-          <tr className="border-b border-ink text-left text-[8px] font-semibold uppercase tracking-[0.08em] text-ink-mute">
-            <th className="py-2">Mark</th>
-            <th className="py-2">Product</th>
-            <th className="py-2">Lot</th>
-            <th className="py-2 text-right">Qty</th>
-          </tr>
-        </thead>
+        <DocTableHead>
+          <th className="px-2 py-2">Mark</th>
+          <th className="px-2 py-2">Product</th>
+          <th className="px-2 py-2">Lot</th>
+          <th className="px-2 py-2 text-right">Qty</th>
+        </DocTableHead>
         <tbody>
           {order.items.map((item) => (
-            <tr key={item.id} className="border-b border-ink/10">
-              <td className="py-3 align-middle">
+            <tr key={item.id} className="border-b border-[#e6e6e8]">
+              <td className="px-2 py-3.5 align-middle">
                 <MarkCircle />
               </td>
-              <td className="py-3 align-middle font-medium">{item.productName}</td>
-              <td className="py-3 align-middle whitespace-nowrap tabular-nums text-ink">{batch}</td>
-              <td className="py-3 align-middle text-right text-[11px] font-medium tabular-nums">
+              <td className="px-2 py-3.5 align-middle font-medium">{item.productName}</td>
+              <td className="px-2 py-3.5 align-middle whitespace-nowrap tabular-nums">{batch}</td>
+              <td className="px-2 py-3.5 align-middle text-right text-[11pt] font-semibold tabular-nums">
                 {item.quantity}
               </td>
             </tr>
@@ -122,17 +115,19 @@ export default async function PackingSlipPage({ params }: { params: Promise<{ id
         </tbody>
       </table>
 
-      <p className="mt-3 text-[10px] font-semibold text-ink">Total units to pack: {units}</p>
+      <p className="mt-4 text-[10pt] font-semibold text-[#141416]">Total units to pack: {units}</p>
 
-      <div className="mt-8 border-t border-ink/20 pt-4">
+      <div className="mt-9 border-t border-[#d4d4d6] pt-4">
         <DocLabel>Packing instructions</DocLabel>
-        <p className="mt-2 text-[9.5px] text-ink-mute">
+        <p className="mt-2 max-w-[140mm] text-[9pt] leading-relaxed text-[#5c5c60]">
           Include the usage guide and invoice copy when requested. This warehouse copy must not be
           inserted into the customer&apos;s parcel.
         </p>
       </div>
 
-      <DocFooter docLabel={`Packing slip ${order.orderNumber}`} />
+      <div className="mt-10">
+        <DocFooter docLabel={`Packing slip ${order.orderNumber}`} />
+      </div>
     </DocShell>
   );
 }

@@ -2,11 +2,14 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { getOrderInvoiceByToken } from "@/modules/shop/services/order.service";
 import { SITE_CONTACT } from "@/lib/site-contact";
+import { addressLines } from "@/components/admin/order-print-shell";
 import {
   DocFooter,
   DocHeader,
   DocLabel,
+  DocMetaRow,
   DocShell,
+  DocTableHead,
   formatInrPrint
 } from "@/components/admin/order-print-doc";
 
@@ -43,7 +46,16 @@ export default async function PublicInvoicePage({
   const gstin = process.env.COMPANY_GSTIN || "—";
 
   return (
-    <DocShell>
+    <DocShell
+      toolbar={
+        <a
+          href={`/api/order/${order.orderNumber}/invoice.pdf?t=${t}`}
+          className="text-sm underline"
+        >
+          Download PDF invoice
+        </a>
+      }
+    >
       <DocHeader
         title="TAX INVOICE"
         number={invoice.invoiceNumber}
@@ -53,71 +65,57 @@ export default async function PublicInvoicePage({
         ]}
       />
 
-      <p className="mt-6 print:hidden">
-        <a
-          href={`/api/order/${order.orderNumber}/invoice.pdf?t=${t}`}
-          className="text-[10px] text-ink-mute underline-offset-4 hover:underline"
-        >
-          Download PDF invoice
-        </a>
-      </p>
+      <p className="mt-6 text-[9pt] font-semibold tracking-[0.08em] text-[#1f6142]">●  PAID</p>
 
-      <section className="mt-8 grid gap-6 text-[10px] sm:grid-cols-3">
+      <section className="mt-7 grid gap-6 sm:grid-cols-3">
         <div>
           <DocLabel>Sold by</DocLabel>
-          <p className="mt-2 font-semibold text-ink">{SITE_CONTACT.company}</p>
-          {SITE_CONTACT.addressLines.map((line) => (
-            <p key={line} className="text-ink-mute">
-              {line}
-            </p>
-          ))}
-          <p className="mt-1 text-ink-mute">GSTIN {gstin}</p>
-          <p className="text-ink-mute">{SITE_CONTACT.primaryEmail}</p>
-          <p className="text-ink-mute">{SITE_CONTACT.phone}</p>
+          <p className="mt-2 text-[10pt] font-semibold">{SITE_CONTACT.company}</p>
+          <div className="mt-1 space-y-0.5 text-[8.5pt] leading-snug text-[#5c5c60]">
+            {SITE_CONTACT.addressLines.map((line) => (
+              <p key={line}>{line}</p>
+            ))}
+            <p className="pt-1">GSTIN {gstin}</p>
+            <p>{SITE_CONTACT.primaryEmail}</p>
+          </div>
         </div>
         <div>
           <DocLabel>Bill to</DocLabel>
-          <p className="mt-2 font-semibold text-ink">{addr.fullName || order.customerName}</p>
-          {[addr.line1, addr.line2, [addr.city, addr.state, addr.postalCode].filter(Boolean).join(", "), addr.country]
-            .filter(Boolean)
-            .map((line) => (
-              <p key={String(line)} className="text-ink-mute">
-                {line}
+          <div className="mt-2 space-y-0.5 text-[9.5pt] leading-snug">
+            {addressLines({
+              ...addr,
+              fullName: order.customerName ?? addr.fullName,
+              email: order.customerEmail ?? undefined
+            }).map((l, i) => (
+              <p key={l} className={i === 0 ? "font-semibold" : "text-[#5c5c60]"}>
+                {l}
               </p>
             ))}
-          <p className="text-ink-mute">{order.customerEmail}</p>
+          </div>
         </div>
         <div>
           <DocLabel>Details</DocLabel>
           <dl className="mt-2 space-y-1.5">
-            <div className="flex gap-3">
-              <dt className="w-16 shrink-0 text-ink-mute">Payment</dt>
-              <dd className="font-medium text-[#1f6142]">PAID</dd>
-            </div>
-            <div className="flex gap-3">
-              <dt className="w-16 shrink-0 text-ink-mute">Order</dt>
-              <dd className="tabular-nums">{order.orderNumber}</dd>
-            </div>
+            <DocMetaRow label="Payment" value="PAID" strong />
+            <DocMetaRow label="Order" value={order.orderNumber} />
           </dl>
         </div>
       </section>
 
-      <table className="mt-10 w-full text-[10px]">
-        <thead>
-          <tr className="border-b border-ink text-left text-[8px] font-semibold uppercase tracking-[0.08em] text-ink-mute">
-            <th className="py-2">Description</th>
-            <th className="py-2 text-right">Qty</th>
-            <th className="py-2 text-right">Rate</th>
-            <th className="py-2 text-right">Amount</th>
-          </tr>
-        </thead>
+      <table className="mt-9 w-full text-[9.5pt]">
+        <DocTableHead>
+          <th className="px-2 py-2">Description</th>
+          <th className="px-2 py-2 text-right">Qty</th>
+          <th className="px-2 py-2 text-right">Rate</th>
+          <th className="px-2 py-2 text-right">Amount</th>
+        </DocTableHead>
         <tbody>
           {order.items.map((item) => (
-            <tr key={item.id} className="border-b border-ink/10">
-              <td className="py-3 font-medium">{item.productName}</td>
-              <td className="py-3 text-right tabular-nums">{item.quantity}</td>
-              <td className="py-3 text-right tabular-nums">{formatInrPrint(item.unitPriceCents)}</td>
-              <td className="py-3 text-right tabular-nums">
+            <tr key={item.id} className="border-b border-[#e6e6e8]">
+              <td className="px-2 py-3 font-medium">{item.productName}</td>
+              <td className="px-2 py-3 text-right tabular-nums">{item.quantity}</td>
+              <td className="px-2 py-3 text-right tabular-nums">{formatInrPrint(item.unitPriceCents)}</td>
+              <td className="px-2 py-3 text-right tabular-nums font-medium">
                 {formatInrPrint(item.unitPriceCents * item.quantity)}
               </td>
             </tr>
@@ -125,29 +123,24 @@ export default async function PublicInvoicePage({
         </tbody>
       </table>
 
-      <dl className="ml-auto mt-6 max-w-[240px] space-y-1.5 text-[10px]">
-        <div className="flex justify-between gap-6">
-          <dt className="text-ink-mute">Subtotal</dt>
-          <dd className="tabular-nums">{formatInrPrint(invoice.subtotalCents)}</dd>
+      <div className="ml-auto mt-5 w-[58mm] space-y-1.5 text-[9.5pt]">
+        <div className="flex justify-between gap-4">
+          <span className="text-[#6b6b70]">Subtotal</span>
+          <span className="tabular-nums">{formatInrPrint(invoice.subtotalCents)}</span>
         </div>
-        <div className="flex justify-between gap-6">
-          <dt className="text-ink-mute">Tax</dt>
-          <dd className="tabular-nums">{formatInrPrint(invoice.taxCents)}</dd>
+        <div className="flex justify-between gap-4">
+          <span className="text-[#6b6b70]">Tax</span>
+          <span className="tabular-nums">{formatInrPrint(invoice.taxCents)}</span>
         </div>
-        <div className="flex justify-between gap-6 border-t border-ink pt-2 text-[14px] font-semibold">
-          <dt>Total due</dt>
-          <dd className="tabular-nums">{formatInrPrint(invoice.totalCents)}</dd>
+        <div className="flex justify-between gap-4 border-t-[1.1pt] border-[#141416] pt-2 text-[12pt] font-semibold">
+          <span>Total due</span>
+          <span className="tabular-nums">{formatInrPrint(invoice.totalCents)}</span>
         </div>
-      </dl>
-
-      <div className="mt-10 border-t border-ink/20 pt-4">
-        <DocLabel>Note</DocLabel>
-        <p className="mt-2 text-[9.5px] text-ink-mute">
-          This is a computer-generated tax invoice. Payment confirmation appears when captured.
-        </p>
       </div>
 
-      <DocFooter docLabel={`Invoice ${invoice.invoiceNumber}`} />
+      <div className="mt-10">
+        <DocFooter docLabel={`Invoice ${invoice.invoiceNumber}`} />
+      </div>
     </DocShell>
   );
 }

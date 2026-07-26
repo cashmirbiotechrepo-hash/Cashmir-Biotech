@@ -7,8 +7,9 @@ import {
   DocFooter,
   DocHeader,
   DocLabel,
+  DocMetaRow,
   DocShell,
-  MarkCircle,
+  DocTableHead,
   formatInrPrint
 } from "@/components/admin/order-print-doc";
 import { batchLabelForOrder } from "@/modules/shop/services/order-ops.service";
@@ -33,7 +34,10 @@ export default async function OrderReceiptPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const order = await db.order.findUnique({ where: { id }, include: { items: true, invoices: true } });
+  const order = await db.order.findUnique({
+    where: { id },
+    include: { items: true, invoices: true }
+  });
   if (!order) notFound();
   const addr = (order.shippingAddress ?? {}) as Addr;
   const inv = order.invoices[0];
@@ -60,81 +64,65 @@ export default async function OrderReceiptPage({
         ]}
       />
 
-      <div className="mt-8 flex items-start justify-between gap-6">
+      <div className="mt-8 flex items-end justify-between gap-6 border-b border-[#e6e6e8] pb-6">
         <div>
-          <p className="text-[20px] font-bold tabular-nums leading-none text-ink">
+          <p className="text-[7.5pt] font-semibold uppercase tracking-[0.07em] text-[#6b6b70]">
+            Amount received
+          </p>
+          <p className="mt-2 text-[22pt] font-bold tabular-nums leading-none tracking-tight text-[#141416]">
             {formatInrPrint(order.totalCents)}
           </p>
-          <p className="mt-2 text-[9.5px] text-ink-mute">
+          <p className="mt-2 text-[8.5pt] text-[#6b6b70]">
             Paid {paidAt.toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" })}
           </p>
         </div>
         {isPaid ? (
-          <p className="text-[10px] font-semibold tracking-[0.08em] text-[#1f6142]">
-            <span className="mr-1.5 inline-block h-1.5 w-1.5 rounded-full bg-[#1f6142] align-middle" />
-            PAID
-          </p>
+          <p className="pb-1 text-[10pt] font-semibold tracking-[0.08em] text-[#1f6142]">●  PAID</p>
         ) : (
-          <p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-ink-mute">
+          <p className="pb-1 text-[10pt] font-semibold uppercase tracking-[0.08em] text-[#6b6b70]">
             {order.status}
           </p>
         )}
       </div>
 
-      <div className="mt-10 grid gap-8 sm:grid-cols-2">
+      <div className="mt-8 grid grid-cols-2 gap-10">
         <div>
           <DocLabel>Paid by</DocLabel>
-          <div className="mt-2 space-y-0.5 text-[10px] leading-snug">
+          <div className="mt-2 space-y-0.5 text-[9.5pt] leading-snug">
             {addressLines({
               ...addr,
               fullName: order.customerName ?? addr.fullName,
               email: order.customerEmail ?? undefined
-            }).map((l) => (
-              <div key={l} className={l === (order.customerName ?? addr.fullName) ? "font-medium text-ink" : "text-ink-mute"}>
+            }).map((l, i) => (
+              <p key={l} className={i === 0 ? "font-semibold text-[#141416]" : "text-[#5c5c60]"}>
                 {l}
-              </div>
+              </p>
             ))}
           </div>
         </div>
         <div>
           <DocLabel>Payment details</DocLabel>
-          <dl className="mt-2 space-y-1.5 text-[10px]">
-            <div className="flex gap-4">
-              <dt className="w-20 shrink-0 text-ink-mute">Payment ID</dt>
-              <dd className="min-w-0 break-all tabular-nums text-ink">{order.razorpayPaymentId || "—"}</dd>
-            </div>
-            <div className="flex gap-4">
-              <dt className="w-20 shrink-0 text-ink-mute">Gateway</dt>
-              <dd className="min-w-0 break-all tabular-nums text-ink">{order.razorpayOrderId || "—"}</dd>
-            </div>
-            <div className="flex gap-4">
-              <dt className="w-20 shrink-0 text-ink-mute">Invoice</dt>
-              <dd className="tabular-nums text-ink">{inv?.invoiceNumber ?? "Pending"}</dd>
-            </div>
-            <div className="flex gap-4">
-              <dt className="w-20 shrink-0 text-ink-mute">Lot</dt>
-              <dd className="tabular-nums text-ink">
-                {batchLabelForOrder(order.orderNumber, order.createdAt)}
-              </dd>
-            </div>
+          <dl className="mt-2 space-y-1.5">
+            <DocMetaRow label="Payment ID" value={order.razorpayPaymentId || "—"} />
+            <DocMetaRow label="Gateway" value={order.razorpayOrderId || "—"} />
+            <DocMetaRow label="Invoice" value={inv?.invoiceNumber ?? "Pending"} />
+            <DocMetaRow label="Lot" value={batchLabelForOrder(order.orderNumber, order.createdAt)} />
           </dl>
         </div>
       </div>
 
-      <table className="mt-10 w-full text-[10px]">
-        <thead>
-          <tr className="border-b border-ink text-left text-[8px] font-semibold uppercase tracking-[0.08em] text-ink-mute">
-            <th className="py-2">Description</th>
-            <th className="py-2 text-right">Qty</th>
-            <th className="py-2 text-right">Amount</th>
-          </tr>
-        </thead>
+      <table className="mt-9 w-full text-[9.5pt]">
+        <DocTableHead>
+          <th className="px-2 py-2">Description</th>
+          <th className="px-2 py-2 text-right">Qty</th>
+          <th className="px-2 py-2 text-right">Amount</th>
+        </DocTableHead>
         <tbody>
           {order.items.map((item) => (
-            <tr key={item.id} className="border-b border-ink/10">
-              <td className="py-2.5 font-medium">{item.productName}</td>
-              <td className="py-2.5 text-right tabular-nums">{item.quantity}</td>
-              <td className="py-2.5 text-right tabular-nums">
+            <tr key={item.id} className="border-b border-[#e6e6e8]">
+              <td className="px-2 py-3 font-medium">{item.productName}</td>
+              <td className="px-2 py-3 text-right tabular-nums">{item.quantity}</td>
+              <td className="px-2 py-3 text-right tabular-nums">
                 {formatInrPrint(item.unitPriceCents * item.quantity)}
               </td>
             </tr>
@@ -142,26 +130,28 @@ export default async function OrderReceiptPage({
         </tbody>
       </table>
 
-      <div className="ml-auto mt-4 max-w-[220px] space-y-1.5 text-[10px]">
-        <div className="flex justify-between gap-6">
-          <span className="text-ink-mute">Subtotal</span>
+      <div className="ml-auto mt-5 w-[52mm] space-y-1.5 text-[9.5pt]">
+        <div className="flex justify-between gap-4">
+          <span className="text-[#6b6b70]">Subtotal</span>
           <span className="tabular-nums">{formatInrPrint(order.subtotalCents)}</span>
         </div>
-        <div className="flex justify-between gap-6">
-          <span className="text-ink-mute">Tax</span>
+        <div className="flex justify-between gap-4">
+          <span className="text-[#6b6b70]">Tax</span>
           <span className="tabular-nums">{formatInrPrint(order.taxCents)}</span>
         </div>
-        <div className="flex justify-between gap-6">
-          <span className="text-ink-mute">Shipping</span>
+        <div className="flex justify-between gap-4">
+          <span className="text-[#6b6b70]">Shipping</span>
           <span className="tabular-nums">{formatInrPrint(order.shippingCents)}</span>
         </div>
-        <div className="flex justify-between gap-6 border-t border-ink pt-2 text-[12px] font-semibold">
+        <div className="flex justify-between gap-4 border-t-[1.1pt] border-[#141416] pt-2 text-[11pt] font-semibold">
           <span>Total paid</span>
           <span className="tabular-nums">{formatInrPrint(order.totalCents)}</span>
         </div>
       </div>
 
-      <DocFooter docLabel={`Receipt ${order.orderNumber}`} />
+      <div className="mt-10">
+        <DocFooter docLabel={`Receipt ${order.orderNumber}`} />
+      </div>
     </DocShell>
   );
 }
