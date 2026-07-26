@@ -1,14 +1,13 @@
 import "server-only";
 import { PDFDocument, StandardFonts } from "pdf-lib";
 import {
-  BRAND_TRUST,
+  DOC,
   PDF,
   companyBlock,
-  drawRect,
-  embedBrandLogo,
-  embedQrPng,
+  drawDocFooter,
+  drawDocHeader,
+  drawHairline,
   formatInrPdf,
-  siteBaseUrl,
   wrapText
 } from "@/modules/shop/services/pdf-brand";
 
@@ -59,237 +58,239 @@ export type InvoicePdfInput = {
   confirmationToken?: string;
 };
 
-function statusStyle(status: InvoicePdfInput["paymentStatus"]) {
+function statusLabel(status: InvoicePdfInput["paymentStatus"]) {
   switch (status) {
     case "paid":
-      return { label: "PAID", bg: PDF.successBg, fg: PDF.success };
+      return { label: "PAID", color: PDF.success };
     case "refunded":
+      return { label: "REFUNDED", color: PDF.warn };
     case "partially_refunded":
-      return {
-        label: status === "refunded" ? "REFUNDED" : "PARTIAL REFUND",
-        bg: PDF.warnBg,
-        fg: PDF.warn
-      };
+      return { label: "PARTIAL REFUND", color: PDF.warn };
     case "failed":
-      return { label: "FAILED", bg: PDF.warnBg, fg: PDF.warn };
+      return { label: "FAILED", color: PDF.warn };
     case "unpaid":
     case "pending":
-      return { label: "UNPAID", bg: PDF.warnBg, fg: PDF.warn };
+      return { label: "UNPAID", color: PDF.warn };
     default:
-      return { label: "ISSUED", bg: PDF.pearl, fg: PDF.ink };
+      return { label: "ISSUED", color: PDF.mute };
   }
 }
 
-/** Builds a branded GST tax invoice PDF (A4). */
+function rightText(
+  page: import("pdf-lib").PDFPage,
+  text: string,
+  rightX: number,
+  y: number,
+  size: number,
+  font: import("pdf-lib").PDFFont,
+  color = PDF.ink
+) {
+  page.drawText(text, {
+    x: rightX - font.widthOfTextAtSize(text, size),
+    y,
+    size,
+    font,
+    color
+  });
+}
+
+/** Builds a restrained GST tax invoice PDF (A4). */
 export async function buildInvoicePdf(input: InvoicePdfInput): Promise<Uint8Array> {
-  const doc = await PDFDocument.create();
-  const page = doc.addPage([PDF.page.w, PDF.page.h]);
-  const font = await doc.embedFont(StandardFonts.Helvetica);
-  const bold = await doc.embedFont(StandardFonts.HelveticaBold);
+  const pdf = await PDFDocument.create();
+  const page = pdf.addPage([PDF.page.w, PDF.page.h]);
+  const font = await pdf.embedFont(StandardFonts.Helvetica);
+  const bold = await pdf.embedFont(StandardFonts.HelveticaBold);
   const company = companyBlock();
   const m = PDF.margin;
   const contentW = PDF.page.w - m * 2;
-  let y = PDF.page.h;
-
-  const write = (
-    text: string,
-    x: number,
-    size: number,
-    f = font,
-    color = PDF.ink,
-    maxW?: number
-  ) => {
-    const t = maxW
-      ? text.length > 80
-        ? wrapText(text, maxW, f, size)[0]!.slice(0, 90)
-        : text
-      : text;
-    page.drawText(t, { x, y, size, font: f, color });
-  };
-
-  // ——— Header ———
-  const headerH = 78;
-  drawRect(page, 0, PDF.page.h - headerH, PDF.page.w, headerH, PDF.ink);
-  y = PDF.page.h - 18;
-
-  const logo = await embedBrandLogo(doc);
-  if (logo) {
-    const logoH = 46;
-    const logoW = (logo.width / logo.height) * logoH;
-    page.drawImage(logo, {
-      x: m,
-      y: PDF.page.h - headerH + (headerH - logoH) / 2,
-      width: Math.min(logoW, 120),
-      height: logoH
-    });
-  } else {
-    page.drawText("Cashmir Biotech", {
-      x: m,
-      y: PDF.page.h - 42,
-      size: 14,
-      font: bold,
-      color: PDF.white
-    });
-  }
-
-  page.drawText("GST TAX INVOICE", {
-    x: PDF.page.w - m - bold.widthOfTextAtSize("GST TAX INVOICE", 16),
-    y: PDF.page.h - 36,
-    size: 16,
-    font: bold,
-    color: PDF.white
-  });
-  page.drawText(company.name, {
-    x: PDF.page.w - m - font.widthOfTextAtSize(company.name, 8),
-    y: PDF.page.h - 52,
-    size: 8,
-    font,
-    color: PDF.gold
-  });
-
-  // Gold rule under header
-  drawRect(page, 0, PDF.page.h - headerH - 3, PDF.page.w, 3, PDF.gold);
-
-  y = PDF.page.h - headerH - 28;
-
-  // Demo banner when GSTIN missing
   const gstin = input.gstin || company.gstin;
+  const status = statusLabel(input.paymentStatus ?? "paid");
+
+  let y = await drawDocHeader({
+    page,
+    doc: pdf,
+    font,
+    bold,
+    title: "TAX INVOICE",
+    number: input.invoiceNumber,
+    metaLines: [
+      `Issued ${input.issuedAt.toLocaleDateString("en-IN", { dateStyle: "medium" })}`,
+      `Order ${input.orderNumber}`
+    ]
+  });
+
   if (company.demoMode && !input.gstin) {
-    drawRect(page, m, y - 6, contentW, 22, PDF.warnBg, { color: PDF.warn, thickness: 0.6 });
-    page.drawText("DEMO / TEST INVOICE - GST registration details not yet configured", {
-      x: m + 8,
-      y: y,
-      size: 8,
+    page.drawText("Demo invoice — GST registration not configured", {
+      x: m,
+      y,
+      size: DOC.label,
       font: bold,
       color: PDF.warn
     });
-    y -= 30;
+    y -= 18;
   }
 
-  // Meta row
-  const status = statusStyle(input.paymentStatus ?? "paid");
-  const badgeW = bold.widthOfTextAtSize(status.label, 9) + 16;
-  drawRect(page, PDF.page.w - m - badgeW, y - 4, badgeW, 16, status.bg, {
-    color: status.fg,
-    thickness: 0.6
-  });
+  // Status as plain text (no pill)
   page.drawText(status.label, {
-    x: PDF.page.w - m - badgeW + 8,
-    y: y,
-    size: 9,
+    x: m,
+    y,
+    size: DOC.label,
     font: bold,
-    color: status.fg
+    color: status.color
   });
-
-  write(input.invoiceNumber, m, 13, bold);
-  y -= 14;
-  write(`Issued ${input.issuedAt.toLocaleDateString("en-IN", { dateStyle: "medium" })}`, m, 9, font, PDF.mute);
-  y -= 12;
-  write(`Order ${input.orderNumber}`, m, 9, font, PDF.mute);
-  if (gstin) {
-    write(`GSTIN ${gstin}`, m + 220, 9, font, PDF.mute);
-  }
-  if (input.placeOfSupply) {
-    y -= 12;
-    write(`Place of supply: ${input.placeOfSupply}`, m, 9, font, PDF.mute);
-  }
-
   y -= 22;
 
-  // Bill to / From cards
-  const cardH = 78;
-  const cardW = (contentW - 12) / 2;
-  drawRect(page, m, y - cardH + 12, cardW, cardH, PDF.pearl, { color: PDF.line });
-  drawRect(page, m + cardW + 12, y - cardH + 12, cardW, cardH, PDF.pearl, { color: PDF.line });
+  // Seller | Bill to | Metadata — same baseline
+  const colW = contentW / 3;
+  const col2 = m + colW;
+  const col3 = m + colW * 2;
+  const blockTop = y;
 
-  let leftY = y;
-  page.drawText("BILL TO", { x: m + 10, y: leftY, size: 8, font: bold, color: PDF.gold });
-  leftY -= 13;
-  const billName = (input.shippingAddress.fullName || input.customerName || "Customer").slice(0, 42);
-  page.drawText(billName, { x: m + 10, y: leftY, size: 10, font: bold, color: PDF.ink });
-  leftY -= 12;
-  const addrLines = [
+  page.drawText("SOLD BY", { x: m, y: blockTop, size: DOC.label, font: bold, color: PDF.mute });
+  page.drawText("BILL TO", { x: col2 + 8, y: blockTop, size: DOC.label, font: bold, color: PDF.mute });
+  page.drawText("DETAILS", { x: col3 + 8, y: blockTop, size: DOC.label, font: bold, color: PDF.mute });
+
+  let ly = blockTop - 14;
+  page.drawText(company.name, { x: m, y: ly, size: DOC.body, font: bold, color: PDF.ink });
+  ly -= 11;
+  for (const line of company.addressLines) {
+    page.drawText(line, { x: m, y: ly, size: DOC.label, font, color: PDF.mute });
+    ly -= 10;
+  }
+  if (gstin) {
+    page.drawText(`GSTIN ${gstin}`, { x: m, y: ly, size: DOC.label, font, color: PDF.mute });
+    ly -= 10;
+  }
+  page.drawText(company.email, { x: m, y: ly, size: DOC.label, font, color: PDF.mute });
+  ly -= 10;
+  page.drawText(company.phone, { x: m, y: ly, size: DOC.label, font, color: PDF.mute });
+
+  let by = blockTop - 14;
+  const billName = (input.shippingAddress.fullName || input.customerName || "Customer").slice(0, 48);
+  page.drawText(billName, { x: col2 + 8, y: by, size: DOC.body, font: bold, color: PDF.ink });
+  by -= 11;
+  const billLines = [
     input.shippingAddress.line1,
     input.shippingAddress.line2,
     [input.shippingAddress.city, input.shippingAddress.state, input.shippingAddress.postalCode]
       .filter(Boolean)
       .join(", "),
+    input.shippingAddress.country,
     input.shippingAddress.phone || input.customerPhone,
     input.customerEmail
   ].filter(Boolean) as string[];
-  for (const line of addrLines.slice(0, 4)) {
-    page.drawText(String(line).slice(0, 42), {
-      x: m + 10,
-      y: leftY,
-      size: 8,
-      font,
-      color: PDF.mute
-    });
-    leftY -= 11;
+  for (const line of billLines) {
+    for (const wrapped of wrapText(String(line), colW - 16, font, DOC.label)) {
+      page.drawText(wrapped, { x: col2 + 8, y: by, size: DOC.label, font, color: PDF.mute });
+      by -= 10;
+    }
   }
 
-  let rightY = y;
-  const fromX = m + cardW + 22;
-  page.drawText("FROM", { x: fromX, y: rightY, size: 8, font: bold, color: PDF.gold });
-  rightY -= 13;
-  page.drawText(company.name, { x: fromX, y: rightY, size: 10, font: bold, color: PDF.ink });
-  rightY -= 12;
-  for (const line of [company.location, company.email, company.phone, gstin ? `GSTIN ${gstin}` : null].filter(
-    Boolean
-  ) as string[]) {
-    page.drawText(line.slice(0, 42), { x: fromX, y: rightY, size: 8, font, color: PDF.mute });
-    rightY -= 11;
+  let my = blockTop - 14;
+  const details: Array<[string, string]> = [
+    ["Payment", status.label],
+    ["Method", input.paymentMethod || "Razorpay"],
+    [
+      "Paid",
+      input.paidAt
+        ? input.paidAt.toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" })
+        : "—"
+    ]
+  ];
+  if (input.placeOfSupply) details.push(["Supply", input.placeOfSupply]);
+  if (input.razorpayPaymentId) details.push(["Payment ID", input.razorpayPaymentId]);
+  const labelColW = 58;
+  for (const [label, value] of details) {
+    page.drawText(label, { x: col3 + 8, y: my, size: DOC.label, font, color: PDF.mute });
+    const valueColor = label === "Payment" ? status.color : PDF.ink;
+    const lines = wrapText(value, colW - labelColW - 12, font, DOC.label);
+    let vx = my;
+    for (let i = 0; i < lines.length; i++) {
+      page.drawText(lines[i]!, {
+        x: col3 + 8 + labelColW,
+        y: vx,
+        size: DOC.label,
+        font,
+        color: valueColor
+      });
+      vx -= 10;
+    }
+    my = vx - 4;
   }
 
-  y -= cardH + 8;
+  y = Math.min(ly, by, my) - 16;
+  drawHairline(page, m, y, PDF.page.w - m);
+  y -= 18;
 
-  // Items table header
-  const colItem = m;
-  const colSku = m + 220;
-  const colQty = m + 320;
-  const colRate = m + 370;
-  const colAmt = m + 455;
+  // Table
+  const colDesc = m;
+  const colQty = m + contentW * 0.58;
+  const colRate = m + contentW * 0.72;
+  const colAmt = m + contentW;
 
-  drawRect(page, m, y - 6, contentW, 20, PDF.ink);
-  page.drawText("ITEM", { x: colItem + 8, y: y, size: 8, font: bold, color: PDF.white });
-  page.drawText("SKU / LOT", { x: colSku, y: y, size: 8, font: bold, color: PDF.white });
-  page.drawText("QTY", { x: colQty, y: y, size: 8, font: bold, color: PDF.white });
-  page.drawText("RATE", { x: colRate, y: y, size: 8, font: bold, color: PDF.white });
-  page.drawText("AMOUNT", { x: colAmt, y: y, size: 8, font: bold, color: PDF.white });
-  y -= 24;
+  page.drawText("DESCRIPTION", { x: colDesc, y, size: DOC.tableHead, font: bold, color: PDF.mute });
+  page.drawText("QTY", {
+    x: colQty - bold.widthOfTextAtSize("QTY", DOC.tableHead),
+    y,
+    size: DOC.tableHead,
+    font: bold,
+    color: PDF.mute
+  });
+  page.drawText("RATE", {
+    x: colRate - bold.widthOfTextAtSize("RATE", DOC.tableHead),
+    y,
+    size: DOC.tableHead,
+    font: bold,
+    color: PDF.mute
+  });
+  page.drawText("AMOUNT", {
+    x: colAmt - bold.widthOfTextAtSize("AMOUNT", DOC.tableHead),
+    y,
+    size: DOC.tableHead,
+    font: bold,
+    color: PDF.mute
+  });
+  y -= 8;
+  drawHairline(page, m, y, PDF.page.w - m, 0.6, PDF.ink);
+  y -= 14;
 
   const hsn = input.hsn || "21069099";
+  const footerReserve = 110;
   for (const line of input.lines) {
-    if (y < 220) break;
+    if (y < footerReserve + 80) break;
     const rate = line.unitPriceCents ?? Math.round(line.amountCents / Math.max(1, line.qty));
-    const nameLines = wrapText(line.description, 200, font, 9);
-    page.drawText(nameLines[0]!.slice(0, 40), { x: colItem + 8, y, size: 9, font: bold, color: PDF.ink });
+    const nameLines = wrapText(line.description, contentW * 0.52, font, DOC.body);
+    page.drawText(nameLines[0]!, {
+      x: colDesc,
+      y,
+      size: DOC.body,
+      font: bold,
+      color: PDF.ink
+    });
+    rightText(page, String(line.qty), colQty, y, DOC.body, font);
+    rightText(page, formatInrPdf(rate), colRate, y, DOC.body, font);
+    rightText(page, formatInrPdf(line.amountCents), colAmt, y, DOC.body, bold);
+    y -= 12;
+
     const meta = [line.sku, line.lot ? `Lot ${line.lot}` : null, `HSN ${line.hsn || hsn}`]
       .filter(Boolean)
-      .join(" | ");
-    page.drawText((meta || "—").slice(0, 28), { x: colSku, y, size: 7, font, color: PDF.mute });
-    page.drawText(String(line.qty), { x: colQty, y, size: 9, font, color: PDF.ink });
-    page.drawText(formatInrPdf(rate), { x: colRate, y, size: 8, font, color: PDF.ink });
-    page.drawText(formatInrPdf(line.amountCents), { x: colAmt, y, size: 9, font: bold, color: PDF.ink });
-    y -= 16;
-    if (nameLines[1]) {
-      page.drawText(nameLines[1].slice(0, 40), { x: colItem + 8, y, size: 8, font, color: PDF.mute });
-      y -= 12;
+      .join("  ·  ");
+    if (meta) {
+      page.drawText(meta, { x: colDesc, y, size: DOC.label, font, color: PDF.mute });
+      y -= 11;
     }
-    page.drawLine({
-      start: { x: m, y: y + 4 },
-      end: { x: m + contentW, y: y + 4 },
-      thickness: 0.4,
-      color: PDF.line
-    });
-    y -= 6;
+    if (nameLines[1]) {
+      page.drawText(nameLines[1], { x: colDesc, y, size: DOC.label, font, color: PDF.mute });
+      y -= 11;
+    }
+    drawHairline(page, m, y + 4, PDF.page.w - m, 0.4, PDF.line);
+    y -= 8;
   }
 
   y -= 8;
 
-  // Totals panel
-  const totalsW = 220;
-  const totalsX = PDF.page.w - m - totalsW;
+  // Totals
+  const totalsX = m + contentW * 0.55;
   const rows: Array<{ label: string; value: string; strong?: boolean }> = [
     { label: "Subtotal", value: formatInrPdf(input.subtotalCents) }
   ];
@@ -302,122 +303,40 @@ export async function buildInvoicePdf(input: InvoicePdfInput): Promise<Uint8Arra
     rows.push({ label: "SGST", value: formatInrPdf(input.sgstCents) });
   } else if ((input.igstCents ?? 0) > 0) {
     rows.push({ label: "IGST", value: formatInrPdf(input.igstCents!) });
-  } else {
-    rows.push({ label: "Tax (GST incl.)", value: formatInrPdf(input.taxCents) });
+  } else if (input.taxCents > 0) {
+    rows.push({ label: "Tax (GST)", value: formatInrPdf(input.taxCents) });
   }
-  rows.push({ label: "Grand total", value: formatInrPdf(input.totalCents), strong: true });
 
-  const totalsH = rows.length * 16 + 18;
-  drawRect(page, totalsX, y - totalsH + 12, totalsW, totalsH, PDF.pearl, { color: PDF.line });
-  let ty = y;
   for (const row of rows) {
-    const f = row.strong ? bold : font;
-    const size = row.strong ? 11 : 9;
-    page.drawText(row.label, {
-      x: totalsX + 10,
-      y: ty,
-      size,
-      font: f,
-      color: row.strong ? PDF.ink : PDF.mute
-    });
-    const vw = f.widthOfTextAtSize(row.value, size);
-    page.drawText(row.value, {
-      x: totalsX + totalsW - 10 - vw,
-      y: ty,
-      size,
-      font: f,
-      color: PDF.ink
-    });
-    ty -= 16;
-  }
-  y -= totalsH + 10;
-
-  // Payment block
-  drawRect(page, m, y - 58, contentW, 70, PDF.paper, { color: PDF.line });
-  page.drawText("PAYMENT", { x: m + 10, y: y, size: 8, font: bold, color: PDF.gold });
-  y -= 14;
-  const payBits = [
-    `Status: ${status.label}`,
-    input.paymentMethod ? `Method: ${input.paymentMethod}` : "Method: Razorpay",
-    input.paidAt
-      ? `Paid on: ${input.paidAt.toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" })}`
-      : null,
-    input.razorpayPaymentId ? `Txn: ${input.razorpayPaymentId}` : null,
-    input.razorpayOrderId ? `Razorpay order: ${input.razorpayOrderId}` : null
-  ].filter(Boolean) as string[];
-  for (const bit of payBits.slice(0, 4)) {
-    page.drawText(bit.slice(0, 70), { x: m + 10, y, size: 8, font, color: PDF.ink });
-    y -= 11;
+    page.drawText(row.label, { x: totalsX, y, size: DOC.body, font, color: PDF.mute });
+    rightText(page, row.value, colAmt, y, DOC.body, font);
+    y -= 13;
   }
 
-  y -= 18;
-
-  // Trust + support + QR
-  const verifyUrl = input.confirmationToken
-    ? `${siteBaseUrl()}/order/${input.orderNumber}?t=${input.confirmationToken}`
-    : `${siteBaseUrl()}/portal/login`;
-  const qr = await embedQrPng(doc, verifyUrl, 96);
-
-  const footerTop = Math.max(y, 130);
-  y = footerTop;
-
-  page.drawText("TRUST & QUALITY", { x: m, y, size: 8, font: bold, color: PDF.gold });
-  y -= 12;
-  for (const line of BRAND_TRUST) {
-    page.drawText(`-  ${line}`, { x: m, y, size: 8, font, color: PDF.mute });
-    y -= 11;
-  }
-
+  drawHairline(page, totalsX, y + 6, PDF.page.w - m, 0.7, PDF.ink);
   y -= 6;
-  page.drawText("NEED HELP?", { x: m, y, size: 8, font: bold, color: PDF.gold });
-  y -= 12;
-  page.drawText(`${company.support}  |  ${company.phone}`, { x: m, y, size: 8, font, color: PDF.ink });
-  y -= 11;
-  page.drawText(`${siteBaseUrl()}  |  Customer Portal for invoices & CoAs`, {
-    x: m,
-    y,
-    size: 8,
-    font,
-    color: PDF.mute
-  });
-  y -= 11;
-  page.drawText("Love this formulation? Reorder at cashmirbiotech.com/products", {
-    x: m,
-    y,
-    size: 8,
-    font,
-    color: PDF.mute
-  });
+  page.drawText("TOTAL DUE", { x: totalsX, y, size: DOC.value, font: bold, color: PDF.ink });
+  rightText(page, formatInrPdf(input.totalCents), colAmt, y, DOC.total, bold);
+  y -= 28;
 
-  if (qr) {
-    const qSize = 72;
-    page.drawImage(qr, {
-      x: PDF.page.w - m - qSize,
-      y: 48,
-      width: qSize,
-      height: qSize
-    });
-    page.drawText("Verify order", {
-      x: PDF.page.w - m - qSize,
-      y: 38,
-      size: 7,
-      font: bold,
-      color: PDF.mute
-    });
+  // Note — rule + text, no card
+  if (y > footerReserve + 40) {
+    drawHairline(page, m, y, PDF.page.w - m);
+    y -= 14;
+    page.drawText("NOTE", { x: m, y, size: DOC.label, font: bold, color: PDF.mute });
+    y -= 12;
+    page.drawText(
+      "This is a computer-generated tax invoice. Payment confirmation appears above when captured.",
+      { x: m, y, size: DOC.label, font, color: PDF.mute }
+    );
   }
 
-  // Bottom authenticity strip
-  drawRect(page, 0, 0, PDF.page.w, 28, PDF.ink);
-  page.drawText(
-    `Computer-generated tax invoice | ${input.invoiceNumber} | Generated ${new Date().toLocaleString("en-IN")}`,
-    {
-      x: m,
-      y: 10,
-      size: 7,
-      font,
-      color: PDF.white
-    }
-  );
+  drawDocFooter({
+    page,
+    font,
+    bold,
+    docLabel: `Invoice ${input.invoiceNumber}`
+  });
 
-  return doc.save();
+  return pdf.save();
 }
