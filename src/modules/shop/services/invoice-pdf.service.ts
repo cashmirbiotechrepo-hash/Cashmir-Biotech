@@ -161,6 +161,14 @@ export async function buildInvoicePdf(input: InvoicePdfInput): Promise<Uint8Arra
     page.drawText(`GSTIN ${gstin}`, { x: m, y: ly, size: DOC.label, font, color: PDF.mute });
     ly -= 10;
   }
+  if (company.pan) {
+    page.drawText(`PAN ${company.pan}`, { x: m, y: ly, size: DOC.label, font, color: PDF.mute });
+    ly -= 10;
+  }
+  if (company.cin) {
+    page.drawText(`CIN ${company.cin}`, { x: m, y: ly, size: DOC.label, font, color: PDF.mute });
+    ly -= 10;
+  }
   page.drawText(company.email, { x: m, y: ly, size: DOC.label, font, color: PDF.mute });
   ly -= 10;
   page.drawText(company.phone, { x: m, y: ly, size: DOC.label, font, color: PDF.mute });

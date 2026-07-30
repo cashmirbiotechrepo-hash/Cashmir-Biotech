@@ -24,6 +24,7 @@ export async function GET() {
   async function* rows() {
     for await (const o of cursorPages((args) =>
       db.order.findMany({
+        where: { status: { notIn: ["pending", "payment_failed"] } },
         ...(args.cursor ? { cursor: { id: args.cursor }, skip: 1 } : {}),
         take: args.take,
         orderBy: { id: "desc" },

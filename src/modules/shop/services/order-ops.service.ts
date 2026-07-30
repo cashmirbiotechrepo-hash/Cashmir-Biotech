@@ -3,6 +3,7 @@ import type { Order, OrderEvent, OrderItem, Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
 import { logger } from "@/lib/logger";
 import { DEFAULT_HSN_CODE, DEFAULT_PLACE_OF_SUPPLY } from "@/lib/constants";
+import { companyLegal } from "@/lib/company-legal";
 import { splitGstCents } from "@/lib/gst";
 import { nextInvoiceNumberAtomic } from "@/modules/admin/services/phase2.service";
 
@@ -67,6 +68,7 @@ export async function ensureInvoiceForOrder(orderId: string): Promise<{
   const addr = (order.shippingAddress ?? {}) as { state?: string };
   const placeOfSupply = addr.state ?? DEFAULT_PLACE_OF_SUPPLY;
   const gstSplit = splitGstCents(tax, placeOfSupply);
+  const legal = companyLegal();
 
   const MAX_ATTEMPTS = 3;
   for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
@@ -81,7 +83,9 @@ export async function ensureInvoiceForOrder(orderId: string): Promise<{
           taxCents: tax,
           totalCents: total,
           gstDetails: {
-            gstin: process.env.COMPANY_GSTIN ?? "",
+            gstin: legal.gstin,
+            pan: legal.pan,
+            cin: legal.cin,
             placeOfSupply,
             taxType: gstSplit.taxType,
             cgstCents: gstSplit.cgstCents,

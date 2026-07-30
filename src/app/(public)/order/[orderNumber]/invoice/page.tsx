@@ -2,8 +2,10 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { getOrderInvoiceByToken } from "@/modules/shop/services/order.service";
 import { SITE_CONTACT } from "@/lib/site-contact";
+import { companyLegal } from "@/lib/company-legal";
 import { addressLines } from "@/components/admin/order-print-shell";
 import {
+  CompanyLegalLines,
   DocFooter,
   DocHeader,
   DocLabel,
@@ -43,7 +45,7 @@ export default async function PublicInvoicePage({
     phone?: string;
     country?: string;
   };
-  const gstin = process.env.COMPANY_GSTIN || "—";
+  const { gstin } = companyLegal();
 
   return (
     <DocShell
@@ -75,8 +77,8 @@ export default async function PublicInvoicePage({
             {SITE_CONTACT.addressLines.map((line) => (
               <p key={line}>{line}</p>
             ))}
-            <p className="pt-1">GSTIN {gstin}</p>
-            <p>{SITE_CONTACT.primaryEmail}</p>
+            <CompanyLegalLines gstin={gstin} />
+            <p className="pt-2">{SITE_CONTACT.primaryEmail}</p>
           </div>
         </div>
         <div>

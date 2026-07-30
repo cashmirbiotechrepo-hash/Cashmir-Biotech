@@ -11,13 +11,11 @@ import { buttonVariants } from "@/components/ui/button";
 export const metadata = { title: "Orders" };
 
 const STATUSES = [
-  "pending",
   "paid",
   "processing",
   "shipped",
   "delivered",
   "cancelled",
-  "payment_failed",
   "refunded"
 ];
 
@@ -34,7 +32,9 @@ export default async function AdminOrdersPage({
   const page = Math.max(1, Number(sp.page ?? "1") || 1);
 
   const where: Prisma.OrderWhereInput = {
-    ...(status ? { status: status as Prisma.OrderWhereInput["status"] } : {}),
+    ...(status
+      ? { status: status as Prisma.OrderWhereInput["status"] }
+      : { status: { notIn: ["pending", "payment_failed"] } }),
     ...(q
       ? {
           OR: [

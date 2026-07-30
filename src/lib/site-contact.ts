@@ -19,5 +19,11 @@ export const SITE_CONTACT = {
     "India"
   ] as const,
   mapsUrl:
-    "https://www.google.com/maps/place/Cashmir+BioTech/@34.1452997,74.8782259,17z"
+    "https://www.google.com/maps/place/Cashmir+BioTech/@34.1452997,74.8782259,17z",
+  /** Registered company identifiers (invoices, GST, legal footers) */
+  legal: {
+    cin: "U15490JK2022PTC013836",
+    pan: "AAKCC6037C",
+    gstin: "01AAKCC6037C1Z7"
+  } as const
 } as const;

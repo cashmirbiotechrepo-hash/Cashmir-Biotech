@@ -32,8 +32,8 @@ export async function getDashboardStats(): Promise<AdminDashboardStats> {
   ] = await Promise.all([
     db.product.count(),
     db.product.count({ where: { active: true } }),
-    db.order.count(),
-    db.order.count({ where: { status: "pending" } }),
+    db.order.count({ where: { status: { notIn: ["pending", "payment_failed"] } } }),
+    db.order.count({ where: { status: { in: ["paid", "processing"] } } }),
     db.order.aggregate({
       where: { status: { in: ["paid", "processing", "shipped", "delivered"] } },
       _sum: { totalCents: true }
@@ -75,6 +75,7 @@ export async function getDashboardStats(): Promise<AdminDashboardStats> {
 
 export async function listRecentOrders(limit = 8) {
   return db.order.findMany({
+    where: { status: { notIn: ["pending", "payment_failed"] } },
     orderBy: { createdAt: "desc" },
     take: limit,
     include: { items: true }

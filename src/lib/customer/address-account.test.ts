@@ -29,12 +29,13 @@ describe("parseIndianMobile", () => {
   });
 
   it("strips +91 / 91", () => {
-    expect(parseIndianMobile("+91 98765 43210").ok && parseIndianMobile("+91 98765 43210").digits).toBe(
-      "9876543210"
-    );
-    expect(parseIndianMobile("919876543210").ok && parseIndianMobile("919876543210").digits).toBe(
-      "9876543210"
-    );
+    const r1 = parseIndianMobile("+91 98765 43210");
+    expect(r1.ok).toBe(true);
+    if (r1.ok) expect(r1.digits).toBe("9876543210");
+
+    const r2 = parseIndianMobile("919876543210");
+    expect(r2.ok).toBe(true);
+    if (r2.ok) expect(r2.digits).toBe("9876543210");
   });
 
   it("rejects invalid", () => {

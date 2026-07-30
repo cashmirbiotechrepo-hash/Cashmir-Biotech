@@ -6,6 +6,7 @@ import { rgb } from "pdf-lib";
 import QRCode from "qrcode";
 import bwipjs from "bwip-js";
 import { SITE_CONTACT } from "@/lib/site-contact";
+import { companyLegal, companyLegalConfigured } from "@/lib/company-legal";
 
 /** A4 @ 72pt — Swiss/print-first document system.
  * One typeface: Helvetica (pdf-lib StandardFonts). HTML print uses Inter via site font-sans.
@@ -182,7 +183,7 @@ export function wrapText(
 }
 
 export function companyBlock() {
-  const gstin = process.env.COMPANY_GSTIN?.trim();
+  const legal = companyLegal();
   return {
     name: SITE_CONTACT.company,
     location: SITE_CONTACT.location,
@@ -190,8 +191,10 @@ export function companyBlock() {
     email: SITE_CONTACT.primaryEmail,
     support: SITE_CONTACT.supportEmail,
     phone: SITE_CONTACT.phone,
-    gstin: gstin && gstin.length > 0 ? gstin : null,
-    demoMode: !gstin || gstin.length < 5
+    gstin: legal.gstin,
+    pan: legal.pan,
+    cin: legal.cin,
+    demoMode: !companyLegalConfigured()
   };
 }
 
@@ -298,6 +301,13 @@ export function drawDocFooter(input: DocFooterInput) {
     page.drawText(line, { x: m, y, size: DOC.footer - 0.5, font, color: PDF.mute });
     y -= 9;
   }
+  page.drawText(`GSTIN ${company.gstin}  ·  PAN ${company.pan}  ·  CIN ${company.cin}`, {
+    x: m,
+    y,
+    size: DOC.footer - 1,
+    font,
+    color: PDF.faint
+  });
 
   const right = PDF.page.w - m;
   page.drawText(docLabel, {

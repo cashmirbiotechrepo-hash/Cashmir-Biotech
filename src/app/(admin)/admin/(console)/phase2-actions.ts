@@ -22,6 +22,7 @@ import {
   patentFullSchema
 } from "@/modules/admin/validations/phase2";
 import type { ActionState } from "./actions";
+import { companyLegal } from "@/lib/company-legal";
 
 function fields(formData: FormData) {
   return Object.fromEntries(formData.entries());
@@ -412,6 +413,7 @@ export async function createInvoiceAction(formData: FormData): Promise<ActionSta
     const total = order.totalCents || subtotal + tax;
     const { splitGstCents } = await import("@/lib/gst");
     const gstSplit = splitGstCents(tax, parsed.data.placeOfSupply);
+    const legal = companyLegal();
 
     const invoice = await db.invoice.create({
       data: {
@@ -421,7 +423,9 @@ export async function createInvoiceAction(formData: FormData): Promise<ActionSta
         taxCents: tax,
         totalCents: total,
         gstDetails: {
-          gstin: parsed.data.gstin ?? "",
+          gstin: parsed.data.gstin?.trim() || legal.gstin,
+          pan: legal.pan,
+          cin: legal.cin,
           placeOfSupply: parsed.data.placeOfSupply,
           taxType: gstSplit.taxType,
           cgstCents: gstSplit.cgstCents,

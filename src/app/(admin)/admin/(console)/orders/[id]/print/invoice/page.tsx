@@ -4,6 +4,7 @@ import { db } from "@/lib/db";
 import { PrintButton } from "@/components/admin/print-button";
 import { addressLines } from "@/components/admin/order-print-shell";
 import {
+  CompanyLegalLines,
   DocFooter,
   DocHeader,
   DocLabel,
@@ -13,6 +14,7 @@ import {
   formatInrPrint
 } from "@/components/admin/order-print-doc";
 import { SITE_CONTACT } from "@/lib/site-contact";
+import { companyLegal } from "@/lib/company-legal";
 
 export const metadata = { title: "Tax invoice" };
 
@@ -52,7 +54,7 @@ export default async function OrderInvoicePrintPage({
 
   const addr = (order.shippingAddress ?? {}) as Addr;
   const gst = (invoice.gstDetails ?? {}) as GstDetails;
-  const gstin = gst.gstin || process.env.COMPANY_GSTIN || null;
+  const gstin = gst.gstin || companyLegal().gstin || null;
   const isPaid = ["paid", "processing", "shipped", "delivered"].includes(order.status);
   const pdfHref =
     order.confirmationToken.length > 0

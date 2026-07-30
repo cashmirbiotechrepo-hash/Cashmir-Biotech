@@ -1,6 +1,7 @@
 import Image from "next/image";
 import type { ReactNode } from "react";
 import { SITE_CONTACT } from "@/lib/site-contact";
+import { companyLegal, companyLegalLines } from "@/lib/company-legal";
 
 /** Shared institutional print system for invoice, packing slip, receipt, label. */
 
@@ -16,6 +17,43 @@ export function formatInrPrint(cents: number) {
 export function DocLabel({ children }: { children: ReactNode }) {
   return (
     <p className="text-[7.5pt] font-semibold uppercase tracking-[0.07em] text-[#5c5c60]">{children}</p>
+  );
+}
+
+/** GSTIN · PAN · CIN block for invoice sold-by sections and footers. */
+export function CompanyLegalLines({
+  gstin,
+  pan,
+  cin,
+  className = "mt-1 space-y-0.5 text-[8.5pt] leading-snug text-[#5c5c60]"
+}: {
+  gstin?: string | null;
+  pan?: string | null;
+  cin?: string | null;
+  className?: string;
+}) {
+  const legal = companyLegal();
+  const lines = [
+    `GSTIN ${gstin || legal.gstin}`,
+    `PAN ${pan || legal.pan}`,
+    `CIN ${cin || legal.cin}`
+  ];
+  return (
+    <div className={className}>
+      {lines.map((line) => (
+        <p key={line} className="tabular-nums">
+          {line}
+        </p>
+      ))}
+    </div>
+  );
+}
+
+export function DocFooterLegalLine() {
+  return (
+    <p className="mt-1.5 tabular-nums text-[7pt] text-[#8a8a8f]">
+      {companyLegalLines().join("  ·  ")}
+    </p>
   );
 }
 
