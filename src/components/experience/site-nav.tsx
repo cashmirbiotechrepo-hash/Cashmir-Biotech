@@ -299,14 +299,15 @@ export function SiteNav({
               aria-label="Cashmir Biotech home"
               className="group flex items-center transition-opacity hover:opacity-85"
             >
-              <Image
-                src="/logo.png"
-                alt="Cashmir Biotech Logo"
-                width={185}
-                height={42}
-                className="h-9.5 sm:h-11 w-auto object-contain object-left"
-                priority
-              />
+              <div className="relative h-7 w-28 sm:h-8 sm:w-32 shrink-0 overflow-hidden">
+                <Image
+                  src="/logo.png"
+                  alt="Cashmir Biotech Logo"
+                  fill
+                  className="object-contain object-left"
+                  priority
+                />
+              </div>
             </Link>
           </div>
 
@@ -376,13 +377,14 @@ export function SiteNav({
           {/* Menu Drawer Header Bar */}
           <div className="flex h-16 shrink-0 items-center justify-between border-b border-ink/10 px-6">
             <Link href="/" onClick={() => setMenuOpen(false)} aria-label="Cashmir Biotech home">
-              <Image
-                src="/logo.png"
-                alt="Cashmir Biotech"
-                width={160}
-                height={36}
-                className="h-8 w-auto object-contain"
-              />
+              <div className="relative h-7 w-28 shrink-0 overflow-hidden">
+                <Image
+                  src="/logo.png"
+                  alt="Cashmir Biotech"
+                  fill
+                  className="object-contain object-left"
+                />
+              </div>
             </Link>
             <button
               onClick={() => setMenuOpen(false)}
