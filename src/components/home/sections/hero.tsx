@@ -17,9 +17,9 @@ export function Hero({ content }: { content: HomeContent }) {
       id="top"
       className="relative flex min-h-0 md:min-h-[100svh] items-start md:items-center overflow-hidden pb-6 pt-24 md:pb-16 md:pt-36 lg:pt-44"
     >
-      <div className="frame grid w-full grid-cols-1 items-center gap-4 md:gap-10 lg:grid-cols-[1.05fr_0.95fr] lg:gap-8">
-        {/* Copy — sits under the jar on small screens; keep compact so CTAs aren’t pushed into the next scroll */}
-        <div className="relative z-10 order-2 lg:order-1">
+      <div className="frame grid w-full grid-cols-1 items-center gap-8 md:gap-10 lg:grid-cols-[1.05fr_0.95fr] lg:gap-8">
+        {/* Copy — sits under the jar on small screens */}
+        <div className="relative z-10 order-2 pt-2 lg:order-1 lg:pt-0">
           <motion.p
             initial={{ opacity: 0, y: 12 }}
             animate={ready ? { opacity: 1, y: 0 } : {}}
@@ -72,8 +72,8 @@ export function Hero({ content }: { content: HomeContent }) {
           </motion.div>
         </div>
 
-        {/* Product — capped height on phone so it doesn’t eat the whole first screen */}
-        <div className="relative order-1 mx-auto h-[34vh] min-h-[200px] max-h-[260px] w-full sm:max-h-[300px] md:mx-0 md:h-[52vh] md:max-h-none md:min-h-[320px] lg:order-2 lg:h-[70vh]">
+        {/* Product — slightly shorter on mobile to leave room for copy */}
+        <div className="relative order-1 mx-auto h-[28vh] min-h-[170px] max-h-[220px] w-full sm:max-h-[260px] md:mx-0 md:h-[52vh] md:max-h-none md:min-h-[320px] lg:order-2 lg:h-[70vh]">
           <HeroProduct ready={ready} />
         </div>
       </div>
