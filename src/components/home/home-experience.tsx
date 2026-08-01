@@ -9,7 +9,6 @@ import { Products } from "@/components/home/sections/products";
 import { Patents } from "@/components/home/sections/patents";
 import { Mission } from "@/components/home/sections/mission";
 import { Faq } from "@/components/home/sections/faq";
-import { CtaNewsletter } from "@/components/home/sections/cta-newsletter";
 import type { HomeContent } from "@/components/home/content";
 
 /**
@@ -28,7 +27,6 @@ export function HomeExperience({ content }: { content: HomeContent }) {
       <Patents patents={content.patents} />
       <Mission statement={content.mission} />
       <Faq faqs={content.faqs} />
-      <CtaNewsletter />
     </>
   );
 }
