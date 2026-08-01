@@ -141,7 +141,10 @@ export async function attachOrderToCustomer(orderId: string, customerId: string)
   await db.order.update({ where: { id: orderId }, data: { customerId } });
 }
 
-export async function requestPortalOtp(emailRaw: string): Promise<{ ok: true } | { ok: false; error: string }> {
+export async function requestPortalOtp(
+  emailRaw: string,
+  purpose: "login" | "password_reset" = "login"
+): Promise<{ ok: true } | { ok: false; error: string }> {
   const email = emailRaw.toLowerCase().trim();
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
     return { ok: false, error: "Enter a valid email address." };
@@ -167,7 +170,7 @@ export async function requestPortalOtp(emailRaw: string): Promise<{ ok: true } |
 
   // Uniform cooldown for every email (known or unknown) — closes OTP enumeration (H5).
   const recentAny = await db.customerOtp.findFirst({
-    where: { email, purpose: "login" },
+    where: { email, purpose },
     orderBy: { createdAt: "desc" }
   });
   if (recentAny && recentAny.createdAt.getTime() > Date.now() - OTP_COOLDOWN_MS) {
@@ -187,7 +190,7 @@ export async function requestPortalOtp(emailRaw: string): Promise<{ ok: true } |
       data: {
         email,
         codeHash: hashOtp(String(randomInt(100000, 1000000))),
-        purpose: "login",
+        purpose,
         expiresAt: new Date(Date.now() + OTP_EXPIRY_MS),
         usedAt: new Date()
       }
@@ -211,7 +214,7 @@ export async function requestPortalOtp(emailRaw: string): Promise<{ ok: true } |
       customerId: customer.id,
       email,
       codeHash: hashOtp(code),
-      purpose: "login",
+      purpose,
       expiresAt: new Date(Date.now() + OTP_EXPIRY_MS)
     }
   });
@@ -219,7 +222,7 @@ export async function requestPortalOtp(emailRaw: string): Promise<{ ok: true } |
   if (smtpReady) {
     const sent = await sendOtpMail({
       to: email,
-      kind: "portal_login",
+      kind: purpose === "password_reset" ? "portal_password_reset" : "portal_login",
       code
     });
     if (!sent) {
@@ -240,7 +243,8 @@ export async function requestPortalOtp(emailRaw: string): Promise<{ ok: true } |
 export async function verifyPortalOtp(
   emailRaw: string,
   code: string,
-  meta?: { ip?: string; userAgent?: string }
+  meta?: { ip?: string; userAgent?: string },
+  purpose: "login" | "password_reset" = "login"
 ): Promise<{ ok: true; customer: CustomerSessionPayload } | { ok: false; error: string }> {
   const email = emailRaw.toLowerCase().trim();
   if (!/^\d{6}$/.test(code)) return { ok: false, error: "Enter the 6-digit code." };
@@ -256,7 +260,7 @@ export async function verifyPortalOtp(
   const activeOtps = await db.customerOtp.findMany({
     where: {
       email,
-      purpose: "login",
+      purpose,
       usedAt: null,
       expiresAt: { gt: new Date() },
       attempts: { lt: MAX_OTP_ATTEMPTS }
@@ -287,7 +291,7 @@ export async function verifyPortalOtp(
 
   // Mark all unused login OTPs for this email as used so none can be replayed
   await db.customerOtp.updateMany({
-    where: { email, purpose: "login", usedAt: null },
+    where: { email, purpose, usedAt: null },
     data: { usedAt: new Date() }
   });
 

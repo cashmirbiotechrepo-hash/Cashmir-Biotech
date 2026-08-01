@@ -211,6 +211,21 @@ export function getSupportTicketRatelimit(): Ratelimit {
   return createRateLimiter({ prefix: "support", limit: 5, window: "1 m" });
 }
 
+/** Rate limit portal password login — 10 per minute per IP. Avoids credential stuffing on new password surface. */
+export function getPortalPasswordRatelimit(): Ratelimit {
+  return createRateLimiter({ prefix: "portal_password", limit: 10, window: "1 m" });
+}
+
+/** Rate limit portal password reset requests — 5 per minute per IP. */
+export function getPortalPasswordResetRatelimit(): Ratelimit {
+  return createRateLimiter({ prefix: "portal_pw_reset", limit: 5, window: "1 m" });
+}
+
+/** Rate limit OAuth initiation (Google/Apple redirect) — 20 per minute per IP. Prevents state cookie spam. */
+export function getOAuthInitRatelimit(): Ratelimit {
+  return createRateLimiter({ prefix: "oauth_init", limit: 20, window: "1 m" });
+}
+
 /**
  * Resolve client IP for rate limiting.
  * Prefer platform-trusted headers (Cloudflare / proxies) over the leftmost

@@ -335,6 +335,7 @@ export async function getCustomerSecurityProfile(customerId: string) {
       phone: true,
       name: true,
       emailVerifiedAt: true,
+      passwordHash: true,
       createdAt: true,
       sessions: {
         where: { isRevoked: false, expiresAt: { gt: new Date() } },

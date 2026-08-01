@@ -3,6 +3,7 @@ import Link from "next/link";
 import { requireCustomerSession } from "@/lib/customer/auth";
 import { getCustomerSecurityProfile } from "@/lib/customer/portal";
 import { revokePortalSession } from "../actions";
+import { SetPasswordForm } from "./set-password-form";
 
 export const metadata: Metadata = {
   title: "Security · Customer Portal",
@@ -28,11 +29,21 @@ export default async function PortalSecurityPage() {
         </p>
       </header>
 
-      <dl className="max-w-lg space-y-5 border-y border-ink/10 py-6">
+      <dl className="max-w-xl space-y-6 border-y border-ink/10 py-6">
         <div>
           <dt className="font-mono text-[10px] uppercase tracking-[0.14em] text-ink-faint">Sign-in email</dt>
           <dd className="mt-1 text-sm text-ink">{profile.email}</dd>
-          <dd className="mt-1 text-xs text-ink-mute">Passwordless — email one-time code only.</dd>
+          <dd className="mt-1 text-xs text-ink-mute">Used for one-time login codes and notifications.</dd>
+        </div>
+        <div>
+          <dt className="font-mono text-[10px] uppercase tracking-[0.14em] text-ink-faint">Password</dt>
+          {profile.passwordHash ? (
+            <dd className="mt-1 text-sm text-ink">Password is set.</dd>
+          ) : (
+            <dd className="mt-2">
+              <SetPasswordForm />
+            </dd>
+          )}
         </div>
       </dl>
 

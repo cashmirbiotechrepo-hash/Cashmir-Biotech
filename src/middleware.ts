@@ -15,9 +15,12 @@ import {
   getAdminUploadRatelimit,
   getCheckoutRatelimit,
   getNewsletterRatelimit,
+  getOAuthInitRatelimit,
   getOrderLookupRatelimit,
   getPaymentVerifyRatelimit,
   getPortalOtpRatelimit,
+  getPortalPasswordRatelimit,
+  getPortalPasswordResetRatelimit,
   getGlobalOtpRatelimit,
   getPowChallengeRatelimit,
   getToolsRatelimit
@@ -139,7 +142,9 @@ function isSuspiciousUrl(url: string): boolean {
 function isPublicAdminApi(pathname: string): boolean {
   return (
     pathname.startsWith("/api/admin/auth/pow-challenge") ||
-    pathname.startsWith("/api/admin/auth/refresh")
+    pathname.startsWith("/api/admin/auth/refresh") ||
+    // Google OAuth for admin — no session needed; protected by signed state cookie
+    pathname.startsWith("/api/admin/auth/google")
   );
 }
 
@@ -192,6 +197,17 @@ export async function middleware(request: NextRequest) {
   // Applying IP rate limits to webhooks can cause Razorpay to disable the endpoint
   // during retry storms after outages.
   if (pathname.startsWith("/api/webhooks/")) {
+    return nextWithNonce(request, nonce);
+  }
+
+  // OAuth callbacks are GET redirects from external providers — they arrive without
+  // a same-origin header and are protected by signed state cookie, not Origin.
+  if (
+    pathname.startsWith("/api/portal/auth/google/callback") ||
+    pathname.startsWith("/api/portal/auth/apple/callback") ||
+    pathname.startsWith("/api/admin/auth/google/callback") ||
+    pathname.startsWith("/api/admin/auth/apple/callback")
+  ) {
     return nextWithNonce(request, nonce);
   }
 
@@ -268,6 +284,44 @@ export async function middleware(request: NextRequest) {
       const { success } = await rl.limit(ip);
       if (!success) {
         return deny(request, nonce, 429, { ok: false, error: "Too many attempts. Please wait a minute." });
+      }
+    }
+  }
+
+  // Portal password login — 10/min per IP
+  if (pathname === "/api/portal/auth/password/login" && request.method === "POST") {
+    const rl = getPortalPasswordRatelimit();
+    if (rl) {
+      const ip = clientIpFromRequest(request);
+      const { success } = await rl.limit(ip);
+      if (!success) {
+        return deny(request, nonce, 429, { ok: false, error: "Too many login attempts. Please wait a minute." });
+      }
+    }
+  }
+
+  // Portal password reset request — 5/min per IP
+  if (pathname === "/api/portal/auth/password/reset/request" && request.method === "POST") {
+    const rl = getPortalPasswordResetRatelimit();
+    if (rl) {
+      const ip = clientIpFromRequest(request);
+      const { success } = await rl.limit(ip);
+      if (!success) {
+        return deny(request, nonce, 429, { ok: false, error: "Too many reset attempts. Please wait a minute." });
+      }
+    }
+  }
+
+  // OAuth initiation — 20/min per IP
+  if (pathname.match(/^\/api\/(portal|admin)\/auth\/(google|apple)$/) && request.method === "GET") {
+    const rl = getOAuthInitRatelimit();
+    if (rl) {
+      const ip = clientIpFromRequest(request);
+      const { success } = await rl.limit(ip);
+      if (!success) {
+        const redirectUrl = new URL(pathname.startsWith("/api/admin") ? "/admin/login" : "/portal/login", request.url);
+        redirectUrl.searchParams.set("rateLimited", "1");
+        return attachSecurityHeaders(NextResponse.redirect(redirectUrl), request, nonce);
       }
     }
   }

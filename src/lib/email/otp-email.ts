@@ -2,7 +2,7 @@ import "server-only";
 import { SITE_CONTACT } from "@/lib/site-contact";
 import { EMAIL, emailSiteUrl, emailSupport, escapeHtml } from "@/lib/email/brand";
 
-export type OtpEmailKind = "portal_login" | "admin_2fa" | "order_lookup";
+export type OtpEmailKind = "portal_login" | "admin_2fa" | "order_lookup" | "portal_password_reset";
 
 export type OtpEmailInput = {
   kind: OtpEmailKind;
@@ -64,10 +64,18 @@ function copyFor(kind: OtpEmailKind, orderNumber?: string): KindCopy {
     default:
       return {
         fromDisplay: "Cashmir Biotech Customer Portal",
-        subject: "Your Customer Portal verification code",
-        title: "Your verification code",
-        ctaLabel: "Open Customer Portal",
-        ctaPath: "/portal/login"
+        subject: "Your portal login code",
+        title: "Your login code",
+        ctaLabel: "Open customer portal",
+        ctaPath: "/portal"
+      };
+    case "portal_password_reset":
+      return {
+        fromDisplay: "Cashmir Biotech Customer Portal",
+        subject: "Reset your portal password",
+        title: "Your password reset code",
+        ctaLabel: "Open customer portal",
+        ctaPath: "/portal"
       };
   }
 }

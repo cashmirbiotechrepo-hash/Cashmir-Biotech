@@ -69,7 +69,13 @@ const serverEnvSchema = z
     S3_UPLOAD_ACCESS_KEY_ID: z.string().min(1).optional(),
     S3_UPLOAD_SECRET_ACCESS_KEY: z.string().min(1).optional(),
     SENTRY_DSN: z.string().min(1).optional(),
-    NEXT_PUBLIC_SENTRY_DSN: z.string().min(1).optional()
+    NEXT_PUBLIC_SENTRY_DSN: z.string().min(1).optional(),
+    /** Google OAuth — Customer Portal (separate app from Admin). */
+    GOOGLE_CLIENT_ID: z.string().min(1).optional(),
+    GOOGLE_CLIENT_SECRET: z.string().min(1).optional(),
+    /** Google OAuth — Admin Panel (separate app, separate redirect URI). */
+    ADMIN_GOOGLE_CLIENT_ID: z.string().min(1).optional(),
+    ADMIN_GOOGLE_CLIENT_SECRET: z.string().min(1).optional()
   })
   .superRefine((val, ctx) => {
     // Fail at boot, not on the first upload: a bucket without a resolvable

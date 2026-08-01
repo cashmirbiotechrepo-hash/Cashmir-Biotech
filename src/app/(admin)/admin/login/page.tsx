@@ -25,7 +25,7 @@ function showLocalDevChip(): boolean {
 export default async function AdminLoginPage({
   searchParams
 }: {
-  searchParams: Promise<{ next?: string; rateLimited?: string; expired?: string }>;
+  searchParams: Promise<{ next?: string; rateLimited?: string; expired?: string; error?: string }>;
 }) {
   const params = await searchParams;
 
@@ -141,6 +141,7 @@ export default async function AdminLoginPage({
             next={next}
             rateLimited={params.rateLimited === "1"}
             sessionExpired={params.expired === "1"}
+            oauthError={params.error}
           />
 
           <p className="mt-5 text-center text-[12px] text-muted-foreground">

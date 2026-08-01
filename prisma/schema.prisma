@@ -641,8 +641,23 @@ model AdminUser {
   createdAt           DateTime       @default(now())
   updatedAt           DateTime       @updatedAt
   sessions            AdminSession[]
+  accounts            AdminAccount[]
 
   @@index([email])
+}
+
+/// Links an OAuth provider identity (Google, Apple) to an AdminUser.
+/// Separate from CustomerAccount — never shared. No auto-provision on callback.
+model AdminAccount {
+  id                String    @id @default(cuid())
+  adminId           String
+  provider          String    /// "google" | "apple"
+  providerAccountId String    /// Stable sub/user ID from the provider
+  admin             AdminUser @relation(fields: [adminId], references: [id], onDelete: Cascade)
+  createdAt         DateTime  @default(now())
+
+  @@unique([provider, providerAccountId])
+  @@index([adminId])
 }
 
 model AdminSession {
@@ -676,7 +691,7 @@ model AdminRefreshToken {
 model Customer {
   id                  String             @id @default(cuid())
   email               String             @unique
-  passwordHash        String?  /// Legacy residue — portal auth is OTP-only; do not use for login.
+  passwordHash        String?  /// Set via first-login (set route) or OTP-verified reset. Optional — OTP is always available.
   name                String?
   phone               String?
   emailVerifiedAt     DateTime?
@@ -699,6 +714,22 @@ model Customer {
   organizationMembers OrganizationMember[]
   circleSubscriptions ResearchCircleSubscription[]
   wishlistItems       CustomerWishlistItem[]
+  accounts            CustomerAccount[]
+}
+
+/// Links an OAuth provider identity (Google, Apple) to a Customer.
+/// One Customer can have multiple accounts (e.g. Google + Apple).
+/// Separate from AdminAccount — no shared/polymorphic table to prevent cross-surface bugs.
+model CustomerAccount {
+  id                String   @id @default(cuid())
+  customerId        String
+  provider          String   /// "google" | "apple"
+  providerAccountId String   /// Stable sub/user ID from the provider
+  customer          Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  createdAt         DateTime @default(now())
+
+  @@unique([provider, providerAccountId])
+  @@index([customerId])
 }
 
 /// Research Circle membership plan (annual / multi-month).

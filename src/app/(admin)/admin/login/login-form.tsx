@@ -25,11 +25,13 @@ async function fetchPoWChallenge(): Promise<PoWChallenge> {
 export function LoginForm({
   next,
   rateLimited,
-  sessionExpired
+  sessionExpired,
+  oauthError
 }: {
   next: string;
   rateLimited: boolean;
   sessionExpired?: boolean;
+  oauthError?: string;
 }) {
   const emailRef = useRef<HTMLInputElement>(null);
   const formRef = useRef<HTMLFormElement>(null);
@@ -44,7 +46,9 @@ export function LoginForm({
       ? "Too many attempts. Please wait a minute and try again."
       : sessionExpired
         ? "Your session expired. Sign in again to continue."
-        : undefined
+        : oauthError
+          ? resolveOAuthError(oauthError)
+          : undefined
   );
 
   useEffect(() => {
@@ -130,6 +134,30 @@ export function LoginForm({
       </div>
 
       <div className="px-7 pb-7 pt-5 sm:px-8 sm:pb-8">
+        {/* Google Sign-In (only shown on the main login step, not 2FA) */}
+        {!twoFactor ? (
+          <div className="mb-5 space-y-3">
+            <a
+              id="admin-google-signin-btn"
+              href="/api/admin/auth/google"
+              className="flex w-full items-center justify-center gap-3 border border-border bg-muted/40 px-4 py-2.5 text-[14px] font-medium text-foreground transition-colors hover:bg-muted"
+            >
+              <svg className="h-4 w-4 shrink-0" viewBox="0 0 24 24" aria-hidden>
+                <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
+                <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
+                <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z" fill="#FBBC05"/>
+                <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
+              </svg>
+              Sign in with Google
+            </a>
+            <div className="flex items-center gap-3">
+              <div className="h-px flex-1 bg-border" aria-hidden />
+              <span className="text-[11px] text-muted-foreground">or use password</span>
+              <div className="h-px flex-1 bg-border" aria-hidden />
+            </div>
+          </div>
+        ) : null}
+
         <form ref={formRef} onSubmit={onSubmit} className="space-y-4">
           <input type="hidden" name="next" value={next} />
           {twoFactor ? (
@@ -285,4 +313,18 @@ export function LoginForm({
       </div>
     </div>
   );
+}
+
+function resolveOAuthError(error: string): string {
+  const messages: Record<string, string> = {
+    no_admin_account: "No admin account found for this Google account. Contact IT to link your account.",
+    oauth_denied: "Google sign-in was cancelled.",
+    oauth_state_mismatch: "Sign-in failed (security check). Please try again.",
+    oauth_token_failed: "Could not complete Google sign-in. Please try again.",
+    oauth_userinfo_failed: "Could not retrieve your Google account details.",
+    account_inactive: "This admin account has been deactivated.",
+    oauth_server_error: "An error occurred. Please try again.",
+    oauth_not_configured: "Google sign-in is not available right now."
+  };
+  return messages[error] ?? "Sign-in failed. Please try again.";
 }
