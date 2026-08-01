@@ -30,5 +30,9 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: false, error: result.error }, { status: 401 });
   }
 
-  return NextResponse.json({ ok: true, customer: { email: result.customer!.email, name: result.customer!.name } });
+  if (!result.customer) {
+    return NextResponse.json({ ok: false, error: "Session creation failed." }, { status: 500 });
+  }
+
+  return NextResponse.json({ ok: true, customer: { email: result.customer.email, name: result.customer.name } });
 }

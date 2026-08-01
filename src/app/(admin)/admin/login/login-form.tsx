@@ -72,12 +72,6 @@ export function LoginForm({
         fd.set("powSignature", challenge.signature);
         fd.set("powDifficulty", String(challenge.difficulty));
         setPowFields({ ...challenge, nonce });
-      } else if (powFields) {
-        fd.set("powChallenge", powFields.challenge);
-        fd.set("powNonce", String(powFields.nonce));
-        fd.set("powTimestamp", String(powFields.timestamp));
-        fd.set("powSignature", powFields.signature);
-        fd.set("powDifficulty", String(powFields.difficulty));
       }
 
       const result = await loginAction(fd);

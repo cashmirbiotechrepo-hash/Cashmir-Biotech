@@ -52,17 +52,20 @@ export async function POST(request: Request) {
       data: { passwordHash }
     });
 
-    // Revoke all active sessions and refresh tokens for this customer (Issue 1.2)
-    await db.customerSession.updateMany({
-      where: { customerId },
-      data: { isRevoked: true }
-    });
-    // customerRefreshToken is linked by sessionId, so we find sessions first
+    // Revoke all active sessions and refresh tokens for this customer (Issue 1.2 & Edge Revocation)
     const sessions = await db.customerSession.findMany({
-      where: { customerId },
+      where: { customerId, isRevoked: false },
       select: { id: true }
     });
+
     if (sessions.length > 0) {
+      const { markSessionRevokedEdge } = await import("@/lib/session-revoke-edge");
+      await Promise.all(sessions.map(s => markSessionRevokedEdge(s.id).catch(() => undefined)));
+
+      await db.customerSession.updateMany({
+        where: { customerId },
+        data: { isRevoked: true }
+      });
       await db.customerRefreshToken.updateMany({
         where: { sessionId: { in: sessions.map(s => s.id) } },
         data: { revoked: true }
