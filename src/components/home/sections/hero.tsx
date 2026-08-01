@@ -15,7 +15,7 @@ export function Hero({ content }: { content: HomeContent }) {
   return (
     <section
       id="top"
-      className="relative flex min-h-0 md:min-h-[100svh] items-start md:items-center overflow-hidden pb-6 pt-20 md:pb-16 md:pt-36 lg:pt-44"
+      className="relative flex min-h-0 md:min-h-[100svh] items-start md:items-center overflow-hidden pb-6 pt-24 sm:pt-28 md:pb-16 md:pt-36 lg:pt-44"
     >
       <div className="frame grid w-full grid-cols-1 items-center gap-4 md:gap-10 lg:grid-cols-[1.05fr_0.95fr] lg:gap-8">
         {/* Copy — sits under the jar on small screens; keep compact so CTAs aren’t pushed into the next scroll */}
