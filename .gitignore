@@ -13,6 +13,7 @@ dist
 .env
 .env.*.local
 MCP.json
+client_secret_*.json
 
 # debug
 npm-debug.log*

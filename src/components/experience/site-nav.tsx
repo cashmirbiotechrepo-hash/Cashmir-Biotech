@@ -1,51 +1,191 @@
 "use client";
 
-import { useEffect, useRef, useState, type ComponentProps, type ReactNode } from "react";
+import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { AnimatePresence, motion } from "framer-motion";
-import { ShoppingBag, User, X } from "lucide-react";
-import { EASE_OUT_EXPO } from "@/lib/motion/ease";
-import { useIntro } from "@/components/experience/intro-context";
+import { Search, User, ShoppingBag, Menu, X, Sun, Moon } from "lucide-react";
+import gsap from "gsap";
+import { useGSAP } from "@gsap/react";
 import { useCart } from "@/components/shop/cart-context";
-import { ThemeSegment, ThemeToggle } from "@/components/experience/theme-toggle";
 import { cn } from "@/lib/utils";
-import { SITE_CONTACT } from "@/lib/site-contact";
+if (typeof window !== "undefined") {
+  gsap.registerPlugin(useGSAP);
+}
 
 type NavLink = { label: string; href: string };
 
 const LINKS: NavLink[] = [
   { label: "Shop", href: "/products" },
-  { label: "Tools", href: "/tools" },
+  { label: "Research", href: "/research" },
+  { label: "Technology", href: "/technology" },
   { label: "Patents", href: "/patents" },
   { label: "Journal", href: "/blog" },
-  { label: "Board", href: "/team" }
+  { label: "Company", href: "/about" }
 ];
-
-const CONTACT_HREF = `mailto:${SITE_CONTACT.primaryEmail}`;
 
 function isActive(pathname: string, href: string) {
   return href !== "/" && pathname.startsWith(href);
 }
 
-/** Invisible 44px touch target — no bordered capsule. */
-function IconHit({
-  className,
-  children,
-  ...props
-}: ComponentProps<"button"> & { children: ReactNode }) {
+/**
+ * GSAP-animated Navigation Link item
+ */
+function AnimatedNavLink({ link, active }: { link: NavLink; active: boolean }) {
+  const container = useRef<HTMLLIElement>(null);
+  const textRef = useRef<HTMLAnchorElement>(null);
+  const lineRef = useRef<HTMLSpanElement>(null);
+
+  useGSAP(() => {
+    gsap.set(lineRef.current, { scaleX: active ? 1 : 0, transformOrigin: "center" });
+  }, { scope: container, dependencies: [active] });
+
+  const { contextSafe } = useGSAP({ scope: container });
+
+  const onEnter = contextSafe(() => {
+    if (active) return;
+    gsap.to(textRef.current, { color: "var(--ink)", duration: 0.25, ease: "power2.out" });
+    gsap.to(lineRef.current, { scaleX: 1, duration: 0.35, ease: "back.out(1.7)" });
+  });
+
+  const onLeave = contextSafe(() => {
+    if (active) return;
+    gsap.to(textRef.current, { color: "var(--ink-mute)", duration: 0.25, ease: "power2.out" });
+    gsap.to(lineRef.current, { scaleX: 0, duration: 0.35, ease: "power2.out" });
+  });
+
   return (
-    <button
-      type="button"
-      className={cn(
-        "relative grid h-11 w-11 place-items-center text-ink transition-opacity hover:opacity-80",
-        className
-      )}
-      {...props}
-    >
-      {children}
-    </button>
+    <li ref={container} className="relative flex items-center py-1" onMouseEnter={onEnter} onMouseLeave={onLeave}>
+      <Link
+        ref={textRef}
+        href={link.href}
+        className="relative block text-[14px] font-medium transition-colors duration-200"
+        style={{ color: active ? "var(--ink)" : "var(--ink-mute)" }}
+      >
+        <span>{link.label}</span>
+        <span className="absolute -bottom-1.5 left-1/2 flex h-[2px] w-[16px] -translate-x-1/2 items-center justify-center overflow-hidden">
+          <span
+            ref={lineRef}
+            className="block h-full w-full bg-gold rounded-full"
+          />
+        </span>
+      </Link>
+    </li>
+  );
+}
+
+/**
+ * Animated Utility Icon Button
+ */
+function AnimatedIconButton({ 
+  children, 
+  onClick, 
+  href, 
+  ariaLabel,
+  badge
+}: { 
+  children: React.ReactNode; 
+  onClick?: () => void; 
+  href?: string; 
+  ariaLabel: string;
+  badge?: React.ReactNode;
+}) {
+  const container = useRef<HTMLDivElement>(null);
+  const iconWrapper = useRef<HTMLDivElement>(null);
+  const { contextSafe } = useGSAP({ scope: container });
+
+  const onEnter = contextSafe(() => {
+    gsap.to(container.current, { color: "var(--ink)", duration: 0.2, ease: "power2.out" });
+    gsap.to(iconWrapper.current, { scale: 1.1, duration: 0.3, ease: "back.out(2)" });
+  });
+
+  const onLeave = contextSafe(() => {
+    gsap.to(container.current, { color: "var(--ink-mute)", duration: 0.2, ease: "power2.out" });
+    gsap.to(iconWrapper.current, { scale: 1, duration: 0.3, ease: "power2.out" });
+  });
+
+  const inner = (
+    <>
+      <div ref={iconWrapper} className="flex items-center justify-center">
+        {children}
+      </div>
+      {badge}
+    </>
+  );
+
+  const className = "relative flex h-9 w-9 items-center justify-center rounded-full transition-colors hover:bg-ink/5";
+  const style = { color: "var(--ink-mute)" };
+
+  if (href) {
+    return (
+      <div ref={container} onMouseEnter={onEnter} onMouseLeave={onLeave} className={className} style={style}>
+        <Link href={href} aria-label={ariaLabel} className="absolute inset-0 flex items-center justify-center">
+          {inner}
+        </Link>
+      </div>
+    );
+  }
+
+  return (
+    <div ref={container} onMouseEnter={onEnter} onMouseLeave={onLeave} className={className} style={style}>
+      <button type="button" onClick={onClick} aria-label={ariaLabel} className="absolute inset-0 flex items-center justify-center">
+        {inner}
+      </button>
+    </div>
+  );
+}
+
+/**
+ * Sun / Moon Theme Toggle
+ */
+function HeaderThemeToggle() {
+  const [theme, setTheme] = useState<"light" | "dark">("light");
+  const sunRef = useRef<SVGSVGElement>(null);
+  const moonRef = useRef<SVGSVGElement>(null);
+
+  useEffect(() => {
+    const root = document.documentElement;
+    const current = root.getAttribute("data-theme") as "light" | "dark" | null;
+    if (current) setTheme(current);
+    
+    const observer = new MutationObserver((mutations) => {
+      mutations.forEach((mutation) => {
+        if (mutation.attributeName === "data-theme") {
+          const t = root.getAttribute("data-theme") as "light" | "dark";
+          if (t) setTheme(t);
+        }
+      });
+    });
+    observer.observe(root, { attributes: true });
+    return () => observer.disconnect();
+  }, []);
+
+  useGSAP(() => {
+    if (theme === "dark") {
+      gsap.to(sunRef.current, { rotate: 180, scale: 0, opacity: 0, duration: 0.3, ease: "back.in(1.4)" });
+      gsap.to(moonRef.current, { rotate: 0, scale: 1, opacity: 1, duration: 0.3, ease: "back.out(1.4)", delay: 0.05 });
+    } else {
+      gsap.to(moonRef.current, { rotate: -180, scale: 0, opacity: 0, duration: 0.3, ease: "back.in(1.4)" });
+      gsap.to(sunRef.current, { rotate: 0, scale: 1, opacity: 1, duration: 0.3, ease: "back.out(1.4)", delay: 0.05 });
+    }
+  }, [theme]);
+
+  function toggle() {
+    const next = theme === "dark" ? "light" : "dark";
+    setTheme(next);
+    document.documentElement.setAttribute("data-theme", next);
+    try {
+      localStorage.setItem("cb_theme", next);
+    } catch {}
+  }
+
+  return (
+    <AnimatedIconButton onClick={toggle} ariaLabel="Toggle theme">
+      <div className="relative flex h-4 w-4 items-center justify-center">
+        <Sun ref={sunRef} className="absolute inset-0 h-4 w-4" strokeWidth={2} />
+        <Moon ref={moonRef} className="absolute inset-0 h-4 w-4" strokeWidth={2} />
+      </div>
+    </AnimatedIconButton>
   );
 }
 
@@ -54,45 +194,61 @@ export function SiteNav({
 }: {
   customer?: { name: string | null; email: string } | null;
 }) {
-  const { ready } = useIntro();
   const { count, ready: cartReady } = useCart();
   const pathname = usePathname();
-  const [hidden, setHidden] = useState(false);
-  const [condensed, setCondensed] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
-
-  const firstName = customer
-    ? (customer.name ?? customer.email.split("@")[0] ?? "Account").split(" ")[0]
-    : null;
-  const accountHref = customer ? "/portal" : "/portal/login?next=/portal";
-  const accountLabel = customer ? (firstName ? firstName : "Account") : "Sign in";
-  const accountCursor = customer ? "Account" : "Sign in";
-  const accountInitials = (() => {
-    if (!customer) return null;
-    const source = (customer.name ?? firstName ?? "A").trim();
-    const parts = source.split(/\s+/).filter(Boolean);
-    if (parts.length === 0) return "A";
-    if (parts.length === 1) return parts[0]!.slice(0, 1).toUpperCase();
-    return `${parts[0]!.slice(0, 1)}${parts[1]!.slice(0, 1)}`.toUpperCase();
-  })();
-
-  const menuOpenRef = useRef(menuOpen);
-  menuOpenRef.current = menuOpen;
+  const [isScrolled, setIsScrolled] = useState(false);
+  const navRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    let previous = window.scrollY;
-    const onScroll = () => {
-      const current = window.scrollY;
-      const nextCondensed = current > 40;
-      const nextHidden = current > previous && current > 220 && !menuOpenRef.current;
-      setCondensed((prev) => (prev === nextCondensed ? prev : nextCondensed));
-      setHidden((prev) => (prev === nextHidden ? prev : nextHidden));
-      previous = current;
+    const handleScroll = () => {
+      setIsScrolled(window.scrollY > 30);
     };
-    window.addEventListener("scroll", onScroll, { passive: true });
-    onScroll();
-    return () => window.removeEventListener("scroll", onScroll);
+    handleScroll();
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    return () => window.removeEventListener("scroll", handleScroll);
   }, []);
+
+  useGSAP(() => {
+    if (!navRef.current) return;
+
+    if (isScrolled) {
+      // Detached floating pill state
+      gsap.to(navRef.current, {
+        marginTop: 12,
+        maxWidth: "1024px",
+        borderRadius: "9999px",
+        paddingTop: 8,
+        paddingBottom: 8,
+        paddingLeft: 24,
+        paddingRight: 24,
+        backgroundColor: "rgb(var(--paper) / 0.85)",
+        borderColor: "rgb(var(--ink) / 0.12)",
+        boxShadow: "0 12px 32px -8px rgba(0, 0, 0, 0.08)",
+        backdropFilter: "blur(20px) saturate(160%)",
+        duration: 0.5,
+        ease: "power3.out"
+      });
+    } else {
+      // Attached top header state (100% transparent blend with hero background)
+      gsap.to(navRef.current, {
+        marginTop: 0,
+        maxWidth: "100%",
+        borderRadius: "0px",
+        paddingTop: 14,
+        paddingBottom: 14,
+        paddingLeft: 32,
+        paddingRight: 32,
+        backgroundColor: "transparent",
+        borderColor: "transparent",
+        borderBottomColor: "transparent",
+        boxShadow: "0 0px 0px rgba(0, 0, 0, 0)",
+        backdropFilter: "blur(0px)",
+        duration: 0.5,
+        ease: "power3.out"
+      });
+    }
+  }, { dependencies: [isScrolled] });
 
   useEffect(() => {
     setMenuOpen(false);
@@ -108,361 +264,143 @@ export function SiteNav({
     }
   }, [menuOpen]);
 
-  const cartBadge =
-    cartReady && count > 0 ? (
-      <span className="absolute right-1.5 top-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-gold px-1 font-mono text-[9px] font-semibold text-ink">
-        {count > 99 ? "99+" : count}
-      </span>
-    ) : null;
+  const accountHref = customer ? "/portal" : "/portal/login?next=/portal";
 
   return (
-    <>
-      {/* ── Mobile header: Logo · Cart · Menu only ───────────────────────── */}
-      <motion.header
-        initial={{ y: -100, opacity: 0 }}
-        animate={
-          ready
-            ? {
-                y: hidden || menuOpen ? -100 : 0,
-                opacity: hidden || menuOpen ? 0 : 1
-              }
-            : { y: -100, opacity: 0 }
-        }
-        transition={{ duration: 0.45, ease: EASE_OUT_EXPO }}
-        style={{ willChange: "transform, opacity" }}
-        className={cn(
-          "fixed inset-x-0 top-0 z-50 md:hidden",
-          menuOpen && "pointer-events-none"
-        )}
+    <header className="fixed top-0 inset-x-0 z-50 w-full">
+      <nav
+        ref={navRef}
+        aria-label="Primary Navigation"
+        className="mx-auto border-b border-transparent transition-none"
+        style={{
+          marginTop: 0,
+          maxWidth: "100%",
+          borderRadius: 0,
+          paddingTop: 14,
+          paddingBottom: 14,
+          paddingLeft: 32,
+          paddingRight: 32,
+          backgroundColor: "transparent",
+          backdropFilter: "none"
+        }}
       >
-        <nav
-          className="flex h-[calc(76px+env(safe-area-inset-top))] w-full items-center justify-between px-5 pt-[env(safe-area-inset-top)]"
-          aria-label="Mobile"
-        >
-          <Link href="/" className="flex items-center" aria-label="Cashmir Biotech home">
-            <Image
-              src="/logo.png"
-              alt="Cashmir Biotech"
-              width={240}
-              height={197}
-              priority
-              className="h-10 w-auto"
-            />
-          </Link>
-
-          <div className="flex items-center gap-0.5">
+        <div className="relative flex items-center justify-between gap-4">
+          {/* Left: Branding */}
+          <div className="flex items-center gap-3 shrink-0">
             <Link
-              href="/cart"
-              data-cursor="Cart"
-              aria-label={
-                cartReady && count > 0 ? `Cart, ${count} item${count === 1 ? "" : "s"}` : "Cart"
-              }
-              className="relative grid h-11 w-11 place-items-center text-ink"
+              href="/"
+              aria-label="Cashmir Biotech home"
+              className="group flex items-center gap-2.5 transition-opacity hover:opacity-80"
             >
-              <ShoppingBag className="h-[22px] w-[22px]" strokeWidth={1.6} />
-              {cartBadge}
-            </Link>
-            <IconHit
-              onClick={() => setMenuOpen(true)}
-              aria-expanded={false}
-              aria-controls="mobile-menu"
-              aria-label="Open menu"
-            >
-              <span className="flex h-3.5 w-[18px] flex-col justify-between" aria-hidden>
-                <span className="h-px w-full bg-ink" />
-                <span className="h-px w-full bg-ink" />
-                <span className="h-px w-full bg-ink" />
-              </span>
-            </IconHit>
-          </div>
-        </nav>
-      </motion.header>
-
-      {/* ── Desktop header: full bar at top → floating pill on scroll ───── */}
-      <motion.header
-        initial={{ y: -140, opacity: 0 }}
-        animate={
-          ready
-            ? { y: hidden ? -140 : 0, opacity: hidden ? 0 : 1 }
-            : { y: -140, opacity: 0 }
-        }
-        transition={{ duration: 0.55, ease: EASE_OUT_EXPO }}
-        style={{ willChange: "transform, opacity" }}
-        className={cn(
-          "fixed inset-x-0 top-0 z-50 hidden transition-[padding] duration-500 ease-expo md:flex",
-          condensed ? "justify-center px-6 pt-3 lg:px-8" : "justify-stretch px-0 pt-0"
-        )}
-      >
-        <nav
-          aria-label="Primary"
-          className={cn(
-            "grid w-full grid-cols-[auto_minmax(0,1fr)_auto] items-center transition-[max-width,height,padding,border-radius,background-color,box-shadow,backdrop-filter,border-color] duration-500 ease-expo",
-            condensed
-              ? "max-w-frame gap-5 rounded-full border border-ink/10 glass-strong h-[72px] px-5 shadow-[0_16px_48px_-28px_rgb(17_17_17/0.35)]"
-              : "max-w-none gap-8 rounded-none border-0 border-b border-ink/10 bg-transparent h-[88px] px-8 lg:px-14 xl:px-16"
-          )}
-        >
-          {/* Brand */}
-          <Link href="/" className="flex items-center justify-self-start" aria-label="Cashmir Biotech home">
-            <span className="logo-plate">
-              <Image
-                src="/logo.png"
-                alt="Cashmir Biotech"
-                width={240}
-                height={197}
-                priority
-                className={cn(
-                  "w-auto transition-all duration-500 ease-expo",
-                  condensed ? "h-10" : "h-11"
-                )}
-              />
-            </span>
-          </Link>
-
-          {/* Primary navigation */}
-          <ul
-            className={cn(
-              "flex items-center justify-self-center",
-              condensed ? "gap-7" : "gap-9"
-            )}
-          >
-            {LINKS.map((link, i) => {
-              const active = isActive(pathname, link.href);
-              return (
-                <li key={link.href}>
-                  <motion.span
-                    initial={{ opacity: 0, y: -6 }}
-                    animate={ready ? { opacity: 1, y: 0 } : {}}
-                    transition={{ duration: 0.5, delay: 0.15 + i * 0.06, ease: EASE_OUT_EXPO }}
-                  >
-                    <Link
-                      href={link.href}
-                      data-cursor="View"
-                      aria-current={active ? "page" : undefined}
-                      className={cn(
-                        "group relative bg-transparent font-mono text-[11px] font-medium uppercase tracking-[0.12em] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold/50 focus-visible:ring-offset-2 focus-visible:ring-offset-paper",
-                        active ? "text-ink" : "text-ink-mute hover:text-ink"
-                      )}
-                    >
-                      {link.label}
-                      <span
-                        className={cn(
-                          "absolute -bottom-1.5 left-0 h-px bg-gold transition-all duration-400 ease-expo",
-                          active ? "w-full" : "w-0 group-hover:w-full"
-                        )}
-                      />
-                    </Link>
-                  </motion.span>
-                </li>
-              );
-            })}
-          </ul>
-
-          {/* Utilities + Contact CTA */}
-          <div
-            className={cn(
-              "flex items-center justify-self-end",
-              condensed ? "gap-2 border-l border-ink/10 pl-4" : "gap-2.5"
-            )}
-          >
-            <ThemeToggle />
-
-            <Link
-              href={accountHref}
-              data-cursor={accountCursor}
-              aria-label={customer ? "Account" : "Sign in"}
-              className="nav-utility-account focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold/50 focus-visible:ring-offset-2 focus-visible:ring-offset-paper"
-            >
-              {accountInitials ? (
-                <span
-                  className="grid h-6 w-6 place-items-center rounded-full bg-ink text-[9px] font-medium tracking-normal text-paper"
-                  aria-hidden
-                >
-                  {accountInitials}
-                </span>
-              ) : (
-                <User className="h-4 w-4 shrink-0" strokeWidth={1.6} aria-hidden />
-              )}
-              <span className="font-mono text-[10px] uppercase tracking-[0.12em] text-ink-mute">
-                {accountLabel}
-              </span>
-            </Link>
-
-            <Link
-              href="/cart"
-              data-cursor="Cart"
-              aria-label={
-                cartReady && count > 0 ? `Cart, ${count} item${count === 1 ? "" : "s"}` : "Cart"
-              }
-              className="nav-utility focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold/50 focus-visible:ring-offset-2 focus-visible:ring-offset-paper"
-            >
-              <ShoppingBag className="h-4 w-4" strokeWidth={1.6} />
-              {cartReady && count > 0 ? (
-                <span className="absolute -right-0.5 -top-0.5 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-gold/90 px-1 font-mono text-[9px] font-semibold leading-none text-ink">
-                  {count > 99 ? "99+" : count}
-                </span>
-              ) : null}
-            </Link>
-
-            <Link
-              href={CONTACT_HREF}
-              data-cursor="Email"
-              className="nav-cta group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold/50 focus-visible:ring-offset-2 focus-visible:ring-offset-paper"
-            >
-              <span className="relative z-10 transition-colors duration-500 group-hover:text-paper">
-                Contact
-              </span>
-              <span className="absolute inset-0 origin-left scale-x-0 rounded-full bg-ink transition-transform duration-500 ease-expo group-hover:scale-x-100" />
-            </Link>
-          </div>
-        </nav>
-      </motion.header>
-
-      {/* ── Mobile drawer (full recomposition) ───────────────────────────── */}
-      <AnimatePresence>
-        {menuOpen ? (
-          <motion.div
-            id="mobile-menu"
-            role="dialog"
-            aria-modal="true"
-            aria-label="Menu"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.35, ease: EASE_OUT_EXPO }}
-            className="fixed inset-0 z-[60] flex flex-col bg-paper md:hidden"
-            style={{
-              paddingTop: "env(safe-area-inset-top)",
-              paddingBottom: "env(safe-area-inset-bottom)"
-            }}
-          >
-            <div className="flex h-[76px] shrink-0 items-center justify-between border-b border-ink/10 px-5">
-              <Link
-                href="/"
-                onClick={() => setMenuOpen(false)}
-                className="flex items-center"
-                aria-label="Cashmir Biotech home"
-              >
+              <div className="relative h-7 w-7 shrink-0">
                 <Image
-                  src="/logo.png"
-                  alt="Cashmir Biotech"
-                  width={240}
-                  height={197}
-                  className="h-10 w-auto"
+                  src="/icon.png"
+                  alt="Cashmir Biotech Logo"
+                  fill
+                  className="object-contain"
+                  priority
                 />
-              </Link>
-              <IconHit onClick={() => setMenuOpen(false)} aria-label="Close menu">
-                <X className="h-[22px] w-[22px]" strokeWidth={1.5} />
-              </IconHit>
+              </div>
+              <span className="font-sans text-[15px] font-bold tracking-tight text-ink">
+                Cashmir <span className="text-gold font-medium">Biotech</span>
+              </span>
+            </Link>
+          </div>
+
+          {/* Center Navigation Links (Absolute Centered like Reference Header) */}
+          <div className="absolute inset-0 m-auto hidden size-fit lg:block">
+            <ul className="flex items-center gap-7 text-[14px]">
+              {LINKS.map((link) => (
+                <AnimatedNavLink
+                  key={link.href}
+                  link={link}
+                  active={isActive(pathname, link.href)}
+                />
+              ))}
+            </ul>
+          </div>
+
+          {/* Right Utilities */}
+          <div className="flex items-center gap-1 sm:gap-1.5 shrink-0">
+            <div className="flex items-center gap-0.5 sm:gap-1">
+              <HeaderThemeToggle />
+
+              <AnimatedIconButton ariaLabel="Search">
+                <Search className="h-4 w-4" strokeWidth={2} />
+              </AnimatedIconButton>
+
+              <AnimatedIconButton href={accountHref} ariaLabel="Account">
+                <User className="h-4 w-4" strokeWidth={2} />
+              </AnimatedIconButton>
+
+              <AnimatedIconButton
+                href="/cart"
+                ariaLabel="Cart"
+                badge={
+                  cartReady && count > 0 && (
+                    <span className="absolute -right-0.5 -top-0.5 flex h-[16px] min-w-[16px] items-center justify-center rounded-full bg-gold px-1 font-mono text-[9px] font-bold text-white">
+                      {count > 99 ? "99+" : count}
+                    </span>
+                  )
+                }
+              >
+                <ShoppingBag className="h-4 w-4" strokeWidth={2} />
+              </AnimatedIconButton>
             </div>
 
-            <div className="flex min-h-0 flex-1 flex-col overflow-y-auto px-5 pb-8 pt-2">
-              <nav aria-label="Primary">
-                <ul className="flex flex-col">
-                  {LINKS.map((link, i) => {
-                    const active = isActive(pathname, link.href);
-                    return (
-                      <motion.li
-                        key={link.href}
-                        initial={{ opacity: 0, y: 10 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{
-                          duration: 0.4,
-                          delay: 0.04 + i * 0.04,
-                          ease: EASE_OUT_EXPO
-                        }}
-                        className="border-b border-ink/10"
-                      >
-                        <Link
-                          href={link.href}
-                          className={cn(
-                            "flex min-h-[76px] items-center justify-between gap-4 py-4 text-[clamp(1.875rem,8vw,2.35rem)] font-light leading-none tracking-tight",
-                            active ? "text-ink" : "text-ink"
-                          )}
-                        >
-                          {link.label}
-                          <span className="font-mono text-[10px] tracking-[0.14em] text-ink-faint">
-                            {String(i + 1).padStart(2, "0")}
-                          </span>
-                        </Link>
-                      </motion.li>
-                    );
-                  })}
-                </ul>
-              </nav>
+            {/* Mobile Menu Hamburger Toggle */}
+            <button
+              onClick={() => setMenuOpen(!menuOpen)}
+              aria-label={menuOpen ? "Close Menu" : "Open Menu"}
+              className="relative flex h-9 w-9 items-center justify-center rounded-full text-ink-mute transition-colors hover:bg-ink/5 hover:text-ink lg:hidden"
+            >
+              {menuOpen ? (
+                <X className="h-5 w-5" strokeWidth={2} />
+              ) : (
+                <Menu className="h-5 w-5" strokeWidth={2} />
+              )}
+            </button>
+          </div>
+        </div>
+      </nav>
 
-              <motion.section
-                initial={{ opacity: 0, y: 8 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.4, delay: 0.28, ease: EASE_OUT_EXPO }}
-                className="mt-8"
-                aria-labelledby="mobile-prefs-label"
-              >
-                <h2
-                  id="mobile-prefs-label"
-                  className="font-mono text-[10px] uppercase tracking-[0.18em] text-ink-faint"
-                >
-                  Preferences
-                </h2>
-                <div className="mt-4">
-                  <ThemeSegment />
-                </div>
-              </motion.section>
-
-              <motion.section
-                initial={{ opacity: 0, y: 8 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.4, delay: 0.34, ease: EASE_OUT_EXPO }}
-                className="mt-8 border-t border-ink/10 pt-8"
-                aria-labelledby="mobile-account-label"
-              >
-                <h2
-                  id="mobile-account-label"
-                  className="font-mono text-[10px] uppercase tracking-[0.18em] text-ink-faint"
-                >
-                  Account
-                </h2>
-                <Link
-                  href="/cart"
-                  className="mt-3 flex min-h-12 items-center justify-between text-[15px] text-ink"
-                >
-                  <span className="inline-flex items-center gap-2.5">
-                    <ShoppingBag className="h-4 w-4 text-ink-mute" strokeWidth={1.6} />
-                    Cart
-                  </span>
-                  <span className="font-mono text-[12px] text-ink-mute">
-                    {cartReady && count > 0 ? count : "—"}
-                  </span>
-                </Link>
+      {/* Mobile Drawer Menu */}
+      {menuOpen && (
+        <div className="fixed inset-0 z-40 flex flex-col bg-paper/95 backdrop-blur-2xl text-ink pt-20 px-6 pb-8 lg:hidden animate-in fade-in duration-200">
+          <nav aria-label="Mobile Navigation" className="flex-1">
+            <ul className="flex flex-col gap-5 text-xl font-medium">
+              {LINKS.map((link) => (
+                <li key={link.href} className="border-b border-ink/10 pb-3">
+                  <Link
+                    href={link.href}
+                    onClick={() => setMenuOpen(false)}
+                    className={cn(
+                      "block transition-colors",
+                      isActive(pathname, link.href) ? "text-gold font-semibold" : "text-ink hover:text-gold"
+                    )}
+                  >
+                    {link.label}
+                  </Link>
+                </li>
+              ))}
+              <li className="border-b border-ink/10 pb-3">
                 <Link
                   href={accountHref}
-                  className="mt-4 flex min-h-12 w-full items-center justify-center bg-ink text-[14px] font-medium text-paper"
+                  onClick={() => setMenuOpen(false)}
+                  className="block text-ink transition-colors hover:text-gold"
                 >
-                  {customer ? accountLabel : "Sign in"}
+                  Account / Sign In
                 </Link>
-              </motion.section>
+              </li>
+            </ul>
+          </nav>
 
-              <motion.nav
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                transition={{ duration: 0.4, delay: 0.4, ease: EASE_OUT_EXPO }}
-                className="mt-8 border-t border-ink/10 pt-6"
-                aria-label="Support"
-              >
-                <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-ink-faint">
-                  Support
-                </p>
-                <Link
-                  href={CONTACT_HREF}
-                  className="mt-3 flex min-h-11 items-center text-[15px] text-ink-mute transition-colors hover:text-ink"
-                >
-                  Contact
-                </Link>
-              </motion.nav>
-            </div>
-          </motion.div>
-        ) : null}
-      </AnimatePresence>
-    </>
+          <div className="flex items-center justify-between border-t border-ink/10 pt-6">
+            <span className="text-sm font-mono text-ink-mute">Appearance</span>
+            <HeaderThemeToggle />
+          </div>
+        </div>
+      )}
+    </header>
   );
 }
