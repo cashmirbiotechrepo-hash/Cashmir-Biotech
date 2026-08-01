@@ -28,6 +28,7 @@ type GoogleUserInfo = {
 };
 
 export async function GET(request: Request) {
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
   const { searchParams } = new URL(request.url);
   const code = searchParams.get("code");
   const stateParam = searchParams.get("state");
@@ -40,27 +41,26 @@ export async function GET(request: Request) {
 
   if (errorParam) {
     logger.warn({ event: "admin_google_oauth_denied", error: errorParam, ip }, "Admin Google OAuth denied");
-    return NextResponse.redirect(new URL("/admin/login?error=oauth_denied", request.url));
+    return NextResponse.redirect(new URL("/admin/login?error=oauth_denied", siteUrl));
   }
 
   if (!code) {
-    return NextResponse.redirect(new URL("/admin/login?error=oauth_missing_code", request.url));
+    return NextResponse.redirect(new URL("/admin/login?error=oauth_missing_code", siteUrl));
   }
 
   // Validate state cookie — CSRF guard
   const statePayload = await validateOAuthState(stateParam, "admin");
   if (!statePayload) {
     logger.warn({ event: "admin_google_state_mismatch", ip }, "Admin Google OAuth state mismatch");
-    return NextResponse.redirect(new URL("/admin/login?error=oauth_state_mismatch", request.url));
+    return NextResponse.redirect(new URL("/admin/login?error=oauth_state_mismatch", siteUrl));
   }
 
   const clientId = process.env.ADMIN_GOOGLE_CLIENT_ID;
   const clientSecret = process.env.ADMIN_GOOGLE_CLIENT_SECRET;
   if (!clientId || !clientSecret) {
-    return NextResponse.redirect(new URL("/admin/login?error=oauth_not_configured", request.url));
+    return NextResponse.redirect(new URL("/admin/login?error=oauth_not_configured", siteUrl));
   }
 
-  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
   const callbackUrl = new URL("/api/admin/auth/google/callback", siteUrl).toString();
 
   // Exchange authorization code for tokens
@@ -81,12 +81,12 @@ export async function GET(request: Request) {
     if (!res.ok) {
       const body = await res.text();
       logger.error({ event: "admin_google_token_failed", status: res.status, body, ip }, "Admin token exchange failed");
-      return NextResponse.redirect(new URL("/admin/login?error=oauth_token_failed", request.url));
+      return NextResponse.redirect(new URL("/admin/login?error=oauth_token_failed", siteUrl));
     }
     tokens = (await res.json()) as GoogleTokenResponse;
   } catch (err) {
     logger.error({ err, event: "admin_google_token_error", ip }, "Admin token exchange threw");
-    return NextResponse.redirect(new URL("/admin/login?error=oauth_token_failed", request.url));
+    return NextResponse.redirect(new URL("/admin/login?error=oauth_token_failed", siteUrl));
   }
 
   // Fetch user info from Google
@@ -96,17 +96,17 @@ export async function GET(request: Request) {
       headers: { Authorization: `Bearer ${tokens.access_token}` }
     });
     if (!res.ok) {
-      return NextResponse.redirect(new URL("/admin/login?error=oauth_userinfo_failed", request.url));
+      return NextResponse.redirect(new URL("/admin/login?error=oauth_userinfo_failed", siteUrl));
     }
     userInfo = (await res.json()) as GoogleUserInfo;
   } catch (err) {
     logger.error({ err, event: "admin_google_userinfo_error", ip }, "Admin userinfo fetch threw");
-    return NextResponse.redirect(new URL("/admin/login?error=oauth_userinfo_failed", request.url));
+    return NextResponse.redirect(new URL("/admin/login?error=oauth_userinfo_failed", siteUrl));
   }
 
   if (!userInfo.email_verified) {
     logger.warn({ event: "admin_google_unverified_email", ip }, "Admin Google returned unverified email");
-    return NextResponse.redirect(new URL("/admin/login?error=oauth_unverified_email", request.url));
+    return NextResponse.redirect(new URL("/admin/login?error=oauth_unverified_email", siteUrl));
   }
 
   const email = userInfo.email.toLowerCase().trim();
@@ -134,7 +134,7 @@ export async function GET(request: Request) {
       });
       if (!admin || !admin.active) {
         logger.warn({ event: "admin_google_deactivated", email, ip }, "Deactivated admin attempted Google OAuth");
-        return NextResponse.redirect(new URL("/admin/login?error=account_inactive", request.url));
+        return NextResponse.redirect(new URL("/admin/login?error=account_inactive", siteUrl));
       }
       adminId = existingAccount.adminId;
     } else {
@@ -150,12 +150,12 @@ export async function GET(request: Request) {
           { event: "admin_google_no_account", email, providerAccountId, ip },
           "Google OAuth attempt from email with no AdminUser — rejected (not auto-provisioned)"
         );
-        return NextResponse.redirect(new URL("/admin/login?error=no_admin_account", request.url));
+        return NextResponse.redirect(new URL("/admin/login?error=no_admin_account", siteUrl));
       }
 
       if (!admin.active) {
         logger.warn({ event: "admin_google_deactivated", email, ip }, "Deactivated admin attempted Google OAuth");
-        return NextResponse.redirect(new URL("/admin/login?error=account_inactive", request.url));
+        return NextResponse.redirect(new URL("/admin/login?error=account_inactive", siteUrl));
       }
 
       // Link this Google account to the existing AdminUser
@@ -167,7 +167,7 @@ export async function GET(request: Request) {
     }
   } catch (err) {
     logger.error({ err, event: "admin_google_db_error", email, ip }, "DB error during admin Google OAuth");
-    return NextResponse.redirect(new URL("/admin/login?error=oauth_server_error", request.url));
+    return NextResponse.redirect(new URL("/admin/login?error=oauth_server_error", siteUrl));
   }
 
   // Issue admin session + cookies
@@ -191,7 +191,7 @@ export async function GET(request: Request) {
     });
   } catch (err) {
     logger.error({ err, event: "admin_google_session_error", adminId, ip }, "Failed to create admin session");
-    return NextResponse.redirect(new URL("/admin/login?error=oauth_server_error", request.url));
+    return NextResponse.redirect(new URL("/admin/login?error=oauth_server_error", siteUrl));
   }
 
   const dest =
@@ -201,5 +201,5 @@ export async function GET(request: Request) {
       ? statePayload.redirectTo
       : "/admin/dashboard";
 
-  return NextResponse.redirect(new URL(dest, request.url));
+  return NextResponse.redirect(new URL(dest, siteUrl));
 }
