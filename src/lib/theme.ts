@@ -19,7 +19,7 @@ export function readStoredTheme(): ThemePreference | null {
 }
 
 export function resolveTheme(): ThemePreference {
-  return readStoredTheme() ?? getSystemTheme();
+  return readStoredTheme() ?? "light";
 }
 
 export function applyTheme(theme: ThemePreference) {
@@ -43,5 +43,5 @@ export function toggleTheme(): ThemePreference {
   return next;
 }
 
-/** Inline head script — must run before first paint (FOUC prevention). */
-export const THEME_BOOTSTRAP_SCRIPT = `(function(){try{var s=localStorage.getItem('${THEME_STORAGE_KEY}');var d=window.matchMedia('(prefers-color-scheme: dark)').matches;var t=s==='light'||s==='dark'?s:(d?'dark':'light');document.documentElement.setAttribute('data-theme',t);}catch(e){}})();`;
+/** Inline head script — must run before first paint (FOUC prevention). Default is light mode. */
+export const THEME_BOOTSTRAP_SCRIPT = `(function(){try{var s=localStorage.getItem('${THEME_STORAGE_KEY}');var t=s==='light'||s==='dark'?s:'light';document.documentElement.setAttribute('data-theme',t);}catch(e){}})();`;

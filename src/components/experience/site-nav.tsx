@@ -182,6 +182,7 @@ function HeaderThemeToggle() {
     setTheme(next);
     document.documentElement.setAttribute("data-theme", next);
     try {
+      localStorage.setItem("theme", next);
       localStorage.setItem("cb_theme", next);
     } catch {}
   }
