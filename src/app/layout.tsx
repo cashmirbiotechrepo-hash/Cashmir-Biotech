@@ -75,7 +75,7 @@ const orgJsonLd = {
   "@type": "MedicalOrganization",
   "name": "Cashmir Biotech Private Limited",
   "url": siteUrl,
-  "logo": `${siteUrl}/icon.png`,
+  "logo": `${siteUrl}/logo.png`,
   "foundingDate": "2022-09-19",
   "description": "An innovative biotechnology startup based in Srinagar, Jammu and Kashmir, specializing in nutraceuticals and functional foods.",
   "address": {

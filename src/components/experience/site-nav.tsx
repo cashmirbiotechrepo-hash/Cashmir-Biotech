@@ -292,18 +292,14 @@ export function SiteNav({
               aria-label="Cashmir Biotech home"
               className="group flex items-center gap-2.5 transition-opacity hover:opacity-80"
             >
-              <div className="relative h-7 w-7 shrink-0">
-                <Image
-                  src="/icon.png"
-                  alt="Cashmir Biotech Logo"
-                  fill
-                  className="object-contain"
-                  priority
-                />
-              </div>
-              <span className="font-sans text-[15px] font-bold tracking-tight text-ink">
-                Cashmir <span className="text-gold font-medium">Biotech</span>
-              </span>
+              <Image
+                src="/logo.png"
+                alt="Cashmir Biotech Logo"
+                width={160}
+                height={36}
+                className="h-8 sm:h-9 w-auto object-contain object-left"
+                priority
+              />
             </Link>
           </div>
 
