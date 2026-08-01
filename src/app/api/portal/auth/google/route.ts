@@ -1,5 +1,4 @@
-import { NextResponse } from "next/server";
-import { redirect } from "next/navigation";
+import { NextRequest, NextResponse } from "next/server";
 import {
   generateCodeChallenge,
   generateCodeVerifier,
@@ -11,11 +10,14 @@ import { logger } from "@/lib/logger";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-export async function GET(request: Request) {
+export async function GET(request: NextRequest) {
   const clientId = process.env.GOOGLE_CLIENT_ID;
   if (!clientId) {
     logger.error({ event: "google_oauth_not_configured" }, "GOOGLE_CLIENT_ID is not set");
-    return NextResponse.redirect(new URL("/portal/login?error=oauth_not_configured", request.url));
+    const url = request.nextUrl.clone();
+    url.pathname = "/portal/login";
+    url.searchParams.set("error", "oauth_not_configured");
+    return NextResponse.redirect(url);
   }
 
   const { searchParams } = new URL(request.url);

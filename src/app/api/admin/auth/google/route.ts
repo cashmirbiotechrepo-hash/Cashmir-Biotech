@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import {
   generateCodeChallenge,
   generateCodeVerifier,
@@ -10,11 +10,14 @@ import { logger } from "@/lib/logger";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-export async function GET(request: Request) {
+export async function GET(request: NextRequest) {
   const clientId = process.env.ADMIN_GOOGLE_CLIENT_ID;
   if (!clientId) {
     logger.error({ event: "admin_google_oauth_not_configured" }, "ADMIN_GOOGLE_CLIENT_ID is not set");
-    return NextResponse.redirect(new URL("/admin/login?error=oauth_not_configured", request.url));
+    const url = request.nextUrl.clone();
+    url.pathname = "/admin/login";
+    url.searchParams.set("error", "oauth_not_configured");
+    return NextResponse.redirect(url);
   }
 
   const { searchParams } = new URL(request.url);
