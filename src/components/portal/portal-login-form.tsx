@@ -429,7 +429,9 @@ export function PortalLoginForm({ initialEmail = "" }: { initialEmail?: string }
         <p className="mt-4 text-[13px] text-red-700" role="alert">{error}</p>
       ) : null}
       {info && !error ? (
-        <p className="sr-only" role="status">{info}</p>
+        <p className="mt-4 text-[13px] text-green-700 bg-green-50 p-3 border border-green-200" role="status">
+          {info}
+        </p>
       ) : null}
     </div>
   );

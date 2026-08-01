@@ -405,13 +405,18 @@ export async function middleware(request: NextRequest) {
   }
 
   const isPortalProtected =
-    pathname.startsWith("/portal") &&
-    !pathname.startsWith("/portal/login") &&
-    !pathname.startsWith("/portal/invite");
+    (pathname.startsWith("/portal") &&
+      !pathname.startsWith("/portal/login") &&
+      !pathname.startsWith("/portal/invite")) ||
+    (pathname.startsWith("/api/portal") && !pathname.startsWith("/api/portal/auth"));
+
   if (isPortalProtected) {
     const token = request.cookies.get(CUSTOMER_SESSION_COOKIE)?.value;
     const payload = token ? await verifyCustomerSessionToken(token) : null;
     if (!payload) {
+      if (pathname.startsWith("/api/")) {
+        return deny(request, nonce, 401, { ok: false, error: "Authentication required." });
+      }
       const restore = redirectToSessionRestore(request, nonce, {
         refreshCookie: CUSTOMER_REFRESH_COOKIE,
         guardCookie: CUSTOMER_RESTORE_GUARD_COOKIE,
@@ -456,7 +461,15 @@ export async function middleware(request: NextRequest) {
       login.searchParams.set("next", pathname + request.nextUrl.search);
       return attachSecurityHeaders(NextResponse.redirect(login), request, nonce);
     }
-    if (pathname === "/admin/login" || pathname === "/admin") {
+    if (pathname === "/admin") {
+      return attachSecurityHeaders(NextResponse.redirect(new URL("/admin/dashboard", process.env.NEXT_PUBLIC_SITE_URL ?? request.url)), request, nonce);
+    }
+  }
+
+  if (pathname === "/admin/login") {
+    const token = request.cookies.get(ADMIN_SESSION_COOKIE)?.value;
+    const payload = token ? await verifyAdminSessionToken(token) : null;
+    if (payload) {
       return attachSecurityHeaders(NextResponse.redirect(new URL("/admin/dashboard", process.env.NEXT_PUBLIC_SITE_URL ?? request.url)), request, nonce);
     }
   }

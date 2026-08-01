@@ -28,7 +28,7 @@ export type AdminTokenPayload = JWTPayload & {
   role: string;
   name?: string;
   sessionId?: string;
-  type?: "access" | "refresh";
+  type?: "access" | "refresh" | "2fa_pending";
 };
 
 export type RotateRefreshResult =
@@ -74,7 +74,7 @@ export class AdminTokenService {
 
   static async verifyToken(
     token: string,
-    expectedType?: "access" | "refresh"
+    expectedType?: "access" | "refresh" | "2fa_pending"
   ): Promise<AdminTokenPayload | null> {
     try {
       const { payload } = await jwtVerify(token, jwtSecret(), {
@@ -87,6 +87,16 @@ export class AdminTokenService {
     } catch {
       return null;
     }
+  }
+
+  static async createTwoFactorToken(email: string): Promise<string> {
+    return new SignJWT({ email, type: "2fa_pending" })
+      .setProtectedHeader({ alg: "HS256" })
+      .setIssuedAt()
+      .setIssuer(JWT_ISSUER)
+      .setAudience(JWT_AUDIENCE)
+      .setExpirationTime("5m")
+      .sign(jwtSecret());
   }
 
   static async rotateRefreshToken(oldToken: string): Promise<RotateRefreshResult> {
@@ -197,16 +207,7 @@ export class AdminTokenService {
       select: { createdAt: true }
     });
     if (newest && Date.now() - newest.createdAt.getTime() < ROTATION_GRACE_MS) {
-      const { token: refreshToken } = await this.createRefreshToken(sessionId);
-      const accessToken = await this.createAccessToken({
-        sub: user.id,
-        id: user.id,
-        email: user.email,
-        name: user.name,
-        role: user.role,
-        sessionId
-      });
-      return { status: "rotated", accessToken, refreshToken };
+      return { status: "raced" };
     }
 
     logger.warn({ event: "refresh_token_reuse", sessionId }, "token reuse detected");

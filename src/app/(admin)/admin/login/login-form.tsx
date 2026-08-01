@@ -39,7 +39,7 @@ export function LoginForm({
   const [twoFactor, setTwoFactor] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [capsLock, setCapsLock] = useState(false);
-  const [savedCreds, setSavedCreds] = useState({ email: "", password: "" });
+  const [savedContext, setSavedContext] = useState({ email: "", token: "" });
   const [powFields, setPowFields] = useState<(PoWChallenge & { nonce: number }) | null>(null);
   const [error, setError] = useState<string | undefined>(
     rateLimited
@@ -86,9 +86,9 @@ export function LoginForm({
         return;
       }
       if (result?.requireTwoFactor) {
-        setSavedCreds({
+        setSavedContext({
           email: String(fd.get("email") ?? ""),
-          password: String(fd.get("password") ?? "")
+          token: result.token ?? ""
         });
         setTwoFactor(true);
         return;
@@ -162,8 +162,8 @@ export function LoginForm({
           <input type="hidden" name="next" value={next} />
           {twoFactor ? (
             <>
-              <input type="hidden" name="email" value={savedCreds.email} />
-              <input type="hidden" name="password" value={savedCreds.password} />
+              <input type="hidden" name="email" value={savedContext.email} />
+              <input type="hidden" name="twoFactorToken" value={savedContext.token} />
             </>
           ) : null}
 
@@ -272,7 +272,7 @@ export function LoginForm({
                   setError(undefined);
                   try {
                     const fd = new FormData();
-                    fd.set("email", savedCreds.email);
+                    fd.set("email", savedContext.email);
                     const result = await resendTwoFactorAction(fd);
                     if (result?.error) setError(result.error);
                     else setError("A new code was sent to your email.");

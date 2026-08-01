@@ -100,7 +100,8 @@ export async function consumeOAuthStateCookie(
   const jar = await cookies();
   const name = cookieName(surface);
   const raw = jar.get(name)?.value;
-  jar.delete(name);
+  // We do not delete the cookie here because it prevents page reloads and double-fires 
+  // from succeeding. It has a short TTL (5 minutes) and will expire naturally. (Issue II.5)
   if (!raw) return null;
   return verify(raw);
 }

@@ -15,6 +15,7 @@ export type LoginState = {
   error?: string;
   requireTwoFactor?: boolean;
   email?: string;
+  token?: string;
   ok?: boolean;
   next?: string;
 };
@@ -33,10 +34,15 @@ async function requestMeta() {
 
 export async function loginAction(formData: FormData): Promise<LoginState> {
   const twoFactorCode = String(formData.get("twoFactorCode") ?? "").trim() || undefined;
-  const parsed = loginSchema.safeParse({
-    email: formData.get("email"),
-    password: formData.get("password")
-  });
+  const twoFactorToken = String(formData.get("twoFactorToken") ?? "").trim();
+  
+  // If we have a token, we skip password validation length limits since JWTs can be long
+  const parsed = twoFactorToken ? 
+    { success: true, data: { email: String(formData.get("email")), password: "" } } :
+    loginSchema.safeParse({
+      email: formData.get("email"),
+      password: formData.get("password")
+    });
 
   if (!parsed.success) {
     return { error: "Enter a valid email and password." };
@@ -87,7 +93,7 @@ export async function loginAction(formData: FormData): Promise<LoginState> {
   try {
     const result = await AdminAuthService.login(
       parsed.data.email,
-      parsed.data.password,
+      twoFactorToken ? twoFactorToken : parsed.data.password,
       ip,
       userAgent,
       twoFactorCode
@@ -96,7 +102,8 @@ export async function loginAction(formData: FormData): Promise<LoginState> {
     if ("requireTwoFactor" in result) {
       return {
         requireTwoFactor: true,
-        email: result.email
+        email: result.email,
+        token: result.token
       };
     }
 

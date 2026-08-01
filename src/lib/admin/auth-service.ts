@@ -42,7 +42,7 @@ export type SessionResult = {
 
 export type LoginResult =
   | SessionResult
-  | { requireTwoFactor: true; email: string };
+  | { requireTwoFactor: true; email: string; token: string };
 
 export class AdminAuthService {
   static async findByEmail(email: string) {
@@ -53,7 +53,7 @@ export class AdminAuthService {
 
   static async login(
     email: string,
-    password: string,
+    passwordOrToken: string,
     ip: string,
     userAgent: string,
     twoFactorCode?: string
@@ -77,8 +77,19 @@ export class AdminAuthService {
       });
     }
 
-    const valid = AdminPasswordService.verify(password, user.passwordHash);
-    if (!valid) {
+    // If 2FA code is provided, we expect passwordOrToken to be the 2FA pending JWT (Issue 2.2 / 2.3)
+    let isPasswordValid = false;
+    if (twoFactorCode) {
+      const payload = await AdminTokenService.verifyToken(passwordOrToken, "2fa_pending");
+      if (!payload || payload.email !== normalized) {
+        throw new AdminAuthError("Session expired. Please log in again.", "INVALID_CREDENTIALS");
+      }
+      isPasswordValid = true;
+    } else {
+      isPasswordValid = AdminPasswordService.verify(passwordOrToken, user.passwordHash);
+    }
+
+    if (!isPasswordValid) {
       const attempts = user.failedLoginAttempts + 1;
       if (attempts >= MAX_FAILED_ATTEMPTS) {
         const lockedUntil = new Date(Date.now() + LOCKOUT_DURATION_MS);
@@ -102,11 +113,11 @@ export class AdminAuthService {
       throw new AdminAuthError("Invalid email or password.", "INVALID_CREDENTIALS");
     }
 
-    // Upgrade legacy bcrypt (no pepper) to peppered hash
-    if (AdminPasswordService.needsPepperUpgrade(password, user.passwordHash)) {
+    // Upgrade legacy bcrypt (no pepper) to peppered hash (only if we actually checked the password)
+    if (!twoFactorCode && AdminPasswordService.needsPepperUpgrade(passwordOrToken, user.passwordHash)) {
       await db.adminUser.update({
         where: { id: user.id },
-        data: { passwordHash: AdminPasswordService.hash(password) }
+        data: { passwordHash: AdminPasswordService.hash(passwordOrToken) }
       });
     }
 
@@ -119,7 +130,8 @@ export class AdminAuthService {
       if (!twoFactorCode) {
         const { generateAdminTwoFactorCode } = await import("@/lib/admin/two-factor");
         await generateAdminTwoFactorCode(normalized);
-        return { requireTwoFactor: true, email: normalized };
+        const token = await AdminTokenService.createTwoFactorToken(normalized);
+        return { requireTwoFactor: true, email: normalized, token };
       }
       const { verifyAdminTwoFactorCode } = await import("@/lib/admin/two-factor");
       const ok = await verifyAdminTwoFactorCode(normalized, twoFactorCode);

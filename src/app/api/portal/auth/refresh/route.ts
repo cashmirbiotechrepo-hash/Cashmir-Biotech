@@ -11,9 +11,8 @@ export const runtime = "nodejs";
 
 /** Rotates Customer Portal access token using the path-scoped refresh cookie. */
 export async function POST(request: Request) {
-  const cookieHeader = request.headers.get("cookie") ?? "";
-  const match = cookieHeader.match(new RegExp(`${CUSTOMER_REFRESH_COOKIE}=([^;]+)`));
-  const raw = match?.[1] ? decodeURIComponent(match[1]) : null;
+  const cookieStore = await cookies();
+  const raw = cookieStore.get(CUSTOMER_REFRESH_COOKIE)?.value;
   if (!raw) {
     return NextResponse.json({ ok: false, error: "No refresh session" }, { status: 401 });
   }

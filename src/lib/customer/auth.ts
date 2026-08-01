@@ -244,8 +244,9 @@ export async function verifyPortalOtp(
   emailRaw: string,
   code: string,
   meta?: { ip?: string; userAgent?: string },
-  purpose: "login" | "password_reset" = "login"
-): Promise<{ ok: true; customer: CustomerSessionPayload } | { ok: false; error: string }> {
+  purpose: "login" | "password_reset" = "login",
+  shouldMintSession: boolean = true
+): Promise<{ ok: true; customer?: CustomerSessionPayload } | { ok: false; error: string }> {
   const email = emailRaw.toLowerCase().trim();
   if (!/^\d{6}$/.test(code)) return { ok: false, error: "Enter the 6-digit code." };
 
@@ -282,16 +283,30 @@ export async function verifyPortalOtp(
   }
 
   if (!matchedOtp) {
-    await db.customerOtp.update({
-      where: { id: activeOtps[0]!.id },
+    // Increment attempts on ALL active OTPs to prevent brute-force multiplier (Issue II.1)
+    await db.customerOtp.updateMany({
+      where: {
+        id: { in: activeOtps.map(o => o.id) }
+      },
       data: { attempts: { increment: 1 } }
     });
     return { ok: false, error: "Invalid or expired code." };
   }
 
-  // Mark all unused login OTPs for this email as used so none can be replayed
+  // Atomically mark this specific OTP as used (Issue 1.3 - Race condition)
+  const result = await db.customerOtp.updateMany({
+    where: { id: matchedOtp.id, usedAt: null },
+    data: { usedAt: new Date() }
+  });
+
+  if (result.count === 0) {
+    // Another concurrent request just used this exact OTP
+    return { ok: false, error: "Invalid or expired code." };
+  }
+
+  // Sweep older unused OTPs for this email/purpose just to clean up
   await db.customerOtp.updateMany({
-    where: { email, purpose, usedAt: null },
+    where: { email, purpose, usedAt: null, id: { not: matchedOtp.id } },
     data: { usedAt: new Date() }
   });
 
@@ -305,32 +320,37 @@ export async function verifyPortalOtp(
 
   const { linkedCount } = await linkGuestOrdersToCustomer(customer.id, email);
 
-  const session = await createCustomerSession(customer.id, meta);
-  const access = await mintCustomerAccessToken({
-    id: customer.id,
-    email: customer.email,
-    name: customer.name,
-    sessionId: session.id,
-    emailVerified: true
-  });
-  const refresh = await mintCustomerRefreshToken(session.id);
-  await setCustomerSessionCookies(access, refresh);
-
-  logger.info(
-    { event: "portal_login", customerId: customer.id, linkedCount, firstVerify },
-    "customer portal login"
-  );
-
-  return {
-    ok: true,
-    customer: {
+  if (shouldMintSession) {
+    const session = await createCustomerSession(customer.id, meta);
+    const access = await mintCustomerAccessToken({
       id: customer.id,
       email: customer.email,
       name: customer.name,
       sessionId: session.id,
       emailVerified: true
-    }
-  };
+    });
+    const refresh = await mintCustomerRefreshToken(session.id);
+    await setCustomerSessionCookies(access, refresh);
+
+    logger.info(
+      { event: "portal_login", customerId: customer.id, linkedCount, firstVerify },
+      "customer portal login"
+    );
+
+    return {
+      ok: true,
+      customer: {
+        id: customer.id,
+        email: customer.email,
+        name: customer.name,
+        sessionId: session.id,
+        emailVerified: true
+      }
+    };
+  } else {
+    // Password reset or other purpose where we just wanted to verify the OTP
+    return { ok: true, customer: undefined };
+  }
 }
 
 async function createCustomerSession(
@@ -434,17 +454,9 @@ async function classifyRevokedCustomerToken(
     select: { createdAt: true }
   });
   if (newest && Date.now() - newest.createdAt.getTime() < ROTATION_GRACE_MS) {
-    // Benign race — heal the stranded client with fresh tokens instead of
-    // leaving it holding a dead refresh token that later reads as "reuse".
-    const refreshToken = await mintCustomerRefreshToken(sessionId);
-    const accessToken = await mintCustomerAccessToken({
-      id: customer.id,
-      email: customer.email,
-      name: customer.name,
-      sessionId,
-      emailVerified: Boolean(customer.emailVerifiedAt)
-    });
-    return { status: "rotated", accessToken, refreshToken };
+    // Benign race — return "raced" so the client relies on the tokens already
+    // issued to the winning concurrent request.
+    return { status: "raced" };
   }
 
   logger.warn(

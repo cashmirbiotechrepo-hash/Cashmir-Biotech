@@ -51,7 +51,9 @@ export async function POST(request: Request) {
   // Use the new purpose parameter
   const result = await requestPortalOtp(email, "password_reset");
   if (!result.ok) {
-    return NextResponse.json({ ok: false, error: result.error }, { status: 400 });
+    logger.error({ event: "password_reset_otp_failed", email, error: result.error }, "Failed to send OTP for password reset");
+    // Return ok:true anyway to prevent email enumeration (Issue 4.1)
+    return NextResponse.json({ ok: true });
   }
 
   return NextResponse.json({ ok: true });
