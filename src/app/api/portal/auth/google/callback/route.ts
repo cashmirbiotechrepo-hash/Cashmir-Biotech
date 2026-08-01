@@ -3,11 +3,7 @@ import { validateOAuthState } from "@/lib/oauth-state";
 import { db } from "@/lib/db";
 import { logger } from "@/lib/logger";
 import { createCustomerSessionFromOAuth } from "@/lib/customer/oauth-session";
-import { cookies } from "next/headers";
-import {
-  CUSTOMER_SESSION_COOKIE,
-  CUSTOMER_REFRESH_COOKIE
-} from "@/config/auth.constants";
+import { setCustomerSessionCookies } from "@/lib/customer/auth";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -179,22 +175,7 @@ export async function GET(request: Request) {
   // Issue session + set cookies
   try {
     const { accessToken, refreshToken } = await createCustomerSessionFromOAuth(customerId, request);
-    const isProd = process.env.NODE_ENV === "production";
-    const jar = await cookies();
-    jar.set(CUSTOMER_SESSION_COOKIE, accessToken, {
-      httpOnly: true,
-      secure: isProd,
-      sameSite: "lax",
-      path: "/",
-      maxAge: 15 * 60 // 15 minutes
-    });
-    jar.set(CUSTOMER_REFRESH_COOKIE, refreshToken, {
-      httpOnly: true,
-      secure: isProd,
-      sameSite: "lax",
-      path: "/",
-      maxAge: 90 * 24 * 60 * 60 // 90 days
-    });
+    await setCustomerSessionCookies(accessToken, refreshToken);
   } catch (err) {
     logger.error({ err, event: "google_oauth_session_error", customerId }, "Failed to create session");
     return NextResponse.redirect(new URL("/portal/login?error=oauth_server_error", siteUrl));

@@ -3,11 +3,7 @@ import { validateOAuthState } from "@/lib/oauth-state";
 import { db } from "@/lib/db";
 import { logger } from "@/lib/logger";
 import { createAdminSessionFromOAuth } from "@/lib/customer/oauth-session";
-import { cookies } from "next/headers";
-import {
-  ADMIN_SESSION_COOKIE,
-  ADMIN_REFRESH_COOKIE
-} from "@/config/auth.constants";
+import { setAdminSessionCookies } from "@/lib/auth";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -173,22 +169,7 @@ export async function GET(request: Request) {
   // Issue admin session + cookies
   try {
     const { accessToken, refreshToken } = await createAdminSessionFromOAuth(adminId, request);
-    const isProd = process.env.NODE_ENV === "production";
-    const jar = await cookies();
-    jar.set(ADMIN_SESSION_COOKIE, accessToken, {
-      httpOnly: true,
-      secure: isProd,
-      sameSite: "lax",
-      path: "/",
-      maxAge: 15 * 60
-    });
-    jar.set(ADMIN_REFRESH_COOKIE, refreshToken, {
-      httpOnly: true,
-      secure: isProd,
-      sameSite: "lax",
-      path: "/",
-      maxAge: 90 * 24 * 60 * 60
-    });
+    await setAdminSessionCookies(accessToken, refreshToken);
   } catch (err) {
     logger.error({ err, event: "admin_google_session_error", adminId, ip }, "Failed to create admin session");
     return NextResponse.redirect(new URL("/admin/login?error=oauth_server_error", siteUrl));
