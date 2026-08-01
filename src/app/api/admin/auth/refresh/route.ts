@@ -58,12 +58,13 @@ function safeNextPath(raw: string | null): string {
  * page reload after >15 minutes resumes the session instead of forcing login.
  */
 export async function GET(request: Request) {
-  const url = new URL(request.url);
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? request.url;
+  const url = new URL(request.url, siteUrl);
   const nextPath = safeNextPath(url.searchParams.get("next"));
   const cookieStore = await cookies();
   const refreshToken = cookieStore.get(ADMIN_REFRESH_COOKIE)?.value;
 
-  const loginUrl = new URL("/admin/login", url.origin);
+  const loginUrl = new URL("/admin/login", siteUrl);
   loginUrl.searchParams.set("next", nextPath);
 
   if (!refreshToken) {
@@ -75,7 +76,7 @@ export async function GET(request: Request) {
   if (rotated.status === "rotated") {
     await setAdminSessionCookies(rotated.accessToken, rotated.refreshToken);
     cookieStore.delete(ADMIN_RESTORE_GUARD_COOKIE);
-    return NextResponse.redirect(new URL(nextPath, url.origin), {
+    return NextResponse.redirect(new URL(nextPath, siteUrl), {
       headers: { "Cache-Control": "no-store" }
     });
   }
@@ -83,7 +84,7 @@ export async function GET(request: Request) {
   if (rotated.status === "raced" || rotated.status === "unavailable") {
     // Another request holds the fresh cookies, or a transient blip — go back and
     // let middleware re-check rather than destroying a healthy session.
-    return NextResponse.redirect(new URL(nextPath, url.origin), {
+    return NextResponse.redirect(new URL(nextPath, siteUrl), {
       headers: { "Cache-Control": "no-store" }
     });
   }

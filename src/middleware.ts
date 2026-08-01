@@ -116,7 +116,7 @@ function redirectToSessionRestore(
   if (!request.cookies.get(opts.refreshCookie)?.value) return null;
   if (request.cookies.get(opts.guardCookie)?.value) return null;
 
-  const restore = new URL(opts.restorePath, request.url);
+  const restore = new URL(opts.restorePath, process.env.NEXT_PUBLIC_SITE_URL ?? request.url);
   restore.searchParams.set("next", request.nextUrl.pathname + request.nextUrl.search);
   const res = NextResponse.redirect(restore);
   res.cookies.set(opts.guardCookie, "1", {
@@ -319,7 +319,7 @@ export async function middleware(request: NextRequest) {
       const ip = clientIpFromRequest(request);
       const { success } = await rl.limit(ip);
       if (!success) {
-        const redirectUrl = new URL(pathname.startsWith("/api/admin") ? "/admin/login" : "/portal/login", request.url);
+        const redirectUrl = new URL(pathname.startsWith("/api/admin") ? "/admin/login" : "/portal/login", process.env.NEXT_PUBLIC_SITE_URL ?? request.url);
         redirectUrl.searchParams.set("rateLimited", "1");
         return attachSecurityHeaders(NextResponse.redirect(redirectUrl), request, nonce);
       }
@@ -421,7 +421,7 @@ export async function middleware(request: NextRequest) {
       });
       if (restore) return restore;
 
-      const login = new URL("/portal/login", request.url);
+      const login = new URL("/portal/login", process.env.NEXT_PUBLIC_SITE_URL ?? request.url);
       login.searchParams.set("next", pathname + request.nextUrl.search);
       return attachSecurityHeaders(NextResponse.redirect(login), request, nonce);
     }
@@ -431,7 +431,7 @@ export async function middleware(request: NextRequest) {
     const token = request.cookies.get(CUSTOMER_SESSION_COOKIE)?.value;
     const payload = token ? await verifyCustomerSessionToken(token) : null;
     if (payload) {
-      return attachSecurityHeaders(NextResponse.redirect(new URL("/portal", request.url)), request, nonce);
+      return attachSecurityHeaders(NextResponse.redirect(new URL("/portal", process.env.NEXT_PUBLIC_SITE_URL ?? request.url)), request, nonce);
     }
   }
 
@@ -454,12 +454,12 @@ export async function middleware(request: NextRequest) {
       });
       if (restore) return restore;
 
-      const login = new URL("/admin/login", request.url);
+      const login = new URL("/admin/login", process.env.NEXT_PUBLIC_SITE_URL ?? request.url);
       login.searchParams.set("next", pathname + request.nextUrl.search);
       return attachSecurityHeaders(NextResponse.redirect(login), request, nonce);
     }
     if (pathname === "/admin/login" || pathname === "/admin") {
-      return attachSecurityHeaders(NextResponse.redirect(new URL("/admin/dashboard", request.url)), request, nonce);
+      return attachSecurityHeaders(NextResponse.redirect(new URL("/admin/dashboard", process.env.NEXT_PUBLIC_SITE_URL ?? request.url)), request, nonce);
     }
   }
 

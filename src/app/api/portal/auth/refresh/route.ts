@@ -49,12 +49,13 @@ function safeNextPath(raw: string | null): string {
  * page reload after >15 minutes resumes the session instead of forcing login.
  */
 export async function GET(request: Request) {
-  const url = new URL(request.url);
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? request.url;
+  const url = new URL(request.url, siteUrl);
   const nextPath = safeNextPath(url.searchParams.get("next"));
   const cookieStore = await cookies();
   const raw = cookieStore.get(CUSTOMER_REFRESH_COOKIE)?.value;
 
-  const loginUrl = new URL("/portal/login", url.origin);
+  const loginUrl = new URL("/portal/login", siteUrl);
   loginUrl.searchParams.set("next", nextPath);
 
   if (!raw) {
