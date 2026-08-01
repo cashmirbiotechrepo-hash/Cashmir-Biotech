@@ -249,8 +249,8 @@ function HomeProductCard({ product }: { product: ProductCard }) {
         )}
 
         {badge ? (
-          <span className="absolute left-3 top-3 bg-ink px-2 py-1 font-mono text-[9px] uppercase tracking-[0.14em] text-paper">
-            {badge}
+          <span className="absolute left-3 top-3 bg-ink px-2 py-0.5 font-mono text-[9px] font-semibold uppercase tracking-[0.18em] text-paper">
+            {badge === "Bestseller" ? "BESTSELLER" : "NO. 01"}
           </span>
         ) : null}
 
@@ -280,7 +280,7 @@ function HomeProductCard({ product }: { product: ProductCard }) {
         </ul>
 
         <p className="mt-2.5 font-mono text-[9px] uppercase tracking-[0.12em] text-ink-faint">
-          Research-backed · Made in India
+          Research-backed · Made in Kashmir
         </p>
 
         <div className="mt-auto flex items-end justify-between gap-3 border-t border-ink/8 pt-3">
@@ -292,8 +292,8 @@ function HomeProductCard({ product }: { product: ProductCard }) {
             />
             <p className="font-mono text-[9px] uppercase tracking-[0.12em] text-ink-faint">{product.sizeLabel}</p>
           </div>
-          <span className="inline-flex items-center gap-1 text-[13px] font-medium text-ink">
-            View product
+          <span className="inline-flex items-center gap-1 text-[13px] font-medium text-ink group-hover:text-gold transition-colors">
+            Details
             <ArrowUpRight className="size-3.5 transition-transform duration-300 group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
           </span>
         </div>

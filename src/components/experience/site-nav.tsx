@@ -9,20 +9,27 @@ import gsap from "gsap";
 import { useGSAP } from "@gsap/react";
 import { useCart } from "@/components/shop/cart-context";
 import { cn } from "@/lib/utils";
+import { ThemeSegment } from "@/components/experience/theme-toggle";
+
 if (typeof window !== "undefined") {
   gsap.registerPlugin(useGSAP);
 }
 
-type NavLink = { label: string; href: string };
+type NavLink = { label: string; href: string; category?: "primary" | "secondary" };
 
-const LINKS: NavLink[] = [
-  { label: "Shop", href: "/products" },
-  { label: "Research", href: "/research" },
-  { label: "Technology", href: "/technology" },
-  { label: "Patents", href: "/patents" },
-  { label: "Journal", href: "/blog" },
-  { label: "Company", href: "/about" }
+const PRIMARY_LINKS: NavLink[] = [
+  { label: "Shop", href: "/products", category: "primary" },
+  { label: "Research", href: "/research", category: "primary" },
+  { label: "Technology", href: "/technology", category: "primary" },
+  { label: "Patents", href: "/patents", category: "primary" }
 ];
+
+const SECONDARY_LINKS: NavLink[] = [
+  { label: "Company", href: "/about", category: "secondary" },
+  { label: "Journal", href: "/blog", category: "secondary" }
+];
+
+const LINKS = [...PRIMARY_LINKS, ...SECONDARY_LINKS];
 
 function isActive(pathname: string, href: string) {
   return href !== "/" && pathname.startsWith(href);
@@ -285,25 +292,25 @@ export function SiteNav({
         }}
       >
         <div className="relative flex items-center justify-between gap-4">
-          {/* Left: Branding */}
+          {/* Left: Branding — ~15% larger with breathing room */}
           <div className="flex items-center gap-3 shrink-0">
             <Link
               href="/"
               aria-label="Cashmir Biotech home"
-              className="group flex items-center gap-2.5 transition-opacity hover:opacity-80"
+              className="group flex items-center transition-opacity hover:opacity-85"
             >
               <Image
                 src="/logo.png"
                 alt="Cashmir Biotech Logo"
-                width={160}
-                height={36}
-                className="h-8 sm:h-9 w-auto object-contain object-left"
+                width={185}
+                height={42}
+                className="h-9.5 sm:h-11 w-auto object-contain object-left"
                 priority
               />
             </Link>
           </div>
 
-          {/* Center Navigation Links (Absolute Centered like Reference Header) */}
+          {/* Center Navigation Links (Desktop) */}
           <div className="absolute inset-0 m-auto hidden size-fit lg:block">
             <ul className="flex items-center gap-7 text-[14px]">
               {LINKS.map((link) => (
@@ -316,17 +323,20 @@ export function SiteNav({
             </ul>
           </div>
 
-          {/* Right Utilities */}
-          <div className="flex items-center gap-1 sm:gap-1.5 shrink-0">
-            <div className="flex items-center gap-0.5 sm:gap-1">
+          {/* Right Utilities — Streamlined for Mobile (Search, Cart, Menu) */}
+          <div className="flex items-center gap-1 sm:gap-2 shrink-0">
+            {/* Desktop Only: Theme & Account */}
+            <div className="hidden lg:flex items-center gap-1">
               <HeaderThemeToggle />
-
-              <AnimatedIconButton ariaLabel="Search">
-                <Search className="h-4 w-4" strokeWidth={2} />
-              </AnimatedIconButton>
-
               <AnimatedIconButton href={accountHref} ariaLabel="Account">
                 <User className="h-4 w-4" strokeWidth={2} />
+              </AnimatedIconButton>
+            </div>
+
+            {/* Mobile & Desktop: Search & Cart */}
+            <div className="flex items-center gap-1 sm:gap-1.5">
+              <AnimatedIconButton ariaLabel="Search">
+                <Search className="h-[18px] w-[18px]" strokeWidth={2} />
               </AnimatedIconButton>
 
               <AnimatedIconButton
@@ -334,13 +344,13 @@ export function SiteNav({
                 ariaLabel="Cart"
                 badge={
                   cartReady && count > 0 && (
-                    <span className="absolute -right-0.5 -top-0.5 flex h-[16px] min-w-[16px] items-center justify-center rounded-full bg-gold px-1 font-mono text-[9px] font-bold text-white">
+                    <span className="absolute -right-1 -top-1 flex h-[16px] min-w-[16px] items-center justify-center rounded-full bg-gold px-1 font-mono text-[9px] font-bold text-white shadow-sm">
                       {count > 99 ? "99+" : count}
                     </span>
                   )
                 }
               >
-                <ShoppingBag className="h-4 w-4" strokeWidth={2} />
+                <ShoppingBag className="h-[18px] w-[18px]" strokeWidth={2} />
               </AnimatedIconButton>
             </div>
 
@@ -348,7 +358,7 @@ export function SiteNav({
             <button
               onClick={() => setMenuOpen(!menuOpen)}
               aria-label={menuOpen ? "Close Menu" : "Open Menu"}
-              className="relative flex h-9 w-9 items-center justify-center rounded-full text-ink-mute transition-colors hover:bg-ink/5 hover:text-ink lg:hidden"
+              className="relative flex h-9.5 w-9.5 items-center justify-center rounded-full text-ink transition-colors hover:bg-ink/5 lg:hidden"
             >
               {menuOpen ? (
                 <X className="h-5 w-5" strokeWidth={2} />
@@ -360,40 +370,132 @@ export function SiteNav({
         </div>
       </nav>
 
-      {/* Mobile Drawer Menu */}
+      {/* Mobile Drawer Menu — Full UX Architecture */}
       {menuOpen && (
-        <div className="fixed inset-0 z-40 flex flex-col bg-paper/95 backdrop-blur-2xl text-ink pt-20 px-6 pb-8 lg:hidden animate-in fade-in duration-200">
-          <nav aria-label="Mobile Navigation" className="flex-1">
-            <ul className="flex flex-col gap-5 text-xl font-medium">
-              {LINKS.map((link) => (
-                <li key={link.href} className="border-b border-ink/10 pb-3">
-                  <Link
-                    href={link.href}
-                    onClick={() => setMenuOpen(false)}
-                    className={cn(
-                      "block transition-colors",
-                      isActive(pathname, link.href) ? "text-gold font-semibold" : "text-ink hover:text-gold"
-                    )}
-                  >
-                    {link.label}
-                  </Link>
-                </li>
-              ))}
-              <li className="border-b border-ink/10 pb-3">
+        <div className="fixed inset-0 z-50 flex flex-col bg-paper text-ink lg:hidden animate-in fade-in slide-in-from-top-3 duration-200 overflow-y-auto">
+          {/* Menu Drawer Header Bar */}
+          <div className="flex h-16 shrink-0 items-center justify-between border-b border-ink/10 px-6">
+            <Link href="/" onClick={() => setMenuOpen(false)} aria-label="Cashmir Biotech home">
+              <Image
+                src="/logo.png"
+                alt="Cashmir Biotech"
+                width={160}
+                height={36}
+                className="h-8 w-auto object-contain"
+              />
+            </Link>
+            <button
+              onClick={() => setMenuOpen(false)}
+              aria-label="Close menu"
+              className="-mr-2 flex h-10 w-10 items-center justify-center rounded-full text-ink transition-colors hover:bg-ink/5"
+            >
+              <X className="h-5 w-5" strokeWidth={2} />
+            </button>
+          </div>
+
+          {/* Menu Drawer Content */}
+          <div className="flex flex-1 flex-col px-6 py-6">
+            <nav aria-label="Mobile Navigation" className="flex-1">
+              <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-ink-faint mb-3">
+                Navigation
+              </p>
+
+              {/* Primary Section */}
+              <ul className="flex flex-col gap-3">
+                {PRIMARY_LINKS.map((link) => {
+                  const active = isActive(pathname, link.href);
+                  return (
+                    <li key={link.href}>
+                      <Link
+                        href={link.href}
+                        onClick={() => setMenuOpen(false)}
+                        className={cn(
+                          "flex items-center justify-between py-2 text-2xl font-light tracking-tight transition-colors",
+                          active ? "text-gold font-normal" : "text-ink hover:text-gold"
+                        )}
+                      >
+                        <span>{link.label}</span>
+                        {active && <span className="h-1.5 w-1.5 rounded-full bg-gold" />}
+                      </Link>
+                    </li>
+                  );
+                })}
+              </ul>
+
+              <div className="my-5 h-px bg-ink/10" />
+
+              {/* Secondary Section */}
+              <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-ink-faint mb-3">
+                Explore
+              </p>
+              <ul className="flex flex-col gap-2.5">
+                {SECONDARY_LINKS.map((link) => {
+                  const active = isActive(pathname, link.href);
+                  return (
+                    <li key={link.href}>
+                      <Link
+                        href={link.href}
+                        onClick={() => setMenuOpen(false)}
+                        className={cn(
+                          "block py-1 text-lg font-normal transition-colors",
+                          active ? "text-gold font-medium" : "text-ink-soft hover:text-ink"
+                        )}
+                      >
+                        {link.label}
+                      </Link>
+                    </li>
+                  );
+                })}
+              </ul>
+
+              <div className="my-5 h-px bg-ink/10" />
+
+              {/* Account & Utilities */}
+              <div className="flex flex-col gap-3">
                 <Link
                   href={accountHref}
                   onClick={() => setMenuOpen(false)}
-                  className="block text-ink transition-colors hover:text-gold"
+                  className="flex items-center gap-2.5 py-1.5 text-base font-medium text-ink transition-colors hover:text-gold"
                 >
-                  Account / Sign In
+                  <User className="h-4.5 w-4.5 text-ink-mute" strokeWidth={1.8} />
+                  {customer ? "My Account" : "Sign In / Register"}
                 </Link>
-              </li>
-            </ul>
-          </nav>
+                <Link
+                  href="/cart"
+                  onClick={() => setMenuOpen(false)}
+                  className="flex items-center justify-between py-1.5 text-base font-medium text-ink transition-colors hover:text-gold"
+                >
+                  <span className="flex items-center gap-2.5">
+                    <ShoppingBag className="h-4.5 w-4.5 text-ink-mute" strokeWidth={1.8} />
+                    Shopping Cart
+                  </span>
+                  {cartReady && count > 0 && (
+                    <span className="rounded-full bg-gold px-2 py-0.5 font-mono text-xs text-white">
+                      {count}
+                    </span>
+                  )}
+                </Link>
+              </div>
 
-          <div className="flex items-center justify-between border-t border-ink/10 pt-6">
-            <span className="text-sm font-mono text-ink-mute">Appearance</span>
-            <HeaderThemeToggle />
+              {/* Appearance / Theme Control */}
+              <div className="mt-6 border-t border-ink/10 pt-5">
+                <ThemeSegment />
+              </div>
+            </nav>
+
+            {/* Menu Footer */}
+            <div className="mt-8 border-t border-ink/10 pt-4 flex items-center justify-between text-[12px] text-ink-mute">
+              <span>© {new Date().getFullYear()} Cashmir Biotech</span>
+              <div className="flex items-center gap-3">
+                <Link href="/about" onClick={() => setMenuOpen(false)} className="hover:text-ink">
+                  Support
+                </Link>
+                <span>·</span>
+                <Link href="/about" onClick={() => setMenuOpen(false)} className="hover:text-ink">
+                  Privacy
+                </Link>
+              </div>
+            </div>
           </div>
         </div>
       )}
