@@ -27,13 +27,23 @@ export const metadata: Metadata = {
     template: "%s · Cashmir Biotech"
   },
   description:
-    "Clinical-precision biotech formulations engineered from Himalayan biodiversity. Molecular research, patented actives, and evidence-led therapeutics.",
+    "Cashmir Biotech Private Limited — an innovative biotechnology startup based in Srinagar, Jammu & Kashmir. Incubated at SKUAST-K and funded by IIT Kanpur. Specializing in high-quality nutraceuticals, functional foods, prostate health, gout management, and iron supplementation.",
   keywords: [
     "biotech",
-    "Himalayan biodiversity",
-    "molecular research",
-    "precision medicine",
-    "Cashmir Biotech"
+    "Cashmir Biotech",
+    "Srinagar",
+    "Jammu and Kashmir",
+    "SKUAST-K",
+    "IIT Kanpur",
+    "nutraceuticals",
+    "functional foods",
+    "prostate health",
+    "gout management",
+    "iron supplementation",
+    "MagicFood",
+    "ZincMagNatural",
+    "IronReviveHerbal",
+    "precision medicine"
   ],
   applicationName: "Cashmir Biotech",
   icons: {
@@ -48,10 +58,39 @@ export const metadata: Metadata = {
   openGraph: {
     title: "Cashmir Biotech — Precision Biology from the Himalaya",
     description:
-      "Clinical-precision biotech formulations engineered from Himalayan biodiversity.",
+      "Innovative biotechnology startup from Srinagar, Jammu & Kashmir. Developing high-quality nutraceuticals and functional foods backed by SKUAST-K and IIT Kanpur.",
     url: siteUrl,
     siteName: "Cashmir Biotech",
     type: "website"
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Cashmir Biotech — Precision Biology from the Himalaya",
+    description: "Innovative biotechnology startup developing high-quality nutraceuticals and functional foods."
+  }
+};
+
+const orgJsonLd = {
+  "@context": "https://schema.org",
+  "@type": "MedicalOrganization",
+  "name": "Cashmir Biotech Private Limited",
+  "url": siteUrl,
+  "logo": `${siteUrl}/icon.png`,
+  "foundingDate": "2022-09-19",
+  "description": "An innovative biotechnology startup based in Srinagar, Jammu and Kashmir, specializing in nutraceuticals and functional foods.",
+  "address": {
+    "@type": "PostalAddress",
+    "addressLocality": "Srinagar",
+    "addressRegion": "Jammu and Kashmir",
+    "addressCountry": "IN"
+  },
+  "parentOrganization": {
+    "@type": "Organization",
+    "name": "Sher-e-Kashmir University of Agricultural Sciences and Technology of Kashmir (SKUAST-K)"
+  },
+  "funder": {
+    "@type": "Organization",
+    "name": "IIT Kanpur"
   }
 };
 
@@ -77,6 +116,11 @@ export default async function RootLayout({ children }: { children: React.ReactNo
           nonce={nonce}
           suppressHydrationWarning
           dangerouslySetInnerHTML={{ __html: THEME_BOOTSTRAP_SCRIPT }}
+        />
+        <script
+          type="application/ld+json"
+          nonce={nonce}
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(orgJsonLd) }}
         />
       </head>
       <body className={`${inter.variable} ${spaceMono.variable} font-sans antialiased`} data-nonce={nonce}>

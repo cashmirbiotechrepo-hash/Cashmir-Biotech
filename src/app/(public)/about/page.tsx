@@ -21,7 +21,7 @@ export default function AboutPage() {
         eyebrow="About Cashmir"
         title="Science, certification, and Kashmir biodiversity."
         accentWords={[2, 4]}
-        description="Cashmir Biotech Pvt Ltd translates faculty–student research from SKUAST-K into patent-backed functional foods and supplements — manufactured under FSSAI licence with full regulatory documentation."
+        description="Cashmir Biotech Pvt Ltd is an innovative biotechnology startup based in Srinagar, Jammu and Kashmir. Incubated at SKUAST-K and funded by IIT Kanpur, we translate faculty–student research into patent-backed functional foods and nutraceuticals focused on prostate health, gout and uric acid management, and iron supplementation."
       />
 
       <section className="frame mb-24">
@@ -36,11 +36,14 @@ export default function AboutPage() {
           ))}
         </div>
         <Reveal delay={0.1}>
-          <p className="mx-auto mt-10 max-w-2xl text-center text-sm leading-relaxed text-ink-mute">
-            Our intellectual property portfolio spans granted Indian patents, inventorship
+          <p className="mx-auto mt-10 max-w-3xl text-center text-sm leading-relaxed text-ink-mute">
+            Our intellectual property portfolio spans 14 granted Indian patents, inventorship
             certificates, a registered industrial design, trademark protection, and an
             international German utility model — documenting innovation across agriculture,
-            nutraceuticals, diagnostics, and oncology research.
+            nutraceuticals, diagnostics, and oncology research. We aim to leverage nature-inspired solutions backed by modern science to deliver effective and affordable products that enhance quality of life.
+          </p>
+          <p className="mx-auto mt-4 max-w-3xl text-center text-sm leading-relaxed text-ink-mute">
+            Recently, Cashmir Biotech showcased its flagship functional foods—including <strong>MagicFood</strong>, <strong>ZincMagNatural</strong>, and <strong>IronReviveHerbal</strong>—at the prestigious Gongul 2025 AgriTech Mela, which was visited by the Chief Minister of Jammu and Kashmir.
           </p>
         </Reveal>
       </section>

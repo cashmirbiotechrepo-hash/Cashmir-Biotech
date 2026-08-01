@@ -39,7 +39,7 @@ export function ProductJsonLd({ product, available }: ProductJsonLdProps) {
     description: product.shortBenefit || product.description,
     sku: product.sku || undefined,
     image: images.length ? images : undefined,
-    brand: brand ? { "@type": "Brand", name: brand } : undefined,
+    brand: { "@type": "Brand", name: brand || "Cashmir Biotech" },
     offers: {
       "@type": "Offer",
       price: sellingInr.toString(),
