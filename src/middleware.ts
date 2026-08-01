@@ -204,9 +204,7 @@ export async function middleware(request: NextRequest) {
   // a same-origin header and are protected by signed state cookie, not Origin.
   if (
     pathname.startsWith("/api/portal/auth/google/callback") ||
-    pathname.startsWith("/api/portal/auth/apple/callback") ||
-    pathname.startsWith("/api/admin/auth/google/callback") ||
-    pathname.startsWith("/api/admin/auth/apple/callback")
+    pathname.startsWith("/api/admin/auth/google/callback")
   ) {
     return nextWithNonce(request, nonce);
   }

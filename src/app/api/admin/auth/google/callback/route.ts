@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { validateOAuthState } from "@/lib/oauth-state";
 import { db } from "@/lib/db";
 import { logger } from "@/lib/logger";
-import { createAdminSessionFromOAuth } from "@/lib/customer/oauth-session";
+import { createAdminSessionFromOAuth } from "@/lib/admin/oauth-session";
 import { setAdminSessionCookies } from "@/lib/auth";
 
 export const runtime = "nodejs";

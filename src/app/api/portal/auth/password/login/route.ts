@@ -5,6 +5,7 @@ import { compare } from "bcryptjs";
 import { db } from "@/lib/db";
 import { logger } from "@/lib/logger";
 import { createCustomerSessionFromOAuth } from "@/lib/customer/oauth-session";
+import { setCustomerSessionCookies } from "@/lib/customer/auth";
 import { CUSTOMER_SESSION_COOKIE, CUSTOMER_REFRESH_COOKIE } from "@/config/auth.constants";
 
 export const runtime = "nodejs";
@@ -49,11 +50,9 @@ export async function POST(request: Request) {
     }
 
     if (!customer.passwordHash) {
-      // Use the generic message. Wait, no, we can tell them to use OTP or OAuth because it's their own portal.
-      // And we know the account exists, but we shouldn't reveal it if it doesn't.
-      // But wait, if they don't have a password, they legitimately need to use another method.
+      await compare("dummy", "dummyhash");
       return NextResponse.json(
-        { ok: false, error: "No password set. Use email code or sign in with Google/Apple." },
+        { ok: false, error: "Invalid email or password." },
         { status: 401 }
       );
     }
@@ -100,23 +99,7 @@ export async function POST(request: Request) {
 
     // Create session (reusing logic from OAuth helper which does exactly what we need)
     const { accessToken, refreshToken } = await createCustomerSessionFromOAuth(customer.id, request);
-    
-    const isProd = process.env.NODE_ENV === "production";
-    const jar = await cookies();
-    jar.set(CUSTOMER_SESSION_COOKIE, accessToken, {
-      httpOnly: true,
-      secure: isProd,
-      sameSite: "lax",
-      path: "/",
-      maxAge: 15 * 60
-    });
-    jar.set(CUSTOMER_REFRESH_COOKIE, refreshToken, {
-      httpOnly: true,
-      secure: isProd,
-      sameSite: "lax",
-      path: "/",
-      maxAge: 90 * 24 * 60 * 60
-    });
+    await setCustomerSessionCookies(accessToken, refreshToken);
 
     return NextResponse.json({ ok: true, next: "/portal" });
   } catch (err) {

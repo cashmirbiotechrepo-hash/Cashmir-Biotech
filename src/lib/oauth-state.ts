@@ -1,5 +1,5 @@
 import "server-only";
-import { createHmac, randomBytes } from "crypto";
+import crypto, { createHmac, randomBytes } from "crypto";
 import { cookies } from "next/headers";
 
 // ── Constants ─────────────────────────────────────────────────────────────────
@@ -39,7 +39,14 @@ function verify(token: string): OAuthStateCookiePayload | null {
   const expected = createHmac("sha256", getKey())
     .update(Buffer.from(encoded, "base64url").toString())
     .digest("base64url");
-  if (mac !== expected) return null;
+    
+  const macBuf = Buffer.from(mac, "base64url");
+  const expectedBuf = Buffer.from(expected, "base64url");
+  
+  if (macBuf.length !== expectedBuf.length || !crypto.timingSafeEqual(macBuf, expectedBuf)) {
+    return null;
+  }
+  
   try {
     return JSON.parse(Buffer.from(encoded, "base64url").toString()) as OAuthStateCookiePayload;
   } catch {

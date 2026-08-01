@@ -124,6 +124,14 @@ export async function GET(request: Request) {
 
     if (existingAccount) {
       // Returning Google user
+      const customer = await db.customer.findUnique({
+        where: { id: existingAccount.customerId },
+        select: { id: true, active: true }
+      });
+      if (!customer || !customer.active) {
+        logger.warn({ event: "google_oauth_inactive_customer", email }, "Inactive customer tried Google login");
+        return NextResponse.redirect(new URL("/portal/login?error=account_inactive", siteUrl));
+      }
       customerId = existingAccount.customerId;
     } else {
       // Look for an existing Customer by email
@@ -146,8 +154,7 @@ export async function GET(request: Request) {
         await db.customer.update({
           where: { id: customerId },
           data: {
-            emailVerifiedAt: new Date(),
-            ...(name ? { name: undefined } : {}) // don't overwrite existing name
+            emailVerifiedAt: new Date()
           }
         });
         logger.info({ event: "google_oauth_linked", customerId, email }, "Google account linked to existing customer");
