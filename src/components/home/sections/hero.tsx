@@ -20,16 +20,8 @@ export function Hero({ content }: { content: HomeContent }) {
       <div className="frame grid w-full grid-cols-1 items-center gap-8 md:gap-10 lg:grid-cols-[1.05fr_0.95fr] lg:gap-8">
         {/* Copy — sits under the jar on small screens */}
         <div className="relative z-10 order-2 pt-8 lg:order-1 lg:pt-0">
-          <motion.p
-            initial={{ opacity: 0, y: 12 }}
-            animate={ready ? { opacity: 1, y: 0 } : {}}
-            transition={{ duration: 0.7, ease: EASE_OUT_EXPO, delay: 0.1 }}
-            className="font-mono text-[10px] uppercase tracking-[0.2em] text-ink-mute"
-          >
-            {hero.eyebrow}
-          </motion.p>
 
-          <h1 className="display-hero mt-4 text-[clamp(2.15rem,7vw,5.4rem)] md:mt-7">
+          <h1 className="display-hero text-[clamp(2.15rem,7vw,5.4rem)]">
             <RevealText
               text={hero.title}
               accentWords={hero.accentWords}
