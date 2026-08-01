@@ -33,7 +33,7 @@ export async function GET(request: NextRequest) {
   await setOAuthStateCookie({ state, codeVerifier, provider: "google", redirectTo }, "customer");
 
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
-  const callbackUrl = `${siteUrl}/api/portal/auth/google/callback`;
+  const callbackUrl = new URL("/api/portal/auth/google/callback", siteUrl).toString();
 
   const authUrl = new URL("https://accounts.google.com/o/oauth2/v2/auth");
   authUrl.searchParams.set("client_id", clientId);

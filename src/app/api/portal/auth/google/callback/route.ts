@@ -60,7 +60,7 @@ export async function GET(request: Request) {
   }
 
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
-  const callbackUrl = `${siteUrl}/api/portal/auth/google/callback`;
+  const callbackUrl = new URL("/api/portal/auth/google/callback", siteUrl).toString();
 
   // Exchange authorization code for tokens
   let tokens: GoogleTokenResponse;
