@@ -218,9 +218,10 @@ export function SiteNav({
 
   useGSAP(() => {
     if (!navRef.current) return;
+    const isMobile = window.innerWidth < 1024;
 
-    if (isScrolled) {
-      // Detached floating pill state
+    if (isScrolled && !isMobile) {
+      // Detached floating pill state (Desktop Only)
       gsap.to(navRef.current, {
         marginTop: 12,
         maxWidth: "1024px",
@@ -234,6 +235,24 @@ export function SiteNav({
         boxShadow: "0 12px 32px -8px rgba(0, 0, 0, 0.08)",
         backdropFilter: "blur(20px) saturate(160%)",
         duration: 0.5,
+        ease: "power3.out"
+      });
+    } else if (isScrolled && isMobile) {
+      // Attached top header on mobile (Does NOT detach on scroll)
+      gsap.to(navRef.current, {
+        marginTop: 0,
+        maxWidth: "100%",
+        borderRadius: "0px",
+        paddingTop: 10,
+        paddingBottom: 10,
+        paddingLeft: 20,
+        paddingRight: 20,
+        backgroundColor: "rgb(var(--paper) / 0.85)",
+        borderColor: "transparent",
+        borderBottomColor: "rgb(var(--ink) / 0.08)",
+        boxShadow: "0 0px 0px rgba(0, 0, 0, 0)",
+        backdropFilter: "blur(16px)",
+        duration: 0.35,
         ease: "power3.out"
       });
     } else {
