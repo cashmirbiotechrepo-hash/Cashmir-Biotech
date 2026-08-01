@@ -172,7 +172,7 @@ export function PortalLoginForm({ initialEmail = "" }: { initialEmail?: string }
           disabled={isPending}
           className={cn(
             "relative flex w-full items-center justify-center gap-3 border border-ink/15 bg-ivory px-4 py-3.5 text-[15px] font-medium text-ink transition-[background-color,opacity,transform]",
-            "hover:bg-white hover:-translate-y-px focus-visible:outline-2 focus-visible:outline-offset-2",
+            "hover:bg-ink/5 hover:-translate-y-px focus-visible:outline-2 focus-visible:outline-offset-2",
             isPending && "cursor-not-allowed opacity-50"
           )}
         >
