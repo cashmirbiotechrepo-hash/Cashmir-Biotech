@@ -19,7 +19,7 @@ export function Hero({ content }: { content: HomeContent }) {
     >
       <div className="frame grid w-full grid-cols-1 items-center gap-8 md:gap-10 lg:grid-cols-[1.05fr_0.95fr] lg:gap-8">
         {/* Copy — sits under the jar on small screens */}
-        <div className="relative z-10 order-2 pt-2 lg:order-1 lg:pt-0">
+        <div className="relative z-10 order-2 pt-8 lg:order-1 lg:pt-0">
           <motion.p
             initial={{ opacity: 0, y: 12 }}
             animate={ready ? { opacity: 1, y: 0 } : {}}
