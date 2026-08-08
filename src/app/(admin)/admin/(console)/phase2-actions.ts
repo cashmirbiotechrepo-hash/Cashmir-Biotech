@@ -409,8 +409,9 @@ export async function createInvoiceAction(formData: FormData): Promise<ActionSta
     if (!order) return { error: "Order not found." };
 
     const subtotal = order.subtotalCents || order.totalCents;
-    const tax = order.taxCents || Math.round(subtotal * 0.18);
-    const total = order.totalCents || subtotal + tax;
+    // GST is inclusive — extract embedded 18% GST using: tax = price × 18 / 118
+    const tax = order.taxCents || Math.round((subtotal * 18) / 118);
+    const total = order.totalCents || subtotal; // total unchanged — tax is already inside
     const { splitGstCents } = await import("@/lib/gst");
     const gstSplit = splitGstCents(tax, parsed.data.placeOfSupply);
     const legal = companyLegal();

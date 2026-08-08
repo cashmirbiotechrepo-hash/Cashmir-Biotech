@@ -176,16 +176,16 @@ export default async function OrderInvoicePrintPage({
           <span className="tabular-nums">{formatInrPrint(order.shippingCents)}</span>
         </div>
         <div className="flex justify-between gap-4">
-          <span className="text-[#6b6b70]">CGST</span>
+          <span className="text-[#6b6b70]">CGST (9%)</span>
           <span className="tabular-nums">{formatInrPrint(gst.cgstCents ?? 0)}</span>
         </div>
         <div className="flex justify-between gap-4">
-          <span className="text-[#6b6b70]">SGST</span>
+          <span className="text-[#6b6b70]">SGST (9%)</span>
           <span className="tabular-nums">{formatInrPrint(gst.sgstCents ?? 0)}</span>
         </div>
         {(gst.igstCents ?? 0) > 0 ? (
           <div className="flex justify-between gap-4">
-            <span className="text-[#6b6b70]">IGST</span>
+            <span className="text-[#6b6b70]">IGST (18%)</span>
             <span className="tabular-nums">{formatInrPrint(gst.igstCents!)}</span>
           </div>
         ) : null}

@@ -76,8 +76,16 @@ export function invalidateShippingRatesCache() {
   shippingRatesCacheExpiresAt = 0;
 }
 
-/** MRP prices are GST-inclusive, so tax is not added on top. */
-const TAX = Money.fromCents(0);
+/** GST rate: 18% inclusive (CGST 9% + SGST 9%).
+ * Since MRP prices already include GST, we back-calculate the embedded tax
+ * rather than adding it on top. Formula: tax = price × 18 / 118
+ */
+const GST_RATE_PERCENT = 18;
+
+function extractInclusiveGst(inclusiveTotalCents: number): number {
+  // GST = inclusive_price × rate / (100 + rate)
+  return Math.round((inclusiveTotalCents * GST_RATE_PERCENT) / (100 + GST_RATE_PERCENT));
+}
 
 export const MAX_QTY_PER_ITEM = 20;
 
@@ -214,15 +222,18 @@ export async function priceCart(items: CartInputItem[], couponCode?: string): Pr
   const shipping = subtotalAfterDiscount.greaterThan(freeThreshold) || subtotalAfterDiscount.equals(freeThreshold)
     ? Money.fromCents(0)
     : flatShipping;
-    
-  const total = subtotalAfterDiscount.add(TAX).add(shipping);
+
+  // GST is inclusive — extract it from the discounted subtotal for invoice display.
+  // The customer-facing total does NOT change.
+  const taxCents = extractInclusiveGst(subtotalAfterDiscount.cents);
+  const total = subtotalAfterDiscount.add(shipping); // tax already inside subtotal
 
   return {
     ok: true,
     cart: {
       lines,
       subtotalCents: subtotal.cents,
-      taxCents: TAX.cents,
+      taxCents,
       shippingCents: shipping.cents,
       totalCents: total.cents,
       couponCode: normalizedCoupon,

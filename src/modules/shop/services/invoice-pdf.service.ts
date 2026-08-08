@@ -307,12 +307,12 @@ export async function buildInvoicePdf(input: InvoicePdfInput): Promise<Uint8Arra
   }
   rows.push({ label: "Shipping", value: formatInrPdf(input.shippingCents ?? 0) });
   if (typeof input.cgstCents === "number" && typeof input.sgstCents === "number") {
-    rows.push({ label: "CGST", value: formatInrPdf(input.cgstCents) });
-    rows.push({ label: "SGST", value: formatInrPdf(input.sgstCents) });
+    rows.push({ label: "CGST (9%)", value: formatInrPdf(input.cgstCents) });
+    rows.push({ label: "SGST (9%)", value: formatInrPdf(input.sgstCents) });
   } else if ((input.igstCents ?? 0) > 0) {
-    rows.push({ label: "IGST", value: formatInrPdf(input.igstCents!) });
+    rows.push({ label: "IGST (18%)", value: formatInrPdf(input.igstCents!) });
   } else if (input.taxCents > 0) {
-    rows.push({ label: "Tax (GST)", value: formatInrPdf(input.taxCents) });
+    rows.push({ label: "GST (18%)", value: formatInrPdf(input.taxCents) });
   }
 
   for (const row of rows) {
