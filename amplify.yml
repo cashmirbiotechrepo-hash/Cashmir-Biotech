@@ -41,7 +41,7 @@ frontend:
         - export FORCE_WRITE_AMPLIFY_ENV=1
         - node scripts/write-amplify-runtime-env.cjs
         - echo "=== verify baked env ==="
-        - node -e "const f=require('./src/generated/amplify-runtime-env.json');const keys=Object.keys(f);console.log('Baked keys ('+keys.length+'):', keys.join(', '));['JWT_SECRET','ENCRYPTION_KEY','PASSWORD_PEPPER','POW_SECRET'].forEach(k=>{if(!f[k])console.error('MISSING IN BAKED ENV: '+k)});"
+        - node scripts/verify-baked-env.cjs
         - echo "=== next build ==="
         # Force plain Next config (no Sentry webpack plugin) on Amplify.
         - export AMPLIFY_NEXT_PLAIN_CONFIG=1
