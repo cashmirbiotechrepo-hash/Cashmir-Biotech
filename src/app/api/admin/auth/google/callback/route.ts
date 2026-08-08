@@ -3,7 +3,7 @@ import { validateOAuthState } from "@/lib/oauth-state";
 import { db } from "@/lib/db";
 import { logger } from "@/lib/logger";
 import { createAdminSessionFromOAuth } from "@/lib/admin/oauth-session";
-import { setAdminSessionCookies } from "@/lib/auth";
+import { ADMIN_SESSION_COOKIE, ADMIN_REFRESH_COOKIE } from "@/config/auth.constants";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -167,14 +167,8 @@ export async function GET(request: Request) {
   }
 
   // Issue admin session + cookies
-  try {
-    const { accessToken, refreshToken } = await createAdminSessionFromOAuth(adminId, request);
-    await setAdminSessionCookies(accessToken, refreshToken);
-  } catch (err) {
-    logger.error({ err, event: "admin_google_session_error", adminId, ip }, "Failed to create admin session");
-    return NextResponse.redirect(new URL("/admin/login?error=oauth_server_error", siteUrl));
-  }
-
+  // IMPORTANT: We set cookies directly on the redirect response because
+  // cookies().set() in a Route Handler does NOT attach to NextResponse.redirect().
   const dest =
     statePayload.redirectTo.startsWith("/admin") &&
     !statePayload.redirectTo.startsWith("//") &&
@@ -182,5 +176,45 @@ export async function GET(request: Request) {
       ? statePayload.redirectTo
       : "/admin/dashboard";
 
-  return NextResponse.redirect(new URL(dest, siteUrl));
+  let accessToken: string;
+  let refreshToken: string;
+  try {
+    const session = await createAdminSessionFromOAuth(adminId, request);
+    accessToken = session.accessToken;
+    refreshToken = session.refreshToken;
+  } catch (err) {
+    logger.error({ err, event: "admin_google_session_error", adminId, ip }, "Failed to create admin session");
+    return NextResponse.redirect(new URL("/admin/login?error=oauth_server_error", siteUrl));
+  }
+
+  // Encrypt the access token for the session cookie
+  const { encryptToken } = await import("@/lib/admin/encryption");
+  const encrypted = await encryptToken(accessToken);
+
+  const isProduction = process.env.NODE_ENV === "production";
+  const SESSION_COOKIE_MAX_AGE = 15 * 60;      // 15 minutes
+  const REFRESH_COOKIE_MAX_AGE = 30 * 24 * 60 * 60; // 30 days
+
+  const response = NextResponse.redirect(new URL(dest, siteUrl));
+
+  // Set session cookie directly on the redirect response
+  response.cookies.set(ADMIN_SESSION_COOKIE, encrypted, {
+    httpOnly: true,
+    secure: isProduction,
+    sameSite: "strict",
+    path: "/",
+    maxAge: SESSION_COOKIE_MAX_AGE
+  });
+
+  // Set refresh cookie directly on the redirect response
+  response.cookies.set(ADMIN_REFRESH_COOKIE, refreshToken, {
+    httpOnly: true,
+    secure: isProduction,
+    sameSite: "strict",
+    path: "/",
+    maxAge: REFRESH_COOKIE_MAX_AGE
+  });
+
+  logger.info({ event: "admin_google_login_success", adminId }, "Admin signed in via Google OAuth");
+  return response;
 }
