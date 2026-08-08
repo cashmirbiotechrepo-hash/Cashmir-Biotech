@@ -85,7 +85,7 @@ export async function setOAuthStateCookie(
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
     sameSite: "lax",
-    path: "/api",
+    path: "/",
     maxAge: STATE_TTL_SECONDS
   });
 }
@@ -101,7 +101,7 @@ export async function consumeOAuthStateCookie(
   const name = cookieName(surface);
   const raw = jar.get(name)?.value;
   if (!raw) return null;
-  jar.delete(name); // Must be deleted on read to enforce single-use state
+  jar.delete({ name, path: "/" }); // path must match what was set
   return verify(raw);
 }
 
