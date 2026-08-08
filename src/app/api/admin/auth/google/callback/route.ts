@@ -195,9 +195,27 @@ export async function GET(request: Request) {
   const SESSION_COOKIE_MAX_AGE = 15 * 60;      // 15 minutes
   const REFRESH_COOKIE_MAX_AGE = 30 * 24 * 60 * 60; // 30 days
 
-  const response = NextResponse.redirect(new URL(dest, siteUrl));
+  // WORKAROUND: AWS Amplify/CloudFront often strips Set-Cookie headers on 30x redirects.
+  // Instead of a 307 redirect, we return a 200 OK HTML page that redirects via browser.
+  const targetUrl = new URL(dest, siteUrl).toString();
+  const html = `<!DOCTYPE html>
+<html>
+  <head>
+    <meta http-equiv="refresh" content="0;url=${targetUrl}">
+    <script>window.location.replace(${JSON.stringify(targetUrl)});</script>
+  </head>
+  <body><p>Redirecting to dashboard...</p></body>
+</html>`;
 
-  // Set session cookie directly on the redirect response
+  const response = new NextResponse(html, {
+    status: 200,
+    headers: {
+      "Content-Type": "text/html",
+      "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0"
+    }
+  });
+
+  // Set session cookie directly on the 200 OK response
   response.cookies.set(ADMIN_SESSION_COOKIE, encrypted, {
     httpOnly: true,
     secure: isProduction,
@@ -206,7 +224,7 @@ export async function GET(request: Request) {
     maxAge: SESSION_COOKIE_MAX_AGE
   });
 
-  // Set refresh cookie directly on the redirect response
+  // Set refresh cookie directly on the 200 OK response
   response.cookies.set(ADMIN_REFRESH_COOKIE, refreshToken, {
     httpOnly: true,
     secure: isProduction,
